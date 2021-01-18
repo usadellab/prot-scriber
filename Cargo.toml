@@ -1,5 +1,5 @@
 [package]
-name = "protscriber"
+name = "prot-scriber"
 version = "0.1.0"
 authors = ["Dr. Asis Hallab <asis.hallab@gmail.com>"]
 edition = "2018"

@@ -162,7 +162,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "protscriber"
+name = "prot-scriber"
 version = "0.1.0"
 dependencies = [
  "clap",

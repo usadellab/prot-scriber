@@ -1,4 +1,11 @@
+#[macro_use]
+extern crate lazy_static;
+
 use clap::{App, Arg};
+
+mod default;
+mod models;
+mod seq_sim_table_reader;
 
 fn main() {
     let matches = App::new("Prot-Scribr")

@@ -79,8 +79,18 @@ impl Query {
             hits: HashMap::<String, Hit>::new(),
         }
     }
+
     pub fn new() -> Query {
         Default::default()
+    }
+
+    pub fn add_hit(&mut self, hit: &Hit) -> usize {
+        if !self.hits.contains_key(&hit.id)
+            || self.hits.get(&hit.id).unwrap().bitscore < hit.bitscore
+        {
+            self.hits.insert(hit.id.clone(), hit.clone());
+        }
+        self.hits.len()
     }
 }
 
@@ -106,6 +116,40 @@ mod tests {
             filter_stitle(t1, &(*FILTER_REGEXS)),
             "Probable LRR receptor-like serine/threonine-protein kinase At3g47570"
         );
+    }
+
+    #[test]
+    fn query_add_hit_only_uses_higest_bitscore() {
+        let high = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let low = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "1.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let highest = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "666.6",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let other = Hit::new(
+            "Hit_Two", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let mut query = Query::from_qacc("Query_Curious".to_string());
+        query.add_hit(&high);
+        assert_eq!(query.hits.len(), 1);
+        query.add_hit(&low);
+        assert_eq!(query.hits.len(), 1);
+        assert_eq!(*query.hits.get("Hit_One").unwrap(), high);
+        query.add_hit(&other);
+        assert_eq!(query.hits.len(), 2);
+        assert_eq!(*query.hits.get("Hit_One").unwrap(), high);
+        assert_eq!(*query.hits.get("Hit_Two").unwrap(), other);
+        query.add_hit(&highest);
+        assert_eq!(query.hits.len(), 2);
+        assert_eq!(*query.hits.get("Hit_One").unwrap(), highest);
+        assert_eq!(*query.hits.get("Hit_Two").unwrap(), other);
     }
 
     #[test]

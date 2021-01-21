@@ -18,13 +18,13 @@ pub fn filter_stitle(stitle: &str, regexs: &Vec<Regex>) -> String {
     )
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Default)]
 pub struct Hit {
     pub id: String,
-    pub bitscore: F64,
+    pub slen: i64,
     pub sstart: i64,
     pub send: i64,
-    pub slen: i64,
+    pub bitscore: F64,
     pub overlap: F64,
     pub description: String,
 }
@@ -32,27 +32,27 @@ pub struct Hit {
 impl Hit {
     pub fn new(
         id: &str,
-        bitscore: &str,
+        qlen: &str,
         qstart: &str,
         qend: &str,
-        qlen: &str,
+        slen: &str,
         sstart: &str,
         send: &str,
-        slen: &str,
+        bitscore: &str,
         stitle: &str,
     ) -> Hit {
+        let slen_prsd = slen.parse().unwrap();
         let sstart_prsd = sstart.parse().unwrap();
         let send_prsd = send.parse().unwrap();
-        let slen_prsd = slen.parse().unwrap();
+        let qlen_prsd = qlen.parse().unwrap();
         let qstart_prsd = qstart.parse().unwrap();
         let qend_prsd = qend.parse().unwrap();
-        let qlen_prsd = qlen.parse().unwrap();
         Hit {
             id: String::from(id),
-            bitscore: F64(bitscore.parse().unwrap()),
+            slen: slen_prsd,
             sstart: sstart_prsd,
             send: send_prsd,
-            slen: slen_prsd,
+            bitscore: F64(bitscore.parse().unwrap()),
             overlap: overlap(
                 sstart_prsd,
                 send_prsd,
@@ -66,15 +66,21 @@ impl Hit {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Default)]
 pub struct Query {
-    id: String,
-    hits: HashMap<String, Hit>,
+    pub id: String,
+    pub hits: HashMap<String, Hit>,
 }
 
 impl Query {
-    pub fn new(id: String, hits: HashMap<String, Hit>) -> Query {
-        Query { id: id, hits: hits }
+    pub fn from_qacc(id: String) -> Query {
+        Query {
+            id: id,
+            hits: HashMap::<String, Hit>::new(),
+        }
+    }
+    pub fn new() -> Query {
+        Default::default()
     }
 }
 
@@ -91,6 +97,7 @@ impl HasDistanceMeasure for Query {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_approx_eq::assert_approx_eq;
 
     #[test]
     fn default_filter_regexs_extract_uni_prot_descriptions() {
@@ -103,15 +110,15 @@ mod tests {
 
     #[test]
     fn parse_hit_from_strs() {
-        let h1 = Hit::new("Hit_One",
-            "123.4", "101", "200", "100", "1", "100", "100", 
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1");
+        let h1 = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "123.4", "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
         assert_eq!(h1.id, String::from("Hit_One"));
         assert_eq!(h1.bitscore, F64(123.4));
-        assert_eq!(h1.sstart, 1);
-        assert_eq!(h1.send, 100);
-        assert_eq!(h1.slen, 100);
-        assert_eq!(h1.overlap, F64(1.0));
+        assert_eq!(h1.sstart, 51);
+        assert_eq!(h1.send, 110);
+        assert_eq!(h1.slen, 200);
+        assert_approx_eq!(h1.overlap.0, 0.37, 0.01);
         assert_eq!(
             h1.description,
             "Probable LRR receptor-like serine/threonine-protein kinase At3g47570"

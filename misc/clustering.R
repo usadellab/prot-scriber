@@ -1,6 +1,0 @@
-x <- read.table('./test_mcl.txt', sep=" ", stringsAsFactors=F)
-x.nodes <- sort(unique(c(x$V1, x$V2)))
-x.dist.mtrx <- matrix( unlist( lapply(x.nodes, function(col.i) { lapply( x.nodes, function(row.j) { k <- which( x$V1 == col.i & x$V2 == row.j | x$V1 == row.j & x$V2 == col.i ); if( length(k) > 0 ) { x[k,"V3"][[1]] } else { 0 } } ) } ) ), ncol=length(x.nodes), dimnames=list(x.nodes,x.nodes) )
-plot(hclust(dist(x.dist.mtrx)))
-x.dist.obj <- dist(x.dist.mtrx)
-kmeans(x.dist.obj,2)

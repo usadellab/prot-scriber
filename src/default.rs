@@ -16,15 +16,16 @@ lazy_static! {
     ];
     pub static ref SEQ_SIM_TABLE_COLUMNS: HashMap<String, usize> = {
         let mut h = HashMap::new();
-        h.insert("sacc".to_string(), 0);
-        h.insert("qacc".to_string(), 1);
-        h.insert("bitscore".to_string(), 2);
+        // Default header is 'qacc sacc qlen qstart qend slen sstart send bitscore stitle'
+        h.insert("qacc".to_string(), 0);
+        h.insert("sacc".to_string(), 1);
+        h.insert("qlen".to_string(), 2);
         h.insert("qstart".to_string(), 3);
         h.insert("qend".to_string(), 4);
-        h.insert("qlen".to_string(), 5);
+        h.insert("slen".to_string(), 5);
         h.insert("sstart".to_string(), 6);
         h.insert("send".to_string(), 7);
-        h.insert("slen".to_string(), 8);
+        h.insert("bitscore".to_string(), 8);
         h.insert("stitle".to_string(), 9);
         h
     };

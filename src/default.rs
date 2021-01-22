@@ -29,4 +29,6 @@ lazy_static! {
         h.insert("stitle".to_string(), 9);
         h
     };
+
+    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"\s+").unwrap();
 }

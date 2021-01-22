@@ -29,25 +29,33 @@ pub fn parse_table(
             // Is it the very first line?:
             if curr_query.id != String::new() {
                 // Insert the results collected for the last query:
-                h.insert(curr_query.id.clone(), curr_query.clone());
+                insert_query(&mut h, &mut curr_query);
             }
             // Prepare gathering of results for the next query:
             curr_query = Query::from_qacc(qacc_i.to_string());
         }
         // Process the current hit:
-        let hit_i = parse_hit(&record_cols, separator, table_cols);
+        let hit_i = parse_hit(&record_cols, table_cols);
         curr_query.add_hit(&hit_i);
     }
     // Insert the last query, because we reached the end of the file:
-    h.insert(curr_query.id.clone(), curr_query.clone());
+    insert_query(&mut h, &mut curr_query);
     h
 }
 
-pub fn parse_hit(
-    record_cols: &Vec<&str>,
-    separator: char,
-    table_cols: &HashMap<String, usize>,
-) -> Hit {
+pub fn insert_query(queries_db: &mut HashMap<String, Query>, query: &mut Query) {
+    if queries_db.contains_key(&query.id) {
+        // Panic, so we can ensure that if the parsed sequence similarity search result table is
+        // not sorted by the `qacc` column, prot-scriber does not read in false data.
+        panic!("Query '{}' was already stored in the database.\nMake sure your table is sorted by the `qacc` column.", query.id);
+    }
+    // Now, that the query has been initialized with all its hits, we can compute the scaling
+    // bitscore factor:
+    query.find_bitscore_scaling_factor();
+    queries_db.insert(query.id.clone(), query.clone());
+}
+
+pub fn parse_hit(record_cols: &Vec<&str>, table_cols: &HashMap<String, usize>) -> Hit {
     Hit::new(
         record_cols[*table_cols.get("sacc").unwrap()],
         record_cols[*table_cols.get("qlen").unwrap()],
@@ -73,7 +81,7 @@ mod tests {
             "Soltu.DM.02G015700.1", "sp|C0LGP4|Y3475_ARATH", "2209", "1284", "2199", "1010", "64", "998", "580",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         ];
-        let hit = parse_hit(&record_cols, '\t', &(*SEQ_SIM_TABLE_COLUMNS));
+        let hit = parse_hit(&record_cols, &(*SEQ_SIM_TABLE_COLUMNS));
         let expected = Hit::new( "sp|C0LGP4|Y3475_ARATH",
             "2209", "1284", "2199", "1010", "64", "998", "580",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
@@ -98,6 +106,13 @@ mod tests {
                 .0,
             32.3
         );
+        assert_eq!(
+            h.get("Soltu.DM.10G003150.1")
+                .unwrap()
+                .bitscore_scaling_factor
+                .0,
+            32.3
+        );
         assert!(h.contains_key("Soltu.DM.02G015700.1"));
         assert_eq!(h.get("Soltu.DM.02G015700.1").unwrap().hits.len(), 500);
         assert_eq!(
@@ -109,6 +124,13 @@ mod tests {
                 .bitscore
                 .0,
             560.0
+        );
+        assert_eq!(
+            h.get("Soltu.DM.02G015700.1")
+                .unwrap()
+                .bitscore_scaling_factor
+                .0,
+            580.0
         );
     }
 }

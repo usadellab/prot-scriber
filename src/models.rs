@@ -6,6 +6,16 @@ use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+/// Fasta entries have a long title in which the sequence identifier and often taxonomic
+/// information is given along with a short human readable protein description. We are only
+/// interested in the latter. This function extracts the short description using regular
+/// expressions.
+///
+/// # Arguments
+///
+/// * stitle - The sequence title line as found in the original Fasta file.
+/// * regexs - A vector of regular expressions to be applied in series to the argument stitle to
+///            extract the desired short description.
 pub fn filter_stitle(stitle: &str, regexs: &Vec<Regex>) -> String {
     String::from(
         regexs
@@ -17,6 +27,20 @@ pub fn filter_stitle(stitle: &str, regexs: &Vec<Regex>) -> String {
     )
 }
 
+/// Calculates the overlap between a query and one of its hits as produced by sequence similarity
+/// searches (e.g. Blast or Diamond). These search algorithms produce local alignments and the
+/// arguments to this function. Overlap is calculated as
+///
+/// `((qend - qstart + 1) + (send - sstart + 1))`
+///
+/// # Arguments
+///
+/// * sstart - The start position of the local alignment in the hit
+/// * send - The end position of the local alignment in the hit
+/// * slen - The overall sequence length of the hit
+/// * qstart - The start position of the local alignment in the query
+/// * qend - The end position of the local alignment in the query
+/// * qlen - The overall sequence length of the query
 pub fn overlap_with_query(
     sstart: i64,
     send: i64,

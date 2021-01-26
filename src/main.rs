@@ -5,6 +5,7 @@ use clap::{App, Arg};
 
 mod default;
 mod models;
+mod seq_sim_clustering;
 mod seq_sim_table_reader;
 
 fn main() {

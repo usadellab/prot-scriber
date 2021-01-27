@@ -1,3 +1,4 @@
+//! Code used to parse sequence similarity search result tables is implemented in this module.
 use super::models::Hit;
 use super::models::Query;
 use std::collections::HashMap;
@@ -5,6 +6,15 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
+/// Finds a tabuar file (`path`) and parses it in a stream approach, i.e. line by line. Returns a
+/// in memory database of the respective parsed queries and their hits.
+///
+/// # Arguments
+///
+/// * `path: &str` - The path to the tabular sequence similarity search result file to parse
+/// * `separator: char` - The separator to use to split a line into an array of columns
+/// * `table_cols: &HashMap<String, usize>` - The header information, i.e. the column names and
+///                                           their respective position in the table (`path`).
 pub fn parse_table(
     path: &str,
     separator: char,
@@ -43,6 +53,18 @@ pub fn parse_table(
     h
 }
 
+/// Inserts a new and completely parsed instance of `Query` into the in memory database
+/// `queries_db`. Makes sure that the query does not already exist in the database and panics if it
+/// does. Before insertion the parsing is finalized by invoking
+/// `query.find_bitscore_scaling_factor()`, which computes and stores the respective scaling factor
+/// in the query instance.
+///
+/// # Arguments
+///
+/// * `queries_db: &mut HashMap<String, Query>` - A mutable reference to the in memory database
+///                                               into which to insert the parsed query.
+/// * `query: &mut Query` - A mutable reference to the query to be inserted into the in memory
+///                         database.
 pub fn insert_query(queries_db: &mut HashMap<String, Query>, query: &mut Query) {
     if queries_db.contains_key(&query.id) {
         // Panic, so we can ensure that if the parsed sequence similarity search result table is
@@ -55,6 +77,14 @@ pub fn insert_query(queries_db: &mut HashMap<String, Query>, query: &mut Query) 
     queries_db.insert(query.id.clone(), query.clone());
 }
 
+/// Parses a line in the respective sequence similarity search result table. The line is already
+/// split into cells (columns). Returns a new instance of `Hit`.
+///
+/// # Arguments
+///
+/// * `record_cols: &Vec<&str>` - The record parsed from splitting the respective line
+/// * `table_cols: &HashMap<String, usize>` - The table header, i.e. the column names and their
+///                                           position in the argument `record_cols`.
 pub fn parse_hit(record_cols: &Vec<&str>, table_cols: &HashMap<String, usize>) -> Hit {
     Hit::new(
         record_cols[*table_cols.get("sacc").unwrap()],

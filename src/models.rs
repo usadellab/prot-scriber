@@ -52,6 +52,7 @@ pub fn overlap_with_query(
     F64((((qend - qstart + 1) + (send - sstart + 1)) as f64) / ((qlen + slen) as f64))
 }
 
+/// A sequence similarity search result is called a "Hit" and is represented by its namesake.
 #[derive(PartialEq, Eq, Debug, Clone, Default)]
 pub struct Hit {
     pub id: String,
@@ -63,6 +64,22 @@ pub struct Hit {
 }
 
 impl Hit {
+    /// Constructor to generate a new instance of structure `Hit`. The arguments are mostly named
+    /// after their namesakes in the output table as produced e.g. by Blast or Diamond (see e.g.
+    /// their respective manuals for more details).
+    ///
+    /// # Arguments
+    ///
+    /// * `id: &str` - The hit sequence's accession (identifier) as stored in the `sacc` column
+    /// * `qlen: &str` - The query sequence's length
+    /// * `qstart: &str` - The start of the local alignment in the query sequence
+    /// * `qend: &str` - The end of the local alignment in the query sequence
+    /// * `slen: &str` - The length of the hit sequence
+    /// * `sstart: &str` - The start of the local alignment in the hit sequence
+    /// * `send: &str` - The end of the local alignment in the hit sequence
+    /// * `bitscore: &str` - The bitscore of the local alignment
+    /// * `stitle: &str` - The full title line of the hit in the reference database (stored in
+    ///                    fasta format)
     pub fn new(
         id: &str,
         qlen: &str,
@@ -116,6 +133,11 @@ impl Hit {
         (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64) / qlen
     }
 
+    /// Splits the Hit's description into words using the argument regular expression.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - The Hit whose description to split into words
     fn description_words(&self) -> HashSet<&str> {
         (*SPLIT_DESCRIPTION_REGEX)
             .split(&self.description)
@@ -123,6 +145,14 @@ impl Hit {
             .collect::<HashSet<&str>>()
     }
 
+    /// Computes a numerical distance ranging from zero to one between two respective descriptions.
+    /// The formula is number of shared words divided by the shorter description's length (as in
+    /// number of words). _Note_ that double appearances of words are not counted.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - The Hit whose description to compare to the other
+    /// * `to: &Hit` - The other Hit whose description to compute the distance to
     fn description_distance(&self, to: &Hit) -> f64 {
         let self_words = self.description_words();
         let to_words = to.description_words();
@@ -130,6 +160,17 @@ impl Hit {
         intersection.len() as f64 / min(self_words.len(), to_words.len()) as f64
     }
 
+    /// Computes the distance between two hits (`&self` and `to: &Hit`) based on a linear
+    /// combination of the overlap between the two hits respective local alignment with the
+    /// original query and the distance between the hits' descriptions (see `description_distance`
+    /// for details).
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - The instance of Hit itself
+    /// * `to: &Hit` - The other instance of Hit taken from sequence similarity searches for the
+    ///                same query.
+    /// * `qlen: &f64` - The length of the query the two argument hits were found for.
     fn distance(&self, to: &Hit, qlen: &f64) -> f64 {
         let o = self.overlap_with_hit(to, qlen);
         let dd = self.description_distance(to);
@@ -137,6 +178,7 @@ impl Hit {
     }
 }
 
+/// A sequence similarity search is executed for a query sequence, which is represented by `Query`.
 #[derive(PartialEq, Eq, Debug, Clone, Default)]
 pub struct Query {
     pub id: String,

@@ -1,7 +1,11 @@
+//! Default values and global constants are kept in this module.
 use regex::Regex;
 use std::collections::HashMap;
 
 lazy_static! {
+
+    /// The default regular expressions used to filter a Hit title (`stitle`) and retain the short
+    /// human readable description.
     pub static ref FILTER_REGEXS: Vec<Regex> = vec![
         Regex::new(r"\sOS=.*$").unwrap(),
         Regex::new(r"(?i)OS.*[.].*protein").unwrap(),
@@ -14,6 +18,9 @@ lazy_static! {
         Regex::new(r"\(\s*Fragment\s*\)").unwrap(),
         Regex::new(r"^(\s|/|\(|\)|-|\+|\*|,|;|\.|:|\||\d)+$").unwrap(),
     ];
+
+    /// The default header definition of sequence similarity search result tables, i.e. mapping
+    /// column names to their factual position in the to be parsed table.
     pub static ref SEQ_SIM_TABLE_COLUMNS: HashMap<String, usize> = {
         let mut h = HashMap::new();
         // Default header is 'qacc sacc qlen qstart qend slen sstart send bitscore stitle'
@@ -30,5 +37,6 @@ lazy_static! {
         h
     };
 
+    /// A Hit's description is split into words using this default regular expression.
     pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"\s+").unwrap();
 }

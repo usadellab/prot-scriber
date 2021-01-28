@@ -148,7 +148,7 @@ mod tests {
             [0.05, 0.05, 0.0, 0.0, 0.9],
             [0.05, 0.05, 0.0, 0.9, 0.0],
         ]);
-        let cm = round_matrix(&mcl(&dm, &5.0, &0.001, 0, &10), &4i32);
+        let cm = round_matrix(&mcl(&dm, &5.0, &0.0001, 0, &10), &4i32);
         // println!("Testing markov clustering. Input matrix for nodes 1-5 is:\n{:?}\n, and clustered matrix is:\n{:?}",
         //    dm, cm);
         let expected = arr2(&[

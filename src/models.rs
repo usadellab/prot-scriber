@@ -1,6 +1,7 @@
 use super::default::FILTER_REGEXS;
 use super::default::SPLIT_DESCRIPTION_REGEX;
 use eq_float::F64;
+use ndarray::{Array2, ArrayBase};
 use regex::Regex;
 use std::cmp::{max, min};
 use std::collections::HashMap;
@@ -260,6 +261,48 @@ impl Query {
             );
         }
         1.0 - (to.overlap_with_query.0 + to.bitscore.0 / self.bitscore_scaling_factor.0) / 2.0
+    }
+
+    /// Calculates similarities between the query (`&self`) its `hits` and in between the hits.
+    /// Returns those as a quadratic two dimensional similarity matrix (`Array2<f64>`). Note that
+    /// similarities of a node (matrix-cell) to itself is not yet initialized. Use function
+    /// seq_sim_clustering::add_self_loops to do that.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - the query
+    fn to_similarity_matrix(&self) -> Array2<f64> {
+        let mut seq_ids: Vec<&String> = self.hits.keys().collect();
+        seq_ids.push(&self.id);
+        let mut mtrx: Array2<f64> = ArrayBase::zeros((seq_ids.len(), seq_ids.len()));
+        for row_ind in 0..seq_ids.len() {
+            if row_ind == seq_ids.len() - 1 {
+                // Similarities with the Query
+                // Note, that the similarity of the query to itself will be added later using function
+                // seq_sim_clustering::add_self_loops
+                for col_ind in 0..self.hits.len() {
+                    mtrx[[row_ind, col_ind]] =
+                        1.0 - self.distance(self.hits.get(seq_ids[col_ind]).unwrap());
+                }
+            } else {
+                // Similarities between hit "row_ind" and ...
+                for col_ind in 0..self.hits.len() {
+                    // ... and hit "col_i"
+                    // Note, that similarity to self will be set later using
+                    // seq_sim_clustering::add_self_loops
+                    if row_ind != col_ind {
+                        let hit_row_i = self.hits.get(seq_ids[row_ind]).unwrap();
+                        let hit_col_i = self.hits.get(seq_ids[col_ind]).unwrap();
+                        mtrx[[row_ind, col_ind]] =
+                            1.0 - hit_row_i.distance(hit_col_i, &self.qlen.0);
+                    }
+                }
+                // ... and the query (always last column)
+                mtrx[[row_ind, seq_ids.len() - 1]] =
+                    self.distance(self.hits.get(seq_ids[row_ind]).unwrap());
+            }
+        }
+        mtrx
     }
 }
 

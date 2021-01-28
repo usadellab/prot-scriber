@@ -4,7 +4,6 @@ extern crate lazy_static;
 use clap::{App, Arg};
 
 mod default;
-mod matrix;
 mod models;
 mod seq_sim_clustering;
 mod seq_sim_table_reader;

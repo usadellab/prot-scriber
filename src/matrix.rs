@@ -1,10 +1,11 @@
 //! Implementation of a two dimensional triangular square matrix
 use eq_float::F64;
+use std::fmt;
 
 /// Representation of a triangular square two dimensional matrix. Triangular means that the
 /// diagonal mirrors cells, i.e. matrix cells [i,k] are identical to [k,i]. _Note_ that cells are
 /// stored in the "C"-style manner, i.e. by row, and not in the "R" or "Fortran" style by column.
-#[derive(PartialEq, Eq, Debug, Clone, Default)]
+#[derive(PartialEq, Eq, Clone, Default)]
 pub struct Triang2dMatrix {
     pub cells: Vec<F64>,
     pub row_n_col_names: Vec<String>,
@@ -111,7 +112,7 @@ impl Triang2dMatrix {
     ///
     /// * `&self` - the instance of Triang2dMatrix
     pub fn stochastic_normalize(&self) -> Triang2dMatrix {
-        let mut stoch_norm_cells: Vec<F64> = Vec::with_capacity(self.axis_len());
+        let mut stoch_norm_cells: Vec<F64> = Vec::new();
         for i in 0..self.axis_len() {
             // The Isley Brothers - Summer Breeze
             // is a great song! Just and simply great!
@@ -122,6 +123,70 @@ impl Triang2dMatrix {
             }
         }
         Triang2dMatrix::new(stoch_norm_cells, self.row_n_col_names.clone())
+    }
+
+    /// Comutes the maximum absolute difference between cells of argument `&self` and `to`
+    /// comparing cells of the same index only. Returns the difference as `f64`.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - the instance of Triang2dMatrix
+    /// * `to: &Triang2dMatrix` - the other instance of Triang2dMatrix to compute the max absolute
+    ///                           cellwise difference to.
+    pub fn max_abs_cellwise_difference(&self, to: &Triang2dMatrix) -> f64 {
+        if self.axis_len() != to.axis_len() {
+            panic!("Cannot compute cellwise absolute differences on matrices of different sizes.");
+        }
+        (0..self.cells.len())
+            .map(|i| F64((self.cells[i].0 - to.cells[i].0).abs()))
+            .max()
+            .unwrap()
+            .0
+    }
+
+    /// Rounds the cells of a two dimensional matrix of `f64` values. Each value is rounded to the
+    /// argument number of digits.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - the instance of Triang2dMatrix
+    /// * `n_digits: &i32` - The number of digits to round the `F64` cells to
+    pub fn round(&self, n_digits: &i32) -> Triang2dMatrix {
+        let fctr = 10f64.powi(*n_digits);
+        Triang2dMatrix::new(
+            self.cells
+                .iter()
+                .map(|x| F64((x.0 * fctr).round() / fctr))
+                .collect(),
+            self.row_n_col_names.clone(),
+        )
+    }
+}
+
+/// Triang2dMatrix derives from Debug
+impl fmt::Debug for Triang2dMatrix {
+    /// Manual implementation of Debug formatting displays the triangular square stoachastic matrix
+    /// in a grid to ease human readibility.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - the instance of Triang2dMatrix
+    /// * `f: &mut fmt::Formatter<'_>` - the formatter instance used to construct the string
+    ///                                  representation of `&self`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut cells_str = "\n".to_string();
+        for row_i in 0..self.axis_len() {
+            for col_k in 0..self.axis_len() {
+                cells_str.push_str(
+                    &format!(" {cell:^6.*} ", 4, cell = self.get(row_i, col_k)).to_string(),
+                );
+            }
+            cells_str.push_str("\n");
+        }
+        f.debug_struct("Triang2dMatrix")
+            .field("row_n_col_names", &self.row_n_col_names)
+            .field("cells", &format_args!("{}", cells_str))
+            .finish()
     }
 }
 
@@ -278,5 +343,16 @@ mod tests {
                 F64(6.0 / 14.0)
             ]
         );
+    }
+
+    #[test]
+    fn test_max_absolute_difference() {
+        let c1 = vec![F64(1.0), F64(2.0), F64(3.0), F64(4.0), F64(5.0), F64(6.0)];
+        let n1 = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let m1 = Triang2dMatrix::new(c1, n1);
+        let c2 = vec![F64(2.0), F64(1.0), F64(4.0), F64(3.0), F64(6.0), F64(8.0)];
+        let n2 = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let m2 = Triang2dMatrix::new(c2, n2);
+        assert_eq!(m1.max_abs_cellwise_difference(&m2), 2.0);
     }
 }

@@ -16,8 +16,9 @@
 //! Bacterial Molecular Networks: Methods and Protocols, Methods in Molecular Biology, Vol 804,
 //! pages 281—295 (2012). PMID 22144159.
 
+use super::matrix::Triang2dMatrix;
 use super::models::Query;
-use ndarray::{arr2, Array2};
+use eq_float::F64;
 
 /// Function clusters a query and its hits to find the cluster of which the query is member of and
 /// use that as a basis to generate a short human readable protein function description.
@@ -25,38 +26,12 @@ use ndarray::{arr2, Array2};
 /// # Arguments
 ///
 /// * query - The query including its hits to be subjected to clustering
-pub fn cluster_hits(query: &Query) -> Array2<f64> {
+pub fn cluster_hits(query: &Query) -> Triang2dMatrix {
     // To Do !!!
-    arr2(&[[6f64, 5f64, 4f64], [3f64, 2f64, 1f64]])
-}
-
-/// Normalizes a sqaure two dimensional matrix so that all rows sum up to one, and thus a row's
-/// cells can be interpreted as probabilities. See Markov Clustering for more details on this step.
-///
-/// # Arguments
-///
-/// * mtrx - The square two-dimensional matrix to normalize.
-pub fn normalize(mtrx: &Array2<f64>) -> Array2<f64> {
-    let mut norm_mtrx = mtrx.clone();
-    for i in 0..mtrx.shape()[0] {
-        let row_sum = mtrx.row(i).scalar_sum();
-        for k in 0..mtrx.shape()[1] {
-            norm_mtrx[[i, k]] = mtrx[[i, k]] / row_sum;
-        }
-    }
-    norm_mtrx
-}
-
-/// Rounds the cells of a two dimensional matrix of `f64` values. Each value is rounded to the
-/// argument number of digits.
-///
-/// # Arguments
-///
-/// * mtrx - The two dimensional matrix of floats to be rounded
-/// * n_digits - The number of digits to round the values to
-pub fn round_matrix(mtrx: &Array2<f64>, n_digits: &i32) -> Array2<f64> {
-    let fctr = 10f64.powi(*n_digits);
-    mtrx.map(|x: &f64| (x * fctr).round() / fctr)
+    Triang2dMatrix::new(
+        vec![F64(1.0), F64(2.0), F64(3.0), F64(4.0), F64(5.0), F64(6.0)],
+        vec!["A".to_string(), "B".to_string(), "C".to_string()],
+    )
 }
 
 /// Clusters a two dimensional square stochastic adjacency matrix. "stochastic" means that the
@@ -75,27 +50,20 @@ pub fn round_matrix(mtrx: &Array2<f64>, n_digits: &i32) -> Array2<f64> {
 /// * n - The number of the current iteration
 /// * max_iter - The maximum number of interation steps to carry out
 pub fn mcl(
-    distance_matrix: &Array2<f64>,
+    distance_matrix: &Triang2dMatrix,
     inflation: &f64,
     delta: &f64,
     n: i8,
     max_iter: &i8,
-) -> Array2<f64> {
+) -> Triang2dMatrix {
     // expansion: matrix multipliction (squaring):
-    let mut m = distance_matrix.dot(distance_matrix);
+    let mut m = distance_matrix.square();
     // inflation: hadamard power of the matrix
-    m = m.map(|x: &f64| x.powf(*inflation));
+    m = m.hadamard_raise_to_the_power(&inflation);
     // normalize: each row should sum up to one so that the cells represent probabilities:
-    m = normalize(&m);
+    m = m.stochastic_normalize();
     // estimate max difference between the input and processed matrices:
-    let max_abs_diff = (&m - distance_matrix).iter().fold(0.0, |acc, cur| {
-        let abs_cur_diff = cur.abs();
-        if acc < abs_cur_diff {
-            abs_cur_diff
-        } else {
-            acc
-        }
-    });
+    let max_abs_diff = distance_matrix.max_abs_cellwise_difference(&m);
     // Have we reached the max number of iterations or hasn't this iteration yielded significant
     // differences in the probabilities?
     if n == *max_iter || max_abs_diff <= *delta {
@@ -120,15 +88,15 @@ pub fn mcl(
 ///                  stochastic adjacency matrix to. Set to negative value, if no rounding is
 ///                  wanted. Typical value should range between one and four.
 pub fn markov_cluster(
-    distance_matrix: &Array2<f64>,
+    distance_matrix: &Triang2dMatrix,
     inflation: &f64,
     delta: &f64,
     max_iter: &i8,
     round_digits: &i32,
-) -> Array2<f64> {
+) -> Triang2dMatrix {
     let clustered_mtrx = mcl(distance_matrix, inflation, delta, 0, max_iter);
     if *round_digits > -1 {
-        round_matrix(&clustered_mtrx, round_digits)
+        clustered_mtrx.round(round_digits)
     } else {
         clustered_mtrx
     }
@@ -141,23 +109,61 @@ mod tests {
 
     #[test]
     fn test_mcl() {
-        let dm = arr2(&[
-            [0.0, 0.65, 0.25, 0.05, 0.05],
-            [0.65, 0.0, 0.25, 0.05, 0.05],
-            [0.5, 0.5, 0.0, 0.0, 0.0],
-            [0.05, 0.05, 0.0, 0.0, 0.9],
-            [0.05, 0.05, 0.0, 0.9, 0.0],
-        ]);
-        let cm = round_matrix(&mcl(&dm, &5.0, &0.001, 0, &10), &4i32);
-        // println!("Testing markov clustering. Input matrix for nodes 1-5 is:\n{:?}\n, and clustered matrix is:\n{:?}",
-        //    dm, cm);
-        let expected = arr2(&[
-            [1.0, 0.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0, 0.0],
-            [0.5, 0.5, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0, 1.0],
-        ]);
+        let dm = Triang2dMatrix::new(
+            vec![
+                F64(0.0),
+                F64(0.65),
+                F64(0.25),
+                F64(0.05),
+                F64(0.05),
+                F64(0.0),
+                F64(0.25),
+                F64(0.05),
+                F64(0.05),
+                F64(0.0),
+                F64(0.0),
+                F64(0.0),
+                F64(0.0),
+                F64(0.9),
+                F64(0.0),
+            ],
+            vec![
+                "A".to_string(),
+                "B".to_string(),
+                "C".to_string(),
+                "D".to_string(),
+                "E".to_string(),
+            ],
+        );
+        let cm = mcl(&dm, &5.0, &0.001, 0, &10).round(&4i32);
+        println!("Testing markov clustering. Input matrix for nodes 1-5 is:\n{:?}\n, and clustered matrix is:\n{:?}",
+           dm, cm);
+        let expected = Triang2dMatrix::new(
+            vec![
+                F64(1.0),
+                F64(0.0),
+                F64(0.0),
+                F64(0.0),
+                F64(0.0),
+                F64(1.0),
+                F64(0.0),
+                F64(0.0),
+                F64(0.0),
+                F64(1.0),
+                F64(0.0),
+                F64(0.0),
+                F64(1.0),
+                F64(0.0),
+                F64(1.0),
+            ],
+            vec![
+                "A".to_string(),
+                "B".to_string(),
+                "C".to_string(),
+                "D".to_string(),
+                "E".to_string(),
+            ],
+        );
         assert_eq!(cm, expected);
     }
 }

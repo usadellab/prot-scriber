@@ -39,4 +39,16 @@ lazy_static! {
 
     /// A Hit's description is split into words using this default regular expression.
     pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"\s+").unwrap();
+
+    /// The default inflation parameter (I) for Markov Clustering
+    pub static ref MCL_INFLATION: f64 = 5.0;
+
+    /// The default maximum number of MCL iterations to be done
+    pub static ref MCL_MAX_ITERATIONS: i8 = 10;
+
+    /// The minimum delta to accept as no change between Markov Clustering iterations
+    pub static ref MCL_DELTA: f64 = 0.0001;
+
+    /// The default number of digits to round stochastic matrices' decimal values to
+    pub static ref ROUND_DECIMAL_DIGITS: i32 = 4;
 }

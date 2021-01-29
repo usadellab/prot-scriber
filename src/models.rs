@@ -120,7 +120,7 @@ impl Hit {
     /// query! Returns the overlap (`f64`) calculated as follows:
     ///
     /// o.hits( h1, h2 ) =
-    ///   ( min(qend.h1, qend.h2) - max(qstart.h1, qstart.h2) ) / qlen
+    ///   ( min(qend.h1, qend.h2) - max(qstart.h1, qstart.h2) + 1.0 ) / qlen
     ///
     /// _Note_ that the above `qlen` is of course identical between the two hits (`self` and
     /// `with`).
@@ -131,7 +131,7 @@ impl Hit {
     /// * `with: &Hit` - the hit which which to calculate the overlap
     /// * `qlenL &f64` - the query sequence's length
     fn overlap_with_hit(&self, with: &Hit, qlen: &f64) -> f64 {
-        (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64) / qlen
+        (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64 + 1.0) / qlen
     }
 
     /// Splits the Hit's description into words using the argument regular expression.
@@ -146,24 +146,24 @@ impl Hit {
             .collect::<HashSet<&str>>()
     }
 
-    /// Computes a numerical distance ranging from zero to one between two respective descriptions.
+    /// Computes a numerical similarity ranging from zero to one between two respective descriptions.
     /// The formula is number of shared words divided by the shorter description's length (as in
     /// number of words). _Note_ that double appearances of words are not counted.
     ///
     /// # Arguments
     ///
     /// * `&self` - The Hit whose description to compare to the other
-    /// * `to: &Hit` - The other Hit whose description to compute the distance to
-    fn description_distance(&self, to: &Hit) -> f64 {
+    /// * `to: &Hit` - The other Hit whose description to compute the similarity to
+    fn description_similarity(&self, to: &Hit) -> f64 {
         let self_words = self.description_words();
         let to_words = to.description_words();
         let intersection: HashSet<_> = self_words.intersection(&to_words).collect();
         intersection.len() as f64 / min(self_words.len(), to_words.len()) as f64
     }
 
-    /// Computes the distance between two hits (`&self` and `to: &Hit`) based on a linear
+    /// Computes the similarity between two hits (`&self` and `to: &Hit`) based on a linear
     /// combination of the overlap between the two hits respective local alignment with the
-    /// original query and the distance between the hits' descriptions (see `description_distance`
+    /// original query and the similarity between the hits' descriptions (see `description_similarity`
     /// for details).
     ///
     /// # Arguments
@@ -172,10 +172,10 @@ impl Hit {
     /// * `to: &Hit` - The other instance of Hit taken from sequence similarity searches for the
     ///                same query.
     /// * `qlen: &f64` - The length of the query the two argument hits were found for.
-    fn distance(&self, to: &Hit, qlen: &f64) -> f64 {
+    fn similarity(&self, to: &Hit, qlen: &f64) -> f64 {
         let o = self.overlap_with_hit(to, qlen);
-        let dd = self.description_distance(to);
-        1.0 - (o + dd) / 2.0
+        let dd = self.description_similarity(to);
+        (o + dd) / 2.0
     }
 }
 
@@ -245,64 +245,67 @@ impl Query {
         }));
     }
 
-    /// Calculates the distance between the query (`self`) and the argument hit (`to`) as the mean
+    /// Calculates the similarity between the query (`self`) and the argument hit (`to`) as the mean
     /// of overlap_with_query and bitscore, where the bitscore is scaled by dividing it with the max. bitscore
-    /// found for all the query's hits. Returns the distance ranging from zero to one, inclusive.
+    /// found for all the query's hits. Returns the similarity ranging from zero to one, inclusive.
     ///
     /// # Arguments
     ///
     /// * `&self` - the query
-    /// * `to: &Hit` - the hit (one of the query's) to which the calculate the distance to
-    fn distance(&self, to: &Hit) -> f64 {
+    /// * `to: &Hit` - the hit (one of the query's) to which the calculate the similarity to
+    pub fn similarity(&self, to: &Hit) -> f64 {
         if !self.hits.contains_key(&to.id) {
             panic!(
-                "The query '{}' does not contain the hit '{}' to which calculate the distance to.",
+                "The query '{}' does not contain the hit '{}' to which calculate the similarity to.",
                 self.id, to.id
             );
         }
-        1.0 - (to.overlap_with_query.0 + to.bitscore.0 / self.bitscore_scaling_factor.0) / 2.0
+        (to.overlap_with_query.0 + to.bitscore.0 / self.bitscore_scaling_factor.0) / 2.0
     }
 
     /// Calculates similarities between the query (`&self`) its `hits` and in between the hits.
-    /// Returns those as a quadratic two dimensional similarity matrix (`Array2<f64>`). Note that
+    /// Stores those in a quadratic two dimensional similarity matrix (`Array2<f64>`). Note that
     /// similarities of a node (matrix-cell) to itself is not yet initialized. Use function
-    /// seq_sim_clustering::add_self_loops to do that.
+    /// seq_sim_clustering::add_self_loops to do that. Returns a tupel, `(Vec<String>,
+    /// Array2<f64>)`, with first entry the sequence identifiers, i.e. the row and column names of
+    /// the second entry, which is the similarity matrix. The sequence IDs consist of the
+    /// alphabetically sorted hit IDs followed by the terminal Query ID. This order is guaranteed.
     ///
     /// # Arguments
     ///
     /// * `&self` - the query
-    fn to_similarity_matrix(&self) -> Array2<f64> {
-        let mut seq_ids: Vec<&String> = self.hits.keys().collect();
-        seq_ids.push(&self.id);
+    pub fn to_similarity_matrix(&self) -> (Vec<String>, Array2<f64>) {
+        let mut seq_ids: Vec<String> = self.hits.keys().map(|k: &String| (*k).clone()).collect();
+        seq_ids.sort();
+        seq_ids.push(self.id.clone());
         let mut mtrx: Array2<f64> = ArrayBase::zeros((seq_ids.len(), seq_ids.len()));
+        // Save time and iterate over the similarities of the upper triangle including the
+        // diagonal, but set each calculated similarity also in the lower one. Note that the inner
+        // loop starts at the outer loop's index and not at zero.
         for row_ind in 0..seq_ids.len() {
-            if row_ind == seq_ids.len() - 1 {
-                // Similarities with the Query
-                // Note, that the similarity of the query to itself will be added later using function
+            // Similarities between hit "row_ind" and ...
+            for col_ind in row_ind..self.hits.len() {
+                // ... and hit "col_i"
+                // Note, that similarity to self will be set later using
                 // seq_sim_clustering::add_self_loops
-                for col_ind in 0..self.hits.len() {
-                    mtrx[[row_ind, col_ind]] =
-                        1.0 - self.distance(self.hits.get(seq_ids[col_ind]).unwrap());
+                if row_ind != col_ind {
+                    let hit_row_i = self.hits.get(&seq_ids[row_ind]).unwrap();
+                    let hit_col_i = self.hits.get(&seq_ids[col_ind]).unwrap();
+                    let d = hit_row_i.similarity(hit_col_i, &self.qlen.0);
+                    mtrx[[row_ind, col_ind]] = d;
+                    mtrx[[col_ind, row_ind]] = d;
                 }
-            } else {
-                // Similarities between hit "row_ind" and ...
-                for col_ind in 0..self.hits.len() {
-                    // ... and hit "col_i"
-                    // Note, that similarity to self will be set later using
-                    // seq_sim_clustering::add_self_loops
-                    if row_ind != col_ind {
-                        let hit_row_i = self.hits.get(seq_ids[row_ind]).unwrap();
-                        let hit_col_i = self.hits.get(seq_ids[col_ind]).unwrap();
-                        mtrx[[row_ind, col_ind]] =
-                            1.0 - hit_row_i.distance(hit_col_i, &self.qlen.0);
-                    }
-                }
-                // ... and the query (always last column)
-                mtrx[[row_ind, seq_ids.len() - 1]] =
-                    self.distance(self.hits.get(seq_ids[row_ind]).unwrap());
+            }
+            // ... and the query (always last column):
+            // Exclude computation of self similarity. It would fail anyway and also see
+            // remarks on loops (above).
+            if row_ind < (seq_ids.len() - 1) {
+                let d = self.similarity(self.hits.get(&seq_ids[row_ind]).unwrap());
+                mtrx[[row_ind, seq_ids.len() - 1]] = d;
+                mtrx[[seq_ids.len() - 1, row_ind]] = d;
             }
         }
-        mtrx
+        (seq_ids, mtrx)
     }
 }
 
@@ -310,6 +313,7 @@ impl Query {
 mod tests {
     use super::*;
     use assert_approx_eq::assert_approx_eq;
+    use ndarray::arr2;
 
     #[test]
     fn default_filter_regexs_extract_uni_prot_descriptions() {
@@ -393,7 +397,7 @@ mod tests {
             "Hit_One", "100", "1", "50", "200", "51", "110", "123.4", "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let h2 = Hit::new(
-            "Hit_Two", "100", "25", "50", "200", "76", "110", "123.4",
+            "Hit_Two", "100", "26", "50", "200", "76", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let o = h1.overlap_with_hit(&h2, &100.0);
@@ -419,20 +423,34 @@ mod tests {
     }
 
     #[test]
-    fn distance_between_hits() {
+    fn similarity_between_hits() {
         let h1 = Hit::new(
             "Hit_One", "100", "1", "50", "200", "51", "110", "123.4", "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let h2 = Hit::new(
-            "Hit_Two", "100", "25", "50", "200", "76", "110", "123.4",
+            "Hit_Two", "100", "26", "50", "200", "76", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
-        let d = h1.distance(&h2, &100.0);
-        assert_eq!(d, 0.375);
+        let d1 = h1.similarity(&h2, &100.0);
+        assert_eq!(d1, 0.625);
+        let h3 = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "500.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Two", "100", "1", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let d2 = h3.similarity(&h4, &100.0);
+        println!(
+            "h4.description_similarity(h3) = {}",
+            h4.description_similarity(&h3)
+        );
+        assert_eq!(d2, 0.75);
     }
 
     #[test]
-    fn distance_between_query_and_hit() {
+    fn similarity_between_query_and_hit() {
         let h1 = Hit::new(
             "Hit_One", "100", "1", "50", "200", "51", "110", "500.0",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
@@ -447,10 +465,42 @@ mod tests {
         query.find_bitscore_scaling_factor();
         assert_eq!(h2.overlap_with_query.0, 0.5);
         assert_eq!(query.bitscore_scaling_factor.0, 500.0);
-        let d = query.distance(&h2);
-        // distance( query, h2 ) =
-        // 1.0 - likeliness-score =
-        // 1.0 - mean( overlap[ .5 ] + scaled_bitscore[ 1/5 ] )
-        assert_eq!(d, (1.0 - (0.5 + 1.0 / 5.0) / 2.0));
+        let d = query.similarity(&h2);
+        // similarity( query, h2 ) =
+        // mean( overlap[ .5 ] + scaled_bitscore[ 1/5 ] )
+        assert_eq!(d, (0.5 + 1.0 / 5.0) / 2.0);
+    }
+
+    #[test]
+    pub fn test_to_similarity_matrix() {
+        let h1 = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "500.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h2 = Hit::new(
+            "Hit_Two", "100", "1", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let mut query = Query::from_qacc("Query_Curious".to_string());
+        query.qlen = F64(100.0);
+        query.add_hit(&h1);
+        query.add_hit(&h2);
+        query.find_bitscore_scaling_factor();
+        let sim_mtrx = query.to_similarity_matrix();
+        // println!("Query.to_similarity_matrix() yields:\n{:?}\n", sim_mtrx);
+        let expected = arr2(&[
+            [
+                0.0,
+                h1.similarity(&h2, &query.qlen.0),
+                query.similarity(&h1),
+            ],
+            [
+                h1.similarity(&h2, &query.qlen.0),
+                0.0,
+                query.similarity(&h2),
+            ],
+            [query.similarity(&h1), query.similarity(&h2), 0.0],
+        ]);
+        assert_eq!(sim_mtrx.1, expected);
     }
 }

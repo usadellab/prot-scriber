@@ -16,8 +16,9 @@
 //! Bacterial Molecular Networks: Methods and Protocols, Methods in Molecular Biology, Vol 804,
 //! pages 281—295 (2012). PMID 22144159.
 
-use super::models::Query;
-use ndarray::{arr2, Array2, ArrayBase};
+use super::default::*;
+use super::models::*;
+use ndarray::{arr2, Array2};
 
 /// Function clusters a query and its hits to find the cluster of which the query is member of and
 /// use that as a basis to generate a short human readable protein function description.
@@ -26,11 +27,15 @@ use ndarray::{arr2, Array2, ArrayBase};
 ///
 /// * query - The query including its hits to be subjected to clustering
 pub fn cluster(query: &Query) -> Array2<f64> {
-    let mut seq_ids: Vec<&String> = query.hits.keys().collect();
-    seq_ids.push(&query.id);
-    let mtrx: Array2<f64> = ArrayBase::default((seq_ids.len(), seq_ids.len()));
-    // To Do !!!
-    arr2(&[[6f64, 5f64, 4f64], [3f64, 2f64, 1f64]])
+    let m = query.to_similarity_matrix();
+    // To Do: Use user arguments and the defaults only if no user args have been supplied:
+    markov_cluster(
+        &m.1,
+        &(*MCL_INFLATION),
+        &(*MCL_DELTA),
+        &(*MCL_MAX_ITERATIONS),
+        &(*ROUND_DECIMAL_DIGITS),
+    )
 }
 
 /// Normalizes a sqaure two dimensional matrix so that all rows sum up to one, and thus a row's

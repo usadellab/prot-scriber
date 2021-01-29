@@ -18,7 +18,7 @@
 
 use super::default::*;
 use super::models::*;
-use ndarray::{arr2, Array2};
+use ndarray::Array2;
 
 /// Function clusters a query and its hits to find the cluster of which the query is member of and
 /// use that as a basis to generate a short human readable protein function description.
@@ -167,6 +167,7 @@ pub fn markov_cluster(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ndarray::arr2;
 
     #[test]
     fn test_add_self_loops() {

@@ -19,6 +19,7 @@
 use super::default::*;
 use super::models::*;
 use ndarray::Array2;
+use std::collections::HashSet;
 
 /// Function clusters a query and its hits to find the cluster of which the query is member of and
 /// use that as a basis to generate a short human readable protein function description.
@@ -38,7 +39,57 @@ pub fn cluster(query: &Query) -> Array2<f64> {
     )
 }
 
-/// Normalizes a sqaure two dimensional matrix so that all rows sum up to one, and thus a row's
+/// Function extracts the clusters from the result matrix produced by markov clusterin (MCL).
+/// Returns a vector of HashSets of node indices (`usize`) starting from zero. In short, the result
+/// is a vector of mathematic sets in which each set represents a cluster. A cluster indicates
+/// contained nodes by their indices.
+///
+/// # Arguments
+///
+/// * mcl_matrix - The result matrix produced by markov clustering
+pub fn get_clusters(mcl_matrix: &Array2<f64>) -> Vec<HashSet<usize>> {
+    let mut clusters: Vec<HashSet<usize>> = Vec::new();
+    // Iterate over rows. Create a vector of clusters (one per row), where each cluster is a
+    // HashSet of node-indices, indicating nodes that have edges between them.
+    for row_i in 0..mcl_matrix.shape()[0] {
+        let mut node_i_cluster: HashSet<usize> = HashSet::new();
+        node_i_cluster.insert(row_i);
+        for (cell_i, &cell) in mcl_matrix.row(row_i).indexed_iter() {
+            if cell > 0.0 {
+                node_i_cluster.insert(cell_i);
+            }
+        }
+        clusters.push(node_i_cluster);
+    }
+    // Join clusters by iterating over node-indices and joining (set-union) all clusters that
+    // contain the current node-index:
+    for node_i in 0..mcl_matrix.shape()[0] {
+        let clusters_clone = clusters.clone();
+        let mut cluster_inds = clusters_clone
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| v.contains(&node_i)) // cluster has current node i?
+            .map(|(i, _)| i)
+            .collect::<Vec<usize>>();
+        // Sort descending by comparing not a with b, but inverted argument order b.cmp(a).
+        // Note, that this sort order is required to enable iterative removal of vector elements
+        // without affecting lower indices.
+        cluster_inds.sort_by(|a, b| b.cmp(a));
+        let mut joined_cluster: HashSet<usize> = HashSet::new();
+        for i in cluster_inds {
+            let cluster_i = clusters_clone.get(i).unwrap();
+            // join clusters that contain node i:
+            joined_cluster.extend(cluster_i);
+            // and remove the just joined cluster:
+            clusters.remove(i);
+        }
+        // Replace the clusters that contained node i with the set-union of them:
+        clusters.push(joined_cluster);
+    }
+    clusters // return
+}
+
+/// Normalizes a square two dimensional matrix so that all rows sum up to one, and thus a row's
 /// cells can be interpreted as probabilities. See Markov Clustering for more details on this step.
 ///
 /// # Arguments
@@ -246,5 +297,25 @@ mod tests {
             [0.0, 0.0, 0.0, 0.5, 0.5],
         ]);
         assert_eq!(cm, expected);
+    }
+
+    #[test]
+    fn test_get_clusters() {
+        let mcl_matrix = arr2(&[
+            [0.0, 0.5, 0.5, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0],
+        ]);
+        let clusters = get_clusters(&mcl_matrix);
+        // println!(
+        //     "Testing get_clusters from the result of Markov Clustering.\nInput is:\n{:?}\nClusters are:\n{:?}\n",
+        //     &mcl_matrix, &clusters
+        // );
+        let cluster_0: HashSet<usize> = vec![0, 1, 2].iter().cloned().collect();
+        let cluster_1: HashSet<usize> = vec![3, 4].iter().cloned().collect();
+        assert!(clusters.contains(&cluster_0));
+        assert!(clusters.contains(&cluster_1));
     }
 }

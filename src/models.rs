@@ -189,10 +189,17 @@ pub struct Query {
     pub bitscore_scaling_factor: F64,
     pub hits: HashMap<String, Hit>,
     pub seq_sim_mtrx_node_names: Vec<String>,
+    pub clusters: Vec<String>,
 }
 
 impl Query {
-    pub fn cluster_hits(&mut self) -> Vec<String> {
+    /// Function translates the query's sequence similarity search results into a similarity matrix
+    /// and markov clusters it. The results are stored in the query (`&self.clusters`) itself.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A mutable reference to the query itself.
+    pub fn cluster_hits(&mut self) {
         let mcl_matrix = cluster(self);
         let hit_clusters = get_clusters(&mcl_matrix);
         let query_indx = self
@@ -207,11 +214,10 @@ impl Query {
             .get(0)
             .unwrap()))
         .clone();
-        let querys_cluster_seq_names: Vec<String> = querys_cluster
+        self.clusters = querys_cluster
             .iter()
             .map(|x| (*(self.seq_sim_mtrx_node_names.get(*x).unwrap())).clone())
             .collect::<Vec<_>>();
-        querys_cluster_seq_names
     }
 
     /// Creates an empty Query with an initialized empty HashMap (`hits`) and initialized `Default`
@@ -228,6 +234,7 @@ impl Query {
             bitscore_scaling_factor: Default::default(),
             hits: HashMap::<String, Hit>::new(),
             seq_sim_mtrx_node_names: Default::default(),
+            clusters: Default::default(),
         }
     }
 
@@ -585,7 +592,11 @@ mod tests {
         query.qlen = F64(100.0);
         query.add_hit(&h1);
         query.add_hit(&h2);
-        let querys_cluster = query.cluster_hits();
-        println!("query.cluster_hits() yields:\n{:?}", querys_cluster);
+        query.cluster_hits();
+        let querys_cluster = &query.clusters;
+        // println!("query.cluster_hits() yields:\n{:?}", querys_cluster);
+        assert!(querys_cluster.contains(&"Hit_One".to_string()));
+        assert!(querys_cluster.contains(&"Hit_Two".to_string()));
+        assert!(querys_cluster.contains(&"Query_Curious".to_string()));
     }
 }

@@ -27,7 +27,7 @@ use std::collections::HashSet;
 /// # Arguments
 ///
 /// * query - The query including its hits to be subjected to clustering
-pub fn cluster(query: &Query) -> Array2<f64> {
+pub fn cluster(query: &mut Query) -> Array2<f64> {
     let m = query.to_similarity_matrix();
     // To Do: Use user arguments and the defaults only if no user args have been supplied:
     markov_cluster(

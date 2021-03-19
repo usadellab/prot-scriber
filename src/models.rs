@@ -1,5 +1,7 @@
 use super::default::FILTER_REGEXS;
 use super::default::SPLIT_DESCRIPTION_REGEX;
+use super::seq_sim_clustering::cluster;
+use super::seq_sim_clustering::get_clusters;
 use eq_float::F64;
 use ndarray::{Array2, ArrayBase};
 use regex::Regex;
@@ -186,9 +188,32 @@ pub struct Query {
     pub qlen: F64,
     pub bitscore_scaling_factor: F64,
     pub hits: HashMap<String, Hit>,
+    pub seq_sim_mtrx_node_names: Vec<String>,
 }
 
 impl Query {
+    pub fn cluster_hits(&mut self) -> Vec<String> {
+        let mcl_matrix = cluster(self);
+        let hit_clusters = get_clusters(&mcl_matrix);
+        let query_indx = self
+            .seq_sim_mtrx_node_names
+            .iter()
+            .position(|x| *x == self.id)
+            .unwrap();
+        let querys_cluster: HashSet<usize> = (*(hit_clusters
+            .into_iter()
+            .filter(|clstr| clstr.contains(&query_indx))
+            .collect::<Vec<_>>()
+            .get(0)
+            .unwrap()))
+        .clone();
+        let querys_cluster_seq_names: Vec<String> = querys_cluster
+            .iter()
+            .map(|x| (*(self.seq_sim_mtrx_node_names.get(*x).unwrap())).clone())
+            .collect::<Vec<_>>();
+        querys_cluster_seq_names
+    }
+
     /// Creates an empty Query with an initialized empty HashMap (`hits`) and initialized `Default`
     /// `bitscore_scaling_factor`. Sets the `id` field to the provided argument.
     ///
@@ -198,10 +223,11 @@ impl Query {
     /// as provided to the used sequence similarity search tool (e.g. Blast or Diamond).
     pub fn from_qacc(id: String) -> Query {
         Query {
-            id: id,
+            id,
             qlen: Default::default(),
             bitscore_scaling_factor: Default::default(),
             hits: HashMap::<String, Hit>::new(),
+            seq_sim_mtrx_node_names: Default::default(),
         }
     }
 
@@ -236,13 +262,18 @@ impl Query {
     /// * `&mut self` - mutable reference to self (the query)
     pub fn find_bitscore_scaling_factor(&mut self) {
         // find maximum bitscore
-        self.bitscore_scaling_factor = F64(self.hits.iter().fold(0.0, |accumulated, (_, hit)| {
+        let bs_scl_fct = F64(self.hits.iter().fold(0.0, |accumulated, (_, hit)| {
             if hit.bitscore.0 > accumulated {
                 hit.bitscore.0
             } else {
                 accumulated
             }
         }));
+        if bs_scl_fct == F64(0.0) {
+            panic!("bitscore scaling factor for Query '{:?}' is zero. This would cause division by zero.", self.id);
+        } else {
+            self.bitscore_scaling_factor = bs_scl_fct;
+        }
     }
 
     /// Calculates the similarity between the query (`self`) and the argument hit (`to`) as the mean
@@ -274,10 +305,15 @@ impl Query {
     /// # Arguments
     ///
     /// * `&self` - the query
-    pub fn to_similarity_matrix(&self) -> (Vec<String>, Array2<f64>) {
+    pub fn to_similarity_matrix(&mut self) -> (Vec<String>, Array2<f64>) {
+        // find maximum bit-score and use it as scaling factor for all Hits' bit-scores:
+        self.find_bitscore_scaling_factor();
+        // the names of the rows and columns in the similarity matrix:
         let mut seq_ids: Vec<String> = self.hits.keys().map(|k: &String| (*k).clone()).collect();
         seq_ids.sort();
         seq_ids.push(self.id.clone());
+        // remember the sequence identifiers for future reference:
+        self.seq_sim_mtrx_node_names = seq_ids.clone();
         let mut mtrx: Array2<f64> = ArrayBase::zeros((seq_ids.len(), seq_ids.len()));
         // Save time and iterate over the similarities of the upper triangle including the
         // diagonal, but set each calculated similarity also in the lower one. Note that the inner
@@ -442,11 +478,37 @@ mod tests {
             "sp|C0LGP4|Y3475_ARATH serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let d2 = h3.similarity(&h4, &100.0);
-        println!(
-            "h4.description_similarity(h3) = {}",
-            h4.description_similarity(&h3)
-        );
+        // println!(
+        //     "h4.description_similarity(h3) = {}",
+        //     h4.description_similarity(&h3)
+        // );
         assert_eq!(d2, 0.75);
+    }
+
+    #[test]
+    fn test_similarity_between_hits_is_never_infinite() {
+        let h1 = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "500.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h2 = Hit::new(
+            "Hit_Two", "100", "1", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h3 = Hit::new(
+            "Hit_Three", "100", "51", "100", "300", "201", "300", "50.0",
+            "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        // let mut query = Query::from_qacc("Query_Curious".to_string());
+        // query.qlen = F64(100.0);
+        // query.add_hit(&h1);
+        // query.add_hit(&h2);
+        let sim = h1.similarity(&h2, &100.0);
+        assert!(!sim.is_infinite());
+        assert_eq!(sim, 0.75);
+        let sim_zero = h2.similarity(&h3, &100.0);
+        assert!(!sim_zero.is_infinite());
+        assert_eq!(sim_zero, 0.0);
     }
 
     #[test]
@@ -502,5 +564,28 @@ mod tests {
             [query.similarity(&h1), query.similarity(&h2), 0.0],
         ]);
         assert_eq!(sim_mtrx.1, expected);
+        assert!(query.seq_sim_mtrx_node_names.len() == 3);
+        assert_eq!(
+            query.seq_sim_mtrx_node_names,
+            vec!["Hit_One", "Hit_Two", "Query_Curious"]
+        );
+    }
+
+    #[test]
+    pub fn test_cluster_hits() {
+        let h1 = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "500.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h2 = Hit::new(
+            "Hit_Two", "100", "1", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let mut query = Query::from_qacc("Query_Curious".to_string());
+        query.qlen = F64(100.0);
+        query.add_hit(&h1);
+        query.add_hit(&h2);
+        let querys_cluster = query.cluster_hits();
+        println!("query.cluster_hits() yields:\n{:?}", querys_cluster);
     }
 }

@@ -29,7 +29,6 @@ use std::collections::HashSet;
 /// * query - The query including its hits to be subjected to clustering
 pub fn cluster(query: &mut Query) -> Array2<f64> {
     let m = query.to_similarity_matrix();
-    println!("Query '{}' yields similarity matrix:\n{:?}", query.id, m);
     // To Do: Use user arguments and the defaults only if no user args have been supplied:
     markov_cluster(
         &m.1,
@@ -100,8 +99,10 @@ pub fn normalize(mtrx: &Array2<f64>) -> Array2<f64> {
     let mut norm_mtrx = mtrx.clone();
     for i in 0..mtrx.shape()[0] {
         let row_sum = mtrx.row(i).scalar_sum();
-        for k in 0..mtrx.shape()[1] {
-            norm_mtrx[[i, k]] = mtrx[[i, k]] / row_sum;
+        if row_sum > 0.0 {
+            for k in 0..mtrx.shape()[1] {
+                norm_mtrx[[i, k]] = mtrx[[i, k]] / row_sum;
+            }
         }
     }
     norm_mtrx
@@ -178,9 +179,14 @@ pub fn mcl(
 pub fn add_self_loops(stochastic_matrix: &Array2<f64>) -> Array2<f64> {
     let mut loops_added = stochastic_matrix.clone();
     for row_i in 0..loops_added.shape()[0] {
-        let row_max = stochastic_matrix
-            .row(row_i)
-            .fold(0.0, |acc, curr| if *curr > acc { *curr } else { acc });
+        let mut row_max =
+            stochastic_matrix
+                .row(row_i)
+                .fold(0.0, |acc, curr| if *curr > acc { *curr } else { acc });
+        // If the node has no edges with any nodes, the likelihood to take a self loop is 1.0:
+        if row_max == 0.0 {
+            row_max = 1.0
+        }
         loops_added[[row_i, row_i]] = row_max;
     }
     loops_added
@@ -252,6 +258,12 @@ mod tests {
         // because they are included in the following. We just like to waste electrical energy and
         // heat the planet. Feeling cold! Sorry!
         assert_eq!(looped_m, expected);
+        // Assure that an isolated node (index 0 below) will be assigned a loop to itself with
+        // probability 1.0:
+        let dm_isolated_node = arr2(&[[0.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]);
+        let looped_dm_isolated_node = add_self_loops(&dm_isolated_node);
+        let ldin_expected = arr2(&[[1.0, 0.0, 0.0], [0.0, 1.0, 1.0], [0.0, 1.0, 1.0]]);
+        assert_eq!(looped_dm_isolated_node, ldin_expected);
     }
 
     #[test]
@@ -318,5 +330,17 @@ mod tests {
         let cluster_1: HashSet<usize> = vec![3, 4].iter().cloned().collect();
         assert!(clusters.contains(&cluster_0));
         assert!(clusters.contains(&cluster_1));
+    }
+
+    #[test]
+    fn test_normalize() {
+        let sim_mtrx_1 = arr2(&[[1.0, 2.0, 2.0], [2.0, 1.0, 2.0], [2.0, 5.0, 1.0]]);
+        let sm_norm_1 = normalize(&sim_mtrx_1);
+        let expected_1 = arr2(&[[0.2, 0.4, 0.4], [0.4, 0.2, 0.4], [0.25, 0.625, 0.125]]);
+        assert_eq!(sm_norm_1, expected_1);
+        let sim_mtrx_2 = arr2(&[[0.0, 0.0, 0.0], [2.0, 1.0, 2.0], [2.0, 5.0, 1.0]]);
+        let sm_norm_2 = normalize(&sim_mtrx_2);
+        let expected_2 = arr2(&[[0.0, 0.0, 0.0], [0.4, 0.2, 0.4], [0.25, 0.625, 0.125]]);
+        assert_eq!(sm_norm_2, expected_2);
     }
 }

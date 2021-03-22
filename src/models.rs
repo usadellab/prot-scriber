@@ -139,15 +139,7 @@ impl Hit {
                 qlen
             );
         }
-        let o =
-            (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64 + 1.0) / qlen;
-        if o.is_nan() || o.is_infinite() {
-            println!(
-                "overlap_with_hit NaN or inf: {}\nself.quen: {}, with.quend: {}, self.qstart: {}, with.qstart: {}, qlen: {}\nmin(qend): {}, max(qstart): {}",
-                o, self.qend, with.qend, self.qstart, with.qstart, *qlen, min(self.qend, with.qend), max(self.qstart, with.qstart)
-                );
-        }
-        o
+        (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64 + 1.0) / qlen
     }
 
     /// Splits the Hit's description into words using the argument regular expression.
@@ -191,14 +183,7 @@ impl Hit {
     fn similarity(&self, to: &Hit, qlen: &f64) -> f64 {
         let o = self.overlap_with_hit(to, qlen);
         let dd = self.description_similarity(to);
-        let sim = (o + dd) / 2.0;
-        if sim.is_nan() || sim.is_infinite() {
-            println!(
-                "distance between hits is NaN or inf: {:?}\nself:\n{:?}\nto:\n{:?}\noverlap_with_hit: {}, desc-similarity: {}, qlen: {}\n",
-                sim, self, to, o, dd, qlen
-            );
-        }
-        sim
+        (o + dd) / 2.0
     }
 }
 
@@ -232,15 +217,6 @@ impl Query {
         if self.hits.len() > 0 {
             let mcl_matrix = cluster(self);
             let mcl_clusters = get_clusters(&mcl_matrix);
-            let query_indx = self
-                .seq_sim_mtrx_node_names
-                .iter()
-                .position(|x| *x == self.id)
-                .unwrap();
-            self.querys_cluster_ind = mcl_clusters
-                .iter()
-                .position(|clstr| clstr.contains(&query_indx))
-                .unwrap();
             self.clusters = mcl_clusters
                 .iter()
                 .map(|clstr| {
@@ -354,7 +330,6 @@ impl Query {
         // the names of the rows and columns in the similarity matrix:
         let mut seq_ids: Vec<String> = self.hits.keys().map(|k: &String| (*k).clone()).collect();
         seq_ids.sort();
-        seq_ids.push(self.id.clone());
         // remember the sequence identifiers for future reference:
         self.seq_sim_mtrx_node_names = seq_ids.clone();
         let mut mtrx: Array2<f64> = ArrayBase::zeros((seq_ids.len(), seq_ids.len()));
@@ -374,14 +349,6 @@ impl Query {
                     mtrx[[row_ind, col_ind]] = d;
                     mtrx[[col_ind, row_ind]] = d;
                 }
-            }
-            // ... and the query (always last column):
-            // Exclude computation of self similarity. It would fail anyway and also see
-            // remarks on loops (above).
-            if row_ind < (seq_ids.len() - 1) {
-                let d = self.similarity(self.hits.get(&seq_ids[row_ind]).unwrap());
-                mtrx[[row_ind, seq_ids.len() - 1]] = d;
-                mtrx[[seq_ids.len() - 1, row_ind]] = d;
             }
         }
         (seq_ids, mtrx)
@@ -571,10 +538,10 @@ mod tests {
         query_frivolous.add_hit(&h5);
         query_frivolous.find_bitscore_scaling_factor();
         let h3_h5 = h3.similarity(&h5, &100.0);
-        println!(
-            "Similarity between Hits that align to DISJOINT regions of the query and have no shared words in their respective descriptions is: {:?}",
-            h3_h5
-        );
+        // println!(
+        //     "Similarity between Hits that align to DISJOINT regions of the query and have no shared words in their respective descriptions is: {:?}",
+        //     h3_h5
+        // );
         assert!(!h3_h5.is_nan());
         assert!(!h3_h5.is_infinite());
         assert_eq!(h3_h5, 0.0);
@@ -620,24 +587,12 @@ mod tests {
         let sim_mtrx = query.to_similarity_matrix();
         // println!("Query.to_similarity_matrix() yields:\n{:?}\n", sim_mtrx);
         let expected = arr2(&[
-            [
-                0.0,
-                h1.similarity(&h2, &query.qlen.0),
-                query.similarity(&h1),
-            ],
-            [
-                h1.similarity(&h2, &query.qlen.0),
-                0.0,
-                query.similarity(&h2),
-            ],
-            [query.similarity(&h1), query.similarity(&h2), 0.0],
+            [0.0, h1.similarity(&h2, &query.qlen.0)],
+            [h1.similarity(&h2, &query.qlen.0), 0.0],
         ]);
         assert_eq!(sim_mtrx.1, expected);
-        assert!(query.seq_sim_mtrx_node_names.len() == 3);
-        assert_eq!(
-            query.seq_sim_mtrx_node_names,
-            vec!["Hit_One", "Hit_Two", "Query_Curious"]
-        );
+        assert!(query.seq_sim_mtrx_node_names.len() == 2);
+        assert_eq!(query.seq_sim_mtrx_node_names, vec!["Hit_One", "Hit_Two"]);
         // Test query that has hits aligning to disjoint regions of the query sequence and do not
         // share words in their respective descriptions:
         let h3 = Hit::new(
@@ -658,12 +613,12 @@ mod tests {
         query_frivolous.add_hit(&h4);
         query_frivolous.add_hit(&h5);
         let sim_mtrx = query_frivolous.to_similarity_matrix();
-        println!(
-            "Query with hits that align to disjoint regions and do not share words in their respective descriptions yield similarity matrix:\n{:?}",
-            sim_mtrx
-        );
-        assert_eq!(sim_mtrx.1.rows(), 4);
-        assert_eq!(sim_mtrx.1.cols(), 4);
+        // println!(
+        //     "Query with hits that align to disjoint regions and do not share words in their respective descriptions yield similarity matrix:\n{:?}",
+        //     sim_mtrx
+        // );
+        let expected_sim_mtrx = arr2(&[[0.0, 0.0, 0.0], [0.0, 0.0, 0.75], [0.0, 0.75, 0.0]]);
+        assert_eq!(sim_mtrx.1, expected_sim_mtrx);
     }
 
     #[test]
@@ -685,10 +640,9 @@ mod tests {
         assert_eq!(query.clusters.len(), 1);
         assert_eq!(query.querys_cluster_ind, 0);
         let querys_cluster = &query.clusters.get(0).unwrap();
-        println!("query.cluster_hits() yields:\n{:?}", querys_cluster);
+        // println!("query.cluster_hits() yields:\n{:?}", querys_cluster);
         assert!(querys_cluster.contains(&"Hit_One".to_string()));
         assert!(querys_cluster.contains(&"Hit_Two".to_string()));
-        assert!(querys_cluster.contains(&"Query_Curious".to_string()));
         // Test query that has NO hits:
         let mut query_no_hits = Query::from_qacc("Query_So_Lonely".to_string());
         query_no_hits.qlen = F64(123.0);
@@ -713,10 +667,13 @@ mod tests {
         query_frivolous.add_hit(&h4);
         query_frivolous.add_hit(&h5);
         query_frivolous.cluster_hits();
-        println!(
-            "Query with three Hits yields these clusters:\n{:?}",
-            query_frivolous.clusters
-        );
+        // println!(
+        //     "Query with three Hits yields these clusters:\n{:?}",
+        //     query_frivolous.clusters
+        // );
         assert_eq!(query_frivolous.clusters.len(), 2);
+        assert!(query_frivolous
+            .clusters
+            .contains(&vec!["Hit_Five".to_string()]));
     }
 }

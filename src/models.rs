@@ -133,7 +133,21 @@ impl Hit {
     /// * `with: &Hit` - the hit which which to calculate the overlap
     /// * `qlenL &f64` - the query sequence's length
     fn overlap_with_hit(&self, with: &Hit, qlen: &f64) -> f64 {
-        (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64 + 1.0) / qlen
+        if *qlen <= 0.0 {
+            panic!(
+                "Function Hit.overlap_with_hit was given invalid query length (qlen) argument <= 0: {}",
+                qlen
+            );
+        }
+        let o =
+            (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64 + 1.0) / qlen;
+        if o.is_nan() || o.is_infinite() {
+            println!(
+                "overlap_with_hit NaN or inf: {}\nself.quen: {}, with.quend: {}, self.qstart: {}, with.qstart: {}, qlen: {}\nmin(qend): {}, max(qstart): {}",
+                o, self.qend, with.qend, self.qstart, with.qstart, *qlen, min(self.qend, with.qend), max(self.qstart, with.qstart)
+                );
+        }
+        o
     }
 
     /// Splits the Hit's description into words using the argument regular expression.
@@ -177,7 +191,14 @@ impl Hit {
     fn similarity(&self, to: &Hit, qlen: &f64) -> f64 {
         let o = self.overlap_with_hit(to, qlen);
         let dd = self.description_similarity(to);
-        (o + dd) / 2.0
+        let sim = (o + dd) / 2.0;
+        if sim.is_nan() || sim.is_infinite() {
+            println!(
+                "distance between hits is NaN or inf: {:?}\nself:\n{:?}\nto:\n{:?}\noverlap_with_hit: {}, desc-similarity: {}, qlen: {}\n",
+                sim, self, to, o, dd, qlen
+            );
+        }
+        sim
     }
 }
 
@@ -186,38 +207,52 @@ impl Hit {
 pub struct Query {
     pub id: String,
     pub qlen: F64,
-    pub bitscore_scaling_factor: F64,
     pub hits: HashMap<String, Hit>,
+    // The calculation of similarity requires scaling the bit-scores by division by the maximum
+    // bit-score found in all Hits of a respective Query instance:
+    pub bitscore_scaling_factor: F64,
+    // The dimension names of the resulting markov clustered similarity matrix:
     pub seq_sim_mtrx_node_names: Vec<String>,
-    pub clusters: Vec<String>,
+    // The resulting clusters, represented by the respective sequence identifiers (`String`):
+    pub clusters: Vec<Vec<String>>,
+    // This index indicates which of the `Vec<String>` elements of field `clusters` contains the
+    // query itself:
+    pub querys_cluster_ind: usize,
 }
 
 impl Query {
     /// Function translates the query's sequence similarity search results into a similarity matrix
     /// and markov clusters it. The results are stored in the query (`&self.clusters`) itself.
+    /// Additionally, the cluster containing the query is marked in `self.querys_cluster_ind`.
     ///
     /// # Arguments
     ///
     /// * `&mut self` - A mutable reference to the query itself.
     pub fn cluster_hits(&mut self) {
-        let mcl_matrix = cluster(self);
-        let hit_clusters = get_clusters(&mcl_matrix);
-        let query_indx = self
-            .seq_sim_mtrx_node_names
-            .iter()
-            .position(|x| *x == self.id)
-            .unwrap();
-        let querys_cluster: HashSet<usize> = (*(hit_clusters
-            .into_iter()
-            .filter(|clstr| clstr.contains(&query_indx))
-            .collect::<Vec<_>>()
-            .get(0)
-            .unwrap()))
-        .clone();
-        self.clusters = querys_cluster
-            .iter()
-            .map(|x| (*(self.seq_sim_mtrx_node_names.get(*x).unwrap())).clone())
-            .collect::<Vec<_>>();
+        if self.hits.len() > 0 {
+            let mcl_matrix = cluster(self);
+            let mcl_clusters = get_clusters(&mcl_matrix);
+            let query_indx = self
+                .seq_sim_mtrx_node_names
+                .iter()
+                .position(|x| *x == self.id)
+                .unwrap();
+            self.querys_cluster_ind = mcl_clusters
+                .iter()
+                .position(|clstr| clstr.contains(&query_indx))
+                .unwrap();
+            self.clusters = mcl_clusters
+                .iter()
+                .map(|clstr| {
+                    clstr
+                        .iter()
+                        .map(|seq_node| {
+                            self.seq_sim_mtrx_node_names.get(*seq_node).unwrap().clone()
+                        })
+                        .collect()
+                })
+                .collect();
+        }
     }
 
     /// Creates an empty Query with an initialized empty HashMap (`hits`) and initialized `Default`
@@ -235,6 +270,7 @@ impl Query {
             hits: HashMap::<String, Hit>::new(),
             seq_sim_mtrx_node_names: Default::default(),
             clusters: Default::default(),
+            querys_cluster_ind: Default::default(),
         }
     }
 
@@ -516,6 +552,32 @@ mod tests {
         let sim_zero = h2.similarity(&h3, &100.0);
         assert!(!sim_zero.is_infinite());
         assert_eq!(sim_zero, 0.0);
+        // Test similarity between hits after setting the bit-score scaling factor:
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "50", "200", "51", "110", "500.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Four", "100", "1", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "100", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
+        query_frivolous.add_hit(&h3);
+        query_frivolous.add_hit(&h4);
+        query_frivolous.add_hit(&h5);
+        query_frivolous.find_bitscore_scaling_factor();
+        let h3_h5 = h3.similarity(&h5, &100.0);
+        println!(
+            "Similarity between Hits that align to DISJOINT regions of the query and have no shared words in their respective descriptions is: {:?}",
+            h3_h5
+        );
+        assert!(!h3_h5.is_nan());
+        assert!(!h3_h5.is_infinite());
+        assert_eq!(h3_h5, 0.0);
     }
 
     #[test]
@@ -576,10 +638,37 @@ mod tests {
             query.seq_sim_mtrx_node_names,
             vec!["Hit_One", "Hit_Two", "Query_Curious"]
         );
+        // Test query that has hits aligning to disjoint regions of the query sequence and do not
+        // share words in their respective descriptions:
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "50", "200", "51", "110", "500.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Four", "100", "1", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "100", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
+        query_frivolous.qlen = F64(100.0);
+        query_frivolous.add_hit(&h3);
+        query_frivolous.add_hit(&h4);
+        query_frivolous.add_hit(&h5);
+        let sim_mtrx = query_frivolous.to_similarity_matrix();
+        println!(
+            "Query with hits that align to disjoint regions and do not share words in their respective descriptions yield similarity matrix:\n{:?}",
+            sim_mtrx
+        );
+        assert_eq!(sim_mtrx.1.rows(), 4);
+        assert_eq!(sim_mtrx.1.cols(), 4);
     }
 
     #[test]
     pub fn test_cluster_hits() {
+        // Test query that should result in a single cluster:
         let h1 = Hit::new(
             "Hit_One", "100", "1", "50", "200", "51", "110", "500.0",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
@@ -593,10 +682,41 @@ mod tests {
         query.add_hit(&h1);
         query.add_hit(&h2);
         query.cluster_hits();
-        let querys_cluster = &query.clusters;
-        // println!("query.cluster_hits() yields:\n{:?}", querys_cluster);
+        assert_eq!(query.clusters.len(), 1);
+        assert_eq!(query.querys_cluster_ind, 0);
+        let querys_cluster = &query.clusters.get(0).unwrap();
+        println!("query.cluster_hits() yields:\n{:?}", querys_cluster);
         assert!(querys_cluster.contains(&"Hit_One".to_string()));
         assert!(querys_cluster.contains(&"Hit_Two".to_string()));
         assert!(querys_cluster.contains(&"Query_Curious".to_string()));
+        // Test query that has NO hits:
+        let mut query_no_hits = Query::from_qacc("Query_So_Lonely".to_string());
+        query_no_hits.qlen = F64(123.0);
+        query_no_hits.cluster_hits();
+        assert_eq!(query_no_hits.clusters.len(), 0);
+        // Test query that should produce TWO clusters:
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "50", "200", "51", "110", "500.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Four", "100", "1", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "100", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
+        query_frivolous.qlen = F64(100.0);
+        query_frivolous.add_hit(&h3);
+        query_frivolous.add_hit(&h4);
+        query_frivolous.add_hit(&h5);
+        query_frivolous.cluster_hits();
+        println!(
+            "Query with three Hits yields these clusters:\n{:?}",
+            query_frivolous.clusters
+        );
+        assert_eq!(query_frivolous.clusters.len(), 2);
     }
 }

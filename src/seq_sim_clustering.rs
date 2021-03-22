@@ -29,6 +29,7 @@ use std::collections::HashSet;
 /// * query - The query including its hits to be subjected to clustering
 pub fn cluster(query: &mut Query) -> Array2<f64> {
     let m = query.to_similarity_matrix();
+    println!("Query '{}' yields similarity matrix:\n{:?}", query.id, m);
     // To Do: Use user arguments and the defaults only if no user args have been supplied:
     markov_cluster(
         &m.1,

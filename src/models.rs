@@ -231,6 +231,42 @@ impl Query {
         }
     }
 
+    /// Calculates the score of a cluster of `Hit`s generated for a Query (`&self`). The score is
+    /// the arithmetic mean of two scoring measures. The first measure is the maximum similarity -
+    /// see function `Query::similarity(&self, to: &Hit)` - between the Query (`&self`) and any hit
+    /// contained in the cluster (`custer_index`). The second scoring measure is the fraction of
+    /// all the Query's (`&self`) hits contained in the cluster. Thus, the cluster score is
+    /// calculated as:
+    /// score( cluster ) =
+    ///   mean(
+    ///     max( Query.similarity( hit_i ) ),
+    ///     cluster.len() / Query.hits.len()
+    ///   )
+    /// Note that the score is returned as an instance of `F64`.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - A reference to the query instance itself
+    /// * `cluster_index: usize` - The index of the cluster to calculate the score for. The index
+    ///                            is supposed to reference an element of `self.clusters`.
+    pub fn calculate_cluster_score(&self, cluster_index: usize) -> F64 {
+        let cluster = self.clusters.get(cluster_index).unwrap();
+        let max_similarity_between_query_and_hit = cluster.iter().fold(0.0, |acc, curr_hit_id| {
+            let curr_query_hit_sim = self.similarity(&self.hits.get(curr_hit_id).unwrap());
+            if acc > curr_query_hit_sim {
+                acc
+            } else {
+                curr_query_hit_sim
+            }
+        });
+        let cluster_hit_coverage = cluster.len() as f64 / self.hits.len() as f64;
+        F64((max_similarity_between_query_and_hit + cluster_hit_coverage) / 2.0)
+    }
+
+    // pub fn score_clusters(&mut self) {
+    //     self.clusters.iter().map( |clstr|
+    // }
+
     /// Creates an empty Query with an initialized empty HashMap (`hits`) and initialized `Default`
     /// `bitscore_scaling_factor`. Sets the `id` field to the provided argument.
     ///
@@ -675,5 +711,55 @@ mod tests {
         assert!(query_frivolous
             .clusters
             .contains(&vec!["Hit_Five".to_string()]));
+    }
+
+    #[test]
+    fn test_calculate_cluster_score() {
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "50", "100", "51", "100", "500.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Four", "100", "1", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "100", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
+        query_frivolous.qlen = F64(100.0);
+        query_frivolous.add_hit(&h3);
+        query_frivolous.add_hit(&h4);
+        query_frivolous.add_hit(&h5);
+        query_frivolous.cluster_hits();
+        // println!(
+        //     "Query with three Hits yields these clusters:\n{:?}",
+        //     query_frivolous.clusters
+        // );
+        let h3_h4_indx = query_frivolous
+            .clusters
+            .iter()
+            .position(|clstr| clstr.contains(&"Hit_Three".to_string()))
+            .unwrap();
+        let cluster_h3_h4_score = query_frivolous.calculate_cluster_score(h3_h4_indx);
+        let expected_h3_h4_clstr_score = F64((query_frivolous.similarity(&h3) + 2.0 / 3.0) / 2.0);
+        // println!(
+        //     "Cluster of Hits 'Hit_Three' and 'Hit_Four' of Query '{}' has index {} and cluster-score {}",
+        //     query_frivolous.id, h3_h4_indx, cluster_h3_h4_score
+        // );
+        assert_eq!(cluster_h3_h4_score, expected_h3_h4_clstr_score);
+        let h5_indx = query_frivolous
+            .clusters
+            .iter()
+            .position(|clstr| clstr.contains(&"Hit_Five".to_string()))
+            .unwrap();
+        let cluster_h5_score = query_frivolous.calculate_cluster_score(h5_indx);
+        let expected_h5_clstr_score = F64((query_frivolous.similarity(&h5) + 1.0 / 3.0) / 2.0);
+        // println!(
+        //     "Cluster of Hit 'Hit_Five' of Query '{}' has index {} and cluster-score {}",
+        //     query_frivolous.id, h5_indx, cluster_h5_score
+        // );
+        assert_eq!(cluster_h5_score, expected_h5_clstr_score);
     }
 }

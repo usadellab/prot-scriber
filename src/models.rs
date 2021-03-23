@@ -5,6 +5,7 @@ use super::seq_sim_clustering::get_clusters;
 use eq_float::F64;
 use ndarray::{Array2, ArrayBase};
 use regex::Regex;
+use std::cmp::Ordering;
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -206,6 +207,8 @@ impl Query {
     /// Function translates the query's sequence similarity search results into a similarity matrix
     /// and markov clusters it. The results are stored in the query (`&self.clusters`) itself.
     /// Additionally, the cluster containing the query is marked in `self.querys_cluster_ind`.
+    /// _Note_ that the query's clusters will be *sorted* by their respective score _descending_,
+    /// i.e. the best scoring cluster will be the first.
     ///
     /// # Arguments
     ///
@@ -223,12 +226,12 @@ impl Query {
                             self.seq_sim_mtrx_node_names.get(*seq_node).unwrap().clone()
                         })
                         .collect();
-                    Cluster {
-                        hits,
-                        score: Default::default(),
-                    }
+                    let score = self.calculate_cluster_score(&hits);
+                    Cluster { hits, score }
                 })
                 .collect();
+            // Sort by score descending:
+            self.clusters.sort_by(|a, b| b.cmp(&a));
         }
     }
 
@@ -248,8 +251,8 @@ impl Query {
     /// # Arguments
     ///
     /// * `&self` - A reference to the query instance itself
-    /// * `hit_ids: Vec<String>` - The Hit sequences identifiers.
-    pub fn calculate_cluster_score(&self, hit_ids: Vec<String>) -> F64 {
+    /// * `hit_ids: &Vec<String>` - The Hit sequences identifiers.
+    pub fn calculate_cluster_score(&self, hit_ids: &Vec<String>) -> F64 {
         let max_similarity_between_query_and_hit = hit_ids.iter().fold(0.0, |acc, curr_hit_id| {
             let curr_query_hit_sim = self.similarity(&self.hits.get(curr_hit_id).unwrap());
             if acc > curr_query_hit_sim {
@@ -403,6 +406,38 @@ impl Cluster {
     ///                       this (`&self`) cluster.
     pub fn contains(&self, hit_id: &String) -> bool {
         self.hits.contains(hit_id)
+    }
+}
+
+impl Ord for Cluster {
+    /// Sorting of clusters should rely on their respective scores. If scores are equal the one
+    /// with more hit sequences is greater than the other.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - A reference to the cluster to be compared with another
+    /// * `other: &Cluster` - A reference to another cluster `&self` should be compared to
+    fn cmp(&self, other: &Cluster) -> Ordering {
+        let o = self.score.cmp(&other.score);
+        if o == Ordering::Equal {
+            self.hits.len().cmp(&other.hits.len())
+        } else {
+            o
+        }
+    }
+}
+
+impl PartialOrd for Cluster {
+    /// Sorting of clusters should rely on their respective scores. If scores are equal the one
+    /// with more hit sequences is greater than the other. _Note_, that the result is an
+    /// `Option<Ordering>` which makes it an implementation of partial ordering.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - A reference to the cluster to be compared with another
+    /// * `other: &Cluster` - A reference to another cluster `&self` should be compared to
+    fn partial_cmp(&self, other: &Cluster) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -721,11 +756,23 @@ mod tests {
         //     "Query with three Hits yields these clusters:\n{:?}",
         //     query_frivolous.clusters
         // );
+        // Test includes assertion of correct sort order of clusters:
         assert_eq!(query_frivolous.clusters.len(), 2);
         assert!(query_frivolous
             .clusters
-            .iter()
-            .any(|clstr| clstr.contains(&"Hit_Five".to_string())));
+            .get(0)
+            .unwrap()
+            .contains(&"Hit_Three".to_string()));
+        assert!(query_frivolous
+            .clusters
+            .get(0)
+            .unwrap()
+            .contains(&"Hit_Four".to_string()));
+        assert!(query_frivolous
+            .clusters
+            .get(1)
+            .unwrap()
+            .contains(&"Hit_Five".to_string()));
     }
 
     #[test]
@@ -758,7 +805,7 @@ mod tests {
             .position(|clstr| clstr.contains(&"Hit_Three".to_string()))
             .unwrap();
         let cluster_h3_h4_score = query_frivolous.calculate_cluster_score(
-            query_frivolous
+            &query_frivolous
                 .clusters
                 .get(h3_h4_indx)
                 .unwrap()
@@ -777,7 +824,7 @@ mod tests {
             .position(|clstr| clstr.contains(&"Hit_Five".to_string()))
             .unwrap();
         let cluster_h5_score = query_frivolous
-            .calculate_cluster_score(query_frivolous.clusters.get(h5_indx).unwrap().hits.clone());
+            .calculate_cluster_score(&query_frivolous.clusters.get(h5_indx).unwrap().hits.clone());
         let expected_h5_clstr_score = F64((query_frivolous.similarity(&h5) + 1.0 / 3.0) / 2.0);
         // println!(
         //     "Cluster of Hit 'Hit_Five' of Query '{}' has index {} and cluster-score {}",

@@ -199,10 +199,7 @@ pub struct Query {
     // The dimension names of the resulting markov clustered similarity matrix:
     pub seq_sim_mtrx_node_names: Vec<String>,
     // The resulting clusters, represented by the respective sequence identifiers (`String`):
-    pub clusters: Vec<Vec<String>>,
-    // This index indicates which of the `Vec<String>` elements of field `clusters` contains the
-    // query itself:
-    pub querys_cluster_ind: usize,
+    pub clusters: Vec<Cluster>,
 }
 
 impl Query {
@@ -220,12 +217,16 @@ impl Query {
             self.clusters = mcl_clusters
                 .iter()
                 .map(|clstr| {
-                    clstr
+                    let hits = clstr
                         .iter()
                         .map(|seq_node| {
                             self.seq_sim_mtrx_node_names.get(*seq_node).unwrap().clone()
                         })
-                        .collect()
+                        .collect();
+                    Cluster {
+                        hits,
+                        score: Default::default(),
+                    }
                 })
                 .collect();
         }
@@ -247,11 +248,9 @@ impl Query {
     /// # Arguments
     ///
     /// * `&self` - A reference to the query instance itself
-    /// * `cluster_index: usize` - The index of the cluster to calculate the score for. The index
-    ///                            is supposed to reference an element of `self.clusters`.
-    pub fn calculate_cluster_score(&self, cluster_index: usize) -> F64 {
-        let cluster = self.clusters.get(cluster_index).unwrap();
-        let max_similarity_between_query_and_hit = cluster.iter().fold(0.0, |acc, curr_hit_id| {
+    /// * `hit_ids: Vec<String>` - The Hit sequences identifiers.
+    pub fn calculate_cluster_score(&self, hit_ids: Vec<String>) -> F64 {
+        let max_similarity_between_query_and_hit = hit_ids.iter().fold(0.0, |acc, curr_hit_id| {
             let curr_query_hit_sim = self.similarity(&self.hits.get(curr_hit_id).unwrap());
             if acc > curr_query_hit_sim {
                 acc
@@ -259,13 +258,9 @@ impl Query {
                 curr_query_hit_sim
             }
         });
-        let cluster_hit_coverage = cluster.len() as f64 / self.hits.len() as f64;
+        let cluster_hit_coverage = hit_ids.len() as f64 / self.hits.len() as f64;
         F64((max_similarity_between_query_and_hit + cluster_hit_coverage) / 2.0)
     }
-
-    // pub fn score_clusters(&mut self) {
-    //     self.clusters.iter().map( |clstr|
-    // }
 
     /// Creates an empty Query with an initialized empty HashMap (`hits`) and initialized `Default`
     /// `bitscore_scaling_factor`. Sets the `id` field to the provided argument.
@@ -282,7 +277,6 @@ impl Query {
             hits: HashMap::<String, Hit>::new(),
             seq_sim_mtrx_node_names: Default::default(),
             clusters: Default::default(),
-            querys_cluster_ind: Default::default(),
         }
     }
 
@@ -388,6 +382,27 @@ impl Query {
             }
         }
         (seq_ids, mtrx)
+    }
+}
+
+/// A cluster of sequence similarity search hits is represented by this struct.
+#[derive(PartialEq, Eq, Debug, Clone, Default)]
+pub struct Cluster {
+    pub hits: Vec<String>,
+    pub score: F64,
+}
+
+impl Cluster {
+    /// Checks whether the cluster (`&self`) hit identifier vector contains the argument `hit_id`.
+    /// Returns true if so, false otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - The reference to the cluster to be queried
+    /// * `hit_id: &String` - A reference to the hit identifier to check whether it is contained in
+    ///                       this (`&self`) cluster.
+    pub fn contains(&self, hit_id: &String) -> bool {
+        self.hits.contains(hit_id)
     }
 }
 
@@ -674,7 +689,6 @@ mod tests {
         query.add_hit(&h2);
         query.cluster_hits();
         assert_eq!(query.clusters.len(), 1);
-        assert_eq!(query.querys_cluster_ind, 0);
         let querys_cluster = &query.clusters.get(0).unwrap();
         // println!("query.cluster_hits() yields:\n{:?}", querys_cluster);
         assert!(querys_cluster.contains(&"Hit_One".to_string()));
@@ -710,7 +724,8 @@ mod tests {
         assert_eq!(query_frivolous.clusters.len(), 2);
         assert!(query_frivolous
             .clusters
-            .contains(&vec!["Hit_Five".to_string()]));
+            .iter()
+            .any(|clstr| clstr.contains(&"Hit_Five".to_string())));
     }
 
     #[test]
@@ -742,7 +757,14 @@ mod tests {
             .iter()
             .position(|clstr| clstr.contains(&"Hit_Three".to_string()))
             .unwrap();
-        let cluster_h3_h4_score = query_frivolous.calculate_cluster_score(h3_h4_indx);
+        let cluster_h3_h4_score = query_frivolous.calculate_cluster_score(
+            query_frivolous
+                .clusters
+                .get(h3_h4_indx)
+                .unwrap()
+                .hits
+                .clone(),
+        );
         let expected_h3_h4_clstr_score = F64((query_frivolous.similarity(&h3) + 2.0 / 3.0) / 2.0);
         // println!(
         //     "Cluster of Hits 'Hit_Three' and 'Hit_Four' of Query '{}' has index {} and cluster-score {}",
@@ -754,7 +776,8 @@ mod tests {
             .iter()
             .position(|clstr| clstr.contains(&"Hit_Five".to_string()))
             .unwrap();
-        let cluster_h5_score = query_frivolous.calculate_cluster_score(h5_indx);
+        let cluster_h5_score = query_frivolous
+            .calculate_cluster_score(query_frivolous.clusters.get(h5_indx).unwrap().hits.clone());
         let expected_h5_clstr_score = F64((query_frivolous.similarity(&h5) + 1.0 / 3.0) / 2.0);
         // println!(
         //     "Cluster of Hit 'Hit_Five' of Query '{}' has index {} and cluster-score {}",

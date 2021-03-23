@@ -65,6 +65,36 @@ pub struct Hit {
     pub bitscore: F64,
     pub overlap_with_query: F64,
     pub description: String,
+    // the "similarity score" between the Query and this Hit:
+    pub query_similarity_score: F64,
+}
+
+impl Ord for Hit {
+    /// Sorting of hits should rely on their respective query_similarity_scores. If scores are
+    /// equal the one with more hit sequences is greater than the other.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - A reference to the cluster to be compared with another
+    /// * `other: &Hit` - A reference to another cluster `&self` should be compared to
+    fn cmp(&self, other: &Hit) -> Ordering {
+        self.query_similarity_score
+            .cmp(&other.query_similarity_score)
+    }
+}
+
+impl PartialOrd for Hit {
+    /// Sorting of hits should rely on their respective query_similarity_scores. If scores are
+    /// equal the one with more hit sequences is greater than the other. _Note_, that the result is
+    /// an `Option<Ordering>` which makes it an implementation of partial ordering.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - A reference to the cluster to be compared with another
+    /// * `other: &Hit` - A reference to another cluster `&self` should be compared to
+    fn partial_cmp(&self, other: &Hit) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Hit {
@@ -115,6 +145,7 @@ impl Hit {
                 qlen_prsd,
             ),
             description: filter_stitle(&stitle, &(*FILTER_REGEXS)),
+            query_similarity_score: Default::default(),
         }
     }
 
@@ -220,13 +251,21 @@ impl Query {
             self.clusters = mcl_clusters
                 .iter()
                 .map(|clstr| {
-                    let hits = clstr
+                    let mut hits = clstr
                         .iter()
                         .map(|seq_node| {
                             self.seq_sim_mtrx_node_names.get(*seq_node).unwrap().clone()
                         })
                         .collect();
                     let score = self.calculate_cluster_score(&hits);
+                    // Sort hit identifier (in `hits`) by their respective
+                    // Hit.query_similarity_score descending:
+                    hits.sort_by(|a, b| {
+                        let a_hit = self.hits.get(a).unwrap();
+                        let b_hit = self.hits.get(b).unwrap();
+                        // See Ord implementation for struct Query:
+                        b_hit.cmp(a_hit)
+                    });
                     Cluster { hits, score }
                 })
                 .collect();
@@ -246,21 +285,28 @@ impl Query {
     ///     max( Query.similarity( hit_i ) ),
     ///     cluster.len() / Query.hits.len()
     ///   )
-    /// Note that the score is returned as an instance of `F64`.
+    /// Note that the score is returned as an instance of `F64`. Also _note_ that this function
+    /// initializes the field `query_similarity_score` of each instance of struct Hit referenced by
+    /// `hit_ids`.
     ///
     /// # Arguments
     ///
-    /// * `&self` - A reference to the query instance itself
+    /// * `&mut self` - A mutable reference to the query instance itself
     /// * `hit_ids: &Vec<String>` - The Hit sequences identifiers.
-    pub fn calculate_cluster_score(&self, hit_ids: &Vec<String>) -> F64 {
-        let max_similarity_between_query_and_hit = hit_ids.iter().fold(0.0, |acc, curr_hit_id| {
-            let curr_query_hit_sim = self.similarity(&self.hits.get(curr_hit_id).unwrap());
-            if acc > curr_query_hit_sim {
-                acc
-            } else {
-                curr_query_hit_sim
+    pub fn calculate_cluster_score(&mut self, hit_ids: &Vec<String>) -> F64 {
+        let mut max_similarity_between_query_and_hit = 0.0;
+        for curr_hit_id in hit_ids.iter() {
+            let ch_score = self.similarity(self.hits.get(curr_hit_id).unwrap());
+            if ch_score > max_similarity_between_query_and_hit {
+                max_similarity_between_query_and_hit = ch_score;
             }
-        });
+            // Remember the similarity score between the Query (`self`) this Hit (`curr_hit_id`)
+            // for future references:
+            self.hits
+                .get_mut(curr_hit_id)
+                .unwrap()
+                .query_similarity_score = F64(ch_score);
+        }
         let cluster_hit_coverage = hit_ids.len() as f64 / self.hits.len() as f64;
         F64((max_similarity_between_query_and_hit + cluster_hit_coverage) / 2.0)
     }
@@ -385,6 +431,12 @@ impl Query {
             }
         }
         (seq_ids, mtrx)
+    }
+
+    pub fn cluster_consensus_description(&self, cluster_indx: usize) -> String {
+        let cluster = self.clusters.get(cluster_indx).unwrap();
+        let best_scoring_hit_id = cluster.hits.get(0).unwrap();
+        "to do".to_string()
     }
 }
 
@@ -724,22 +776,30 @@ mod tests {
         query.add_hit(&h2);
         query.cluster_hits();
         assert_eq!(query.clusters.len(), 1);
-        let querys_cluster = &query.clusters.get(0).unwrap();
-        // println!("query.cluster_hits() yields:\n{:?}", querys_cluster);
-        assert!(querys_cluster.contains(&"Hit_One".to_string()));
-        assert!(querys_cluster.contains(&"Hit_Two".to_string()));
+        // Assure cluster is as expected and also its sort order:
+        let expected_query_cluster = vec!["Hit_One", "Hit_Two"];
+        // println!(
+        //     "score(h1): {}, score(h2): {}",
+        //     query.hits.get("Hit_One").unwrap().query_similarity_score,
+        //     query.hits.get("Hit_Two").unwrap().query_similarity_score
+        // );
+        assert_eq!(query.clusters.get(0).unwrap().hits, expected_query_cluster);
+        assert!(
+            query.hits.get("Hit_One").unwrap().query_similarity_score
+                > query.hits.get("Hit_Two").unwrap().query_similarity_score
+        );
         // Test query that has NO hits:
         let mut query_no_hits = Query::from_qacc("Query_So_Lonely".to_string());
         query_no_hits.qlen = F64(123.0);
         query_no_hits.cluster_hits();
         assert_eq!(query_no_hits.clusters.len(), 0);
         // Test query that should produce TWO clusters:
-        let h3 = Hit::new(
-            "Hit_Three", "100", "1", "50", "200", "51", "110", "500.0",
+        let h4 = Hit::new(
+            "Hit_Four", "100", "1", "50", "200", "51", "110", "500.0",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
-        let h4 = Hit::new(
-            "Hit_Four", "100", "1", "50", "200", "101", "200", "100.0",
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "50", "200", "101", "200", "100.0",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let h5 = Hit::new(
@@ -758,16 +818,23 @@ mod tests {
         // );
         // Test includes assertion of correct sort order of clusters:
         assert_eq!(query_frivolous.clusters.len(), 2);
-        assert!(query_frivolous
-            .clusters
-            .get(0)
-            .unwrap()
-            .contains(&"Hit_Three".to_string()));
-        assert!(query_frivolous
-            .clusters
-            .get(0)
-            .unwrap()
-            .contains(&"Hit_Four".to_string()));
+        let expected_query_frivolous_first_cluster = vec!["Hit_Four", "Hit_Three"];
+        assert_eq!(
+            query_frivolous.clusters.get(0).unwrap().hits,
+            expected_query_frivolous_first_cluster
+        );
+        assert!(
+            query_frivolous
+                .hits
+                .get("Hit_Four")
+                .unwrap()
+                .query_similarity_score
+                > query_frivolous
+                    .hits
+                    .get("Hit_Three")
+                    .unwrap()
+                    .query_similarity_score
+        );
         assert!(query_frivolous
             .clusters
             .get(1)
@@ -831,5 +898,13 @@ mod tests {
         //     query_frivolous.id, h5_indx, cluster_h5_score
         // );
         assert_eq!(cluster_h5_score, expected_h5_clstr_score);
+
+        // Assure that the hits have their fields `query_similarity_score` set after execution of
+        // calculate_cluster_score:
+        assert!(query_frivolous
+            .hits
+            .iter()
+            // Note, that the `default` query_similarity_score is 0.0, which is why we test > 0.0:
+            .all(|(_, h)| h.query_similarity_score.0 > 0.0));
     }
 }

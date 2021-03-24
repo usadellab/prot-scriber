@@ -433,10 +433,60 @@ impl Query {
         (seq_ids, mtrx)
     }
 
-    pub fn cluster_consensus_description(&self, cluster_indx: usize) -> String {
+    /// Generates a consensus description for a cluster (argument `cluster_indx`) of this query
+    /// (`&self`). Hits' descriptions, contained in the cluster, are split using argument regular
+    /// expression. The returned consensus description is composed of words in the intersection of
+    /// all Hits' descriptions in the order they appear in the best scoring (see
+    /// `Query::similarity(&self, to: &Hit)`) hit's description.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - A reference to the Query containing the cluster `cluster_indx`
+    /// * `cluster_indx` - A usize indicating for which of the Query's cluster to generate the
+    ///                    consensus description.
+    /// * `splitting_axe` - A reference to the regular expression used to split Hit descriptions
+    ///                     into sets or vectors of words.
+    pub fn cluster_consensus_description(
+        &self,
+        cluster_indx: usize,
+        splitting_axe: &Regex,
+    ) -> String {
         let cluster = self.clusters.get(cluster_indx).unwrap();
-        let best_scoring_hit_id = cluster.hits.get(0).unwrap();
-        "to do".to_string()
+        let best_scoring_hit_description: Vec<String> = splitting_axe
+            .split(
+                &self
+                    .hits
+                    .get(cluster.hits.get(0).unwrap())
+                    .unwrap()
+                    .description,
+            )
+            .into_iter()
+            .map(|x| String::from(x))
+            .collect();
+        let hits_description_words: Vec<HashSet<String>> = cluster
+            .hits
+            .iter()
+            .map(|hit_id| {
+                splitting_axe
+                    .split(&self.hits.get(hit_id).unwrap().description)
+                    .into_iter()
+                    .map(|x| String::from(x))
+                    .collect()
+            })
+            .collect();
+        let mut shared_words = hits_description_words.get(0).unwrap().clone();
+        for i in 1..hits_description_words.len() {
+            shared_words = shared_words
+                .intersection(hits_description_words.get(i).unwrap())
+                .into_iter()
+                .map(|x| String::from(x))
+                .collect();
+        }
+        best_scoring_hit_description
+            .into_iter()
+            .filter(|x| shared_words.contains(x))
+            .collect::<Vec<String>>()
+            .join(" ")
     }
 }
 
@@ -906,5 +956,66 @@ mod tests {
             .iter()
             // Note, that the `default` query_similarity_score is 0.0, which is why we test > 0.0:
             .all(|(_, h)| h.query_similarity_score.0 > 0.0));
+    }
+
+    #[test]
+    fn test_cluster_consensus_description() {
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "50", "100", "51", "100", "500.0",
+            "sp|C0LGP4|Y3475_ARATH LRR receptor-like serine/threonine-protein kinase OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Four", "100", "1", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "100", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
+        query_frivolous.qlen = F64(100.0);
+        query_frivolous.add_hit(&h3);
+        query_frivolous.add_hit(&h4);
+        query_frivolous.add_hit(&h5);
+        query_frivolous.cluster_hits();
+        let best_scoring_cluster_consensus_description =
+            query_frivolous.cluster_consensus_description(0, &(*SPLIT_DESCRIPTION_REGEX));
+        // println!(
+        //     "query_frivolous'\n{:?}\nbest scoring cluster consensus description is:\n{}",
+        //     query_frivolous, best_scoring_cluster_consensus_description
+        // );
+        assert_eq!(
+            best_scoring_cluster_consensus_description,
+            "LRR receptor-like serine/threonine-protein kinase"
+        );
+    }
+
+    #[test]
+    fn sandbox() {
+        println!("If this is a stable version of prot-scriber you should remove the test `sandbox` in module ./src/models.rs. It is just used to do quick and dirty Rust experiments.");
+        let x = vec!["ba,f,oo", "ba,r", "ba,z"];
+        let split_sets: Vec<HashSet<String>> = x
+            .iter()
+            .map(|x| {
+                Regex::new(r",")
+                    .unwrap()
+                    .split(x)
+                    .into_iter()
+                    .map(|x| String::from(x))
+                    .collect()
+            })
+            .collect();
+        println!("split_sets: {:?}", split_sets);
+        let mut shared_words: HashSet<String> = split_sets.get(0).unwrap().clone();
+        for i in 1..split_sets.len() {
+            shared_words = shared_words
+                .intersection(&split_sets.get(i).unwrap())
+                .into_iter()
+                .map(|x| String::from(x))
+                .collect()
+        }
+        println!("shared_words: {:?}", shared_words);
+        assert!(shared_words.contains(&"ba".to_string()));
+        assert_eq!(shared_words.len(), 1usize);
     }
 }

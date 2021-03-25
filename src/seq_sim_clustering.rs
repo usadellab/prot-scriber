@@ -17,7 +17,7 @@
 //! pages 281—295 (2012). PMID 22144159.
 
 use super::default::*;
-use super::models::*;
+use super::query::*;
 use ndarray::Array2;
 use std::collections::HashSet;
 

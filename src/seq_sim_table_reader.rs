@@ -1,6 +1,6 @@
 //! Code used to parse sequence similarity search result tables is implemented in this module.
-use super::models::Hit;
-use super::models::Query;
+use super::hit::*;
+use super::query::*;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;

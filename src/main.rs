@@ -3,8 +3,11 @@ extern crate lazy_static;
 
 use clap::{App, Arg};
 
+mod cluster;
 mod default;
+mod hit;
 mod models;
+mod query;
 mod seq_sim_clustering;
 mod seq_sim_table_reader;
 

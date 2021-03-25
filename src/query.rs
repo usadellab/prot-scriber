@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 #[derive(PartialEq, Eq, Debug, Clone, Default)]
 pub struct Query {
     pub id: String,
-    pub qlen: F64,
+    pub qlen: u32,
     pub hits: HashMap<String, Hit>,
     // The calculation of similarity requires scaling the bit-scores by division by the maximum
     // bit-score found in all Hits of a respective Query instance:
@@ -213,7 +213,7 @@ impl Query {
                 if row_ind != col_ind {
                     let hit_row_i = self.hits.get(&seq_ids[row_ind]).unwrap();
                     let hit_col_i = self.hits.get(&seq_ids[col_ind]).unwrap();
-                    let d = hit_row_i.similarity(hit_col_i, &self.qlen.0);
+                    let d = hit_row_i.similarity(hit_col_i, &self.qlen);
                     mtrx[[row_ind, col_ind]] = d;
                     mtrx[[col_ind, row_ind]] = d;
                 }
@@ -278,9 +278,21 @@ impl Query {
             .join(" ")
     }
 
-    pub fn cluster_aligned_query_region(&self, hit_ids: &Vec<String>) -> (u32, u32) {
+    /// Function identifies the region in the pairwise local alignments between the hits and the
+    /// query. The region is returned as that stretch of the query sequence that is covered by all
+    /// of the pairwise local alignments between the hit_i and the query. Note that an Option<(u32,
+    /// u32)>` is returned. In case there is _no_ query sequence region a cluster aligns to, None
+    /// is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `&self` - A reference to the instance of Query.
+    /// * `hit_ids: &Vec<String>` - A reference to a vector of Hit identifiers that should be
+    ///                             present among this query's hits. The region returned by this
+    ///                             function will be calculated for these argument hit identifiers.
+    pub fn cluster_aligned_query_region(&self, hit_ids: &Vec<String>) -> Option<(u32, u32)> {
         let mut max_qstart = 0u32;
-        let mut min_qend = 0u32;
+        let mut min_qend = self.qlen;
         for hit_id in hit_ids {
             let hit_i = self.hits.get(hit_id).unwrap();
             if hit_i.qstart > max_qstart {
@@ -290,7 +302,11 @@ impl Query {
                 min_qend = hit_i.qend;
             }
         }
-        (max_qstart, min_qend)
+        if max_qstart < min_qend {
+            Some((max_qstart, min_qend))
+        } else {
+            None
+        }
     }
 }
 

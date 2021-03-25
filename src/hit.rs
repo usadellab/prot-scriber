@@ -112,15 +112,16 @@ impl Hit {
     ///
     /// * `&self` - reference to an instance of Hit
     /// * `with: &Hit` - the hit which which to calculate the overlap
-    /// * `qlenL &f64` - the query sequence's length
-    pub fn overlap_with_hit(&self, with: &Hit, qlen: &f64) -> f64 {
-        if *qlen <= 0.0 {
+    /// * `qlenL &u32` - the query sequence's length
+    pub fn overlap_with_hit(&self, with: &Hit, qlen: &u32) -> f64 {
+        if *qlen == 0 {
             panic!(
-                "Function Hit.overlap_with_hit was given invalid query length (qlen) argument <= 0: {}",
+                "Function Hit.overlap_with_hit was given invalid query length (qlen) argument == 0: {}",
                 qlen
             );
         }
-        (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64 + 1.0) / qlen
+        (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64 + 1.0)
+            / *qlen as f64
     }
 
     /// Splits the Hit's description into words using the argument regular expression.
@@ -160,8 +161,8 @@ impl Hit {
     /// * `&self` - The instance of Hit itself
     /// * `to: &Hit` - The other instance of Hit taken from sequence similarity searches for the
     ///                same query.
-    /// * `qlen: &f64` - The length of the query the two argument hits were found for.
-    pub fn similarity(&self, to: &Hit, qlen: &f64) -> f64 {
+    /// * `qlen: &u32` - The length of the query the two argument hits were found for.
+    pub fn similarity(&self, to: &Hit, qlen: &u32) -> f64 {
         let o = self.overlap_with_hit(to, qlen);
         let dd = self.description_similarity(to);
         (o + dd) / 2.0
@@ -199,7 +200,7 @@ mod tests {
             "Hit_Two", "100", "26", "50", "200", "76", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
-        let o = h1.overlap_with_hit(&h2, &100.0);
+        let o = h1.overlap_with_hit(&h2, &100);
         assert_eq!(o, 0.25);
     }
 
@@ -230,7 +231,7 @@ mod tests {
             "Hit_Two", "100", "26", "50", "200", "76", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
-        let d1 = h1.similarity(&h2, &100.0);
+        let d1 = h1.similarity(&h2, &100);
         assert_eq!(d1, 0.625);
         let h3 = Hit::new(
             "Hit_One", "100", "1", "50", "200", "51", "110", "500.0",
@@ -240,7 +241,7 @@ mod tests {
             "Hit_Two", "100", "1", "50", "200", "101", "200", "100.0",
             "sp|C0LGP4|Y3475_ARATH serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
-        let d2 = h3.similarity(&h4, &100.0);
+        let d2 = h3.similarity(&h4, &100);
         // println!(
         //     "h4.description_similarity(h3) = {}",
         //     h4.description_similarity(&h3)
@@ -266,10 +267,10 @@ mod tests {
         // query.qlen = F64(100.0);
         // query.add_hit(&h1);
         // query.add_hit(&h2);
-        let sim = h1.similarity(&h2, &100.0);
+        let sim = h1.similarity(&h2, &100);
         assert!(!sim.is_infinite());
         assert_eq!(sim, 0.75);
-        let sim_zero = h2.similarity(&h3, &100.0);
+        let sim_zero = h2.similarity(&h3, &100);
         assert!(!sim_zero.is_infinite());
         assert_eq!(sim_zero, 0.0);
         // Test similarity between hits after setting the bit-score scaling factor:
@@ -290,7 +291,7 @@ mod tests {
         query_frivolous.add_hit(&h4);
         query_frivolous.add_hit(&h5);
         query_frivolous.find_bitscore_scaling_factor();
-        let h3_h5 = h3.similarity(&h5, &100.0);
+        let h3_h5 = h3.similarity(&h5, &100);
         // println!(
         //     "Similarity between Hits that align to DISJOINT regions of the query and have no shared words in their respective descriptions is: {:?}",
         //     h3_h5

@@ -93,15 +93,15 @@ mod tests {
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let mut query = Query::from_qacc("Query_Curious".to_string());
-        query.qlen = F64(100.0);
+        query.qlen = 100;
         query.add_hit(&h1);
         query.add_hit(&h2);
         query.find_bitscore_scaling_factor();
         let sim_mtrx = query.to_similarity_matrix();
         // println!("Query.to_similarity_matrix() yields:\n{:?}\n", sim_mtrx);
         let expected = arr2(&[
-            [0.0, h1.similarity(&h2, &query.qlen.0)],
-            [h1.similarity(&h2, &query.qlen.0), 0.0],
+            [0.0, h1.similarity(&h2, &query.qlen)],
+            [h1.similarity(&h2, &query.qlen), 0.0],
         ]);
         assert_eq!(sim_mtrx.1, expected);
         assert!(query.seq_sim_mtrx_node_names.len() == 2);
@@ -121,7 +121,7 @@ mod tests {
             "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
             );
         let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
-        query_frivolous.qlen = F64(100.0);
+        query_frivolous.qlen = 100;
         query_frivolous.add_hit(&h3);
         query_frivolous.add_hit(&h4);
         query_frivolous.add_hit(&h5);
@@ -146,7 +146,7 @@ mod tests {
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let mut query = Query::from_qacc("Query_Curious".to_string());
-        query.qlen = F64(100.0);
+        query.qlen = 100;
         query.add_hit(&h1);
         query.add_hit(&h2);
         query.cluster_hits();
@@ -165,7 +165,7 @@ mod tests {
         );
         // Test query that has NO hits:
         let mut query_no_hits = Query::from_qacc("Query_So_Lonely".to_string());
-        query_no_hits.qlen = F64(123.0);
+        query_no_hits.qlen = 123;
         query_no_hits.cluster_hits();
         assert_eq!(query_no_hits.clusters.len(), 0);
         // Test query that should produce TWO clusters:
@@ -182,7 +182,7 @@ mod tests {
             "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
             );
         let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
-        query_frivolous.qlen = F64(100.0);
+        query_frivolous.qlen = 100;
         query_frivolous.add_hit(&h3);
         query_frivolous.add_hit(&h4);
         query_frivolous.add_hit(&h5);
@@ -232,7 +232,7 @@ mod tests {
             "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
             );
         let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
-        query_frivolous.qlen = F64(100.0);
+        query_frivolous.qlen = 100;
         query_frivolous.add_hit(&h3);
         query_frivolous.add_hit(&h4);
         query_frivolous.add_hit(&h5);
@@ -298,7 +298,7 @@ mod tests {
             "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
             );
         let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
-        query_frivolous.qlen = F64(100.0);
+        query_frivolous.qlen = 100;
         query_frivolous.add_hit(&h3);
         query_frivolous.add_hit(&h4);
         query_frivolous.add_hit(&h5);
@@ -313,5 +313,33 @@ mod tests {
             best_scoring_cluster_consensus_description,
             "LRR receptor-like serine/threonine-protein kinase"
         );
+    }
+
+    #[test]
+    fn test_cluster_aligned_query_region() {
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "45", "100", "51", "100", "500.0",
+            "sp|C0LGP4|Y3475_ARATH LRR receptor-like serine/threonine-protein kinase OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Four", "100", "10", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "100", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Cytochrome P450 11B1, mitochondrial OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
+        query_frivolous.qlen = 100;
+        query_frivolous.add_hit(&h3);
+        query_frivolous.add_hit(&h4);
+        query_frivolous.add_hit(&h5);
+        // println!("query_frivolous'\n{:?}", query_frivolous);
+        let clstr_three_four_query_region = query_frivolous
+            .cluster_aligned_query_region(&vec!["Hit_Three".to_string(), "Hit_Four".to_string()]);
+        assert_eq!(clstr_three_four_query_region, Some((10u32, 45u32)));
+        let clstr_three_five_query_region = query_frivolous
+            .cluster_aligned_query_region(&vec!["Hit_Three".to_string(), "Hit_Five".to_string()]);
+        assert_eq!(clstr_three_five_query_region, None);
     }
 }

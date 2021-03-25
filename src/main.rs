@@ -8,6 +8,7 @@ mod default;
 mod hit;
 mod models;
 mod query;
+mod query_tests;
 mod seq_sim_clustering;
 mod seq_sim_table_reader;
 

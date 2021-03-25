@@ -1,8 +1,9 @@
-/// This module contains the unit tests for struct Query. Moved the tests to a different file,
-/// because they grew too large.
+/// This module contains the unit tests for struct Query. Moved the tests to a different (this)
+/// file, because they grew too large.
 
 #[cfg(test)]
 mod tests {
+    use crate::cluster::*;
     use crate::default::SPLIT_DESCRIPTION_REGEX;
     use crate::hit::*;
     use crate::query::*;
@@ -164,8 +165,17 @@ mod tests {
                 > query.hits.get("Hit_Two").unwrap().query_similarity_score
         );
         assert_eq!(
-            query.clusters.get(0).unwrap().aligned_query_region,
-            Some((1, 50))
+            query.clusters.get(0).unwrap().aligned_query_region.qstart,
+            1
+        );
+        assert_eq!(query.clusters.get(0).unwrap().aligned_query_region.qend, 50);
+        assert!(
+            query
+                .clusters
+                .get(0)
+                .unwrap()
+                .aligned_query_region
+                .all_hits_overlap
         );
         // Test query that has NO hits:
         let mut query_no_hits = Query::from_qacc("Query_So_Lonely".to_string());
@@ -219,21 +229,44 @@ mod tests {
                 .clusters
                 .get(0)
                 .unwrap()
-                .aligned_query_region,
-            Some((1, 50))
+                .aligned_query_region
+                .qstart,
+            1
+        );
+        assert_eq!(
+            query_frivolous
+                .clusters
+                .get(0)
+                .unwrap()
+                .aligned_query_region
+                .qend,
+            50
+        );
+        assert!(
+            query_frivolous
+                .clusters
+                .get(0)
+                .unwrap()
+                .aligned_query_region
+                .all_hits_overlap
         );
         assert!(query_frivolous
             .clusters
             .get(1)
             .unwrap()
             .contains(&"Hit_Five".to_string()));
+        let expected_clstr_1_algn_reg = AlignedQueryRegion {
+            qstart: 51,
+            qend: 100,
+            all_hits_overlap: true,
+        };
         assert_eq!(
             query_frivolous
                 .clusters
                 .get(1)
                 .unwrap()
                 .aligned_query_region,
-            Some((51, 100))
+            expected_clstr_1_algn_reg
         );
     }
 
@@ -357,9 +390,19 @@ mod tests {
         // println!("query_frivolous'\n{:?}", query_frivolous);
         let clstr_three_four_query_region = query_frivolous
             .cluster_aligned_query_region(&vec!["Hit_Three".to_string(), "Hit_Four".to_string()]);
-        assert_eq!(clstr_three_four_query_region, Some((10u32, 45u32)));
+        let exp_clstr_three_four_algn_reg = AlignedQueryRegion {
+            qstart: 10,
+            qend: 45,
+            all_hits_overlap: true,
+        };
+        assert_eq!(clstr_three_four_query_region, exp_clstr_three_four_algn_reg);
         let clstr_three_five_query_region = query_frivolous
             .cluster_aligned_query_region(&vec!["Hit_Three".to_string(), "Hit_Five".to_string()]);
-        assert_eq!(clstr_three_five_query_region, None);
+        let exp_clstr_five_query_reg = AlignedQueryRegion {
+            qstart: 1,
+            qend: 100,
+            all_hits_overlap: false,
+        };
+        assert_eq!(clstr_three_five_query_region, exp_clstr_five_query_reg);
     }
 }

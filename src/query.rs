@@ -284,10 +284,14 @@ impl Query {
     }
 
     /// Function identifies the region in the pairwise local alignments between the hits and the
-    /// query. The region is returned as that stretch of the query sequence that is covered by all
-    /// of the pairwise local alignments between the hit_i and the query. Note that an Option<(u32,
-    /// u32)>` is returned. In case there is _no_ query sequence region a cluster aligns to, None
-    /// is returned.
+    /// query. The region is defined in a strict and a relaxed sense. If a strict region can be
+    /// found, that is returned, otherwise the relaxed one. The strict region is the one _all_
+    /// argument hits' pairwise local alignments with the query overlap to. The relaxed region is
+    /// the maximally long stretch of the query sequence that is covered by any of the hits'
+    /// pairwise local alignments. Note that because of the nature of local sequence alignments
+    /// there will always be a relaxed region covered by one or more hits, even in case the two
+    /// pairwise local alignments (hits) do _not_ have an overlap! Return type is an instance of
+    /// struct `AlignedQueryRegion`.
     ///
     /// # Arguments
     ///
@@ -295,24 +299,66 @@ impl Query {
     /// * `hit_ids: &Vec<String>` - A reference to a vector of Hit identifiers that should be
     ///                             present among this query's hits. The region returned by this
     ///                             function will be calculated for these argument hit identifiers.
-    pub fn cluster_aligned_query_region(&self, hit_ids: &Vec<String>) -> Option<(u32, u32)> {
-        let mut max_qstart = 0u32;
+    pub fn cluster_aligned_query_region(&self, hit_ids: &Vec<String>) -> AlignedQueryRegion {
+        let mut min_qstart = self.qlen;
+        let mut max_qstart = 0;
         let mut min_qend = self.qlen;
+        let mut max_qend = 0;
         for hit_id in hit_ids {
             let hit_i = self.hits.get(hit_id).unwrap();
+            if hit_i.qstart < min_qstart {
+                min_qstart = hit_i.qstart;
+            }
             if hit_i.qstart > max_qstart {
                 max_qstart = hit_i.qstart;
+            }
+            if hit_i.qend > max_qend {
+                max_qend = hit_i.qend;
             }
             if hit_i.qend < min_qend {
                 min_qend = hit_i.qend;
             }
         }
-        if max_qstart < min_qend {
-            Some((max_qstart, min_qend))
+        if max_qstart <= min_qend {
+            AlignedQueryRegion {
+                qstart: max_qstart,
+                qend: min_qend,
+                all_hits_overlap: true,
+            }
+        } else if min_qstart <= max_qend {
+            AlignedQueryRegion {
+                qstart: min_qstart,
+                qend: max_qend,
+                all_hits_overlap: false,
+            }
         } else {
-            None
+            panic!(
+                "Invalid data in cluster_aligned_query_region; the cluster '{:?}' does not cover a query sequence region of query:\n{:?}",
+                hit_ids, self
+            );
         }
     }
+
+    // pub fn next_best_disjoint_cluster_indx(&self, cluster_indx: usize) -> Option<usize> {
+    //     // If there is one or less clusters, or the argument cluster already is the last, no next
+    //     // best scoring cluster exists:
+    //     if self.clusters.len() < 2 || cluster_indx == self.clusters.len() - 1 {
+    //         None
+    //     } else {
+    //         let cluster_region = self
+    //             .clusters
+    //             .get(cluster_indx)
+    //             .unwrap()
+    //             .aligned_query_region;
+    //         match cluster_region {
+    //             // The argument cluster does not align to a conserved region of the query
+    //             None => None,
+    //             Some(aligned_query_region) => {
+    //                 let mut next_cluster_indx: usize;
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 // For unit tests of struct Query see separate module `./src/query_tests.rs`. This file grew too

@@ -6,7 +6,37 @@ use std::cmp::Ordering;
 pub struct Cluster {
     pub hits: Vec<String>,
     pub score: F64,
-    pub aligned_query_region: Option<(u32, u32)>,
+    pub aligned_query_region: AlignedQueryRegion,
+}
+
+/// An instance of AlignedQueryRegion informs about the region, or sub-sequence, of the query to
+/// which all a cluster's hits' pairwise local sequence align. A region can be "strict" in the
+/// sense, that _all_ hits' align to this region, or "relaxed", i.e. non-strict, if just a subset
+/// of the hits align to parts of the region. See the following graphical examples:
+///
+/// * strict (`all_hits_overlap == true`)
+///
+/// query  =============
+/// hit_1     ----
+/// hit_2      ----
+/// hit_3    ----
+/// region     **
+///
+/// * relaxed (`all_hits_overlap == false`)
+///
+/// query  =============
+/// hit_1    ----
+/// hit_2        ---
+/// hit_3      ---
+/// region   *******
+#[derive(PartialEq, Eq, Debug, Clone, Default)]
+pub struct AlignedQueryRegion {
+    /// The position in the query sequence the region starts
+    pub qstart: u32,
+    /// The position in the query sequence the region ends
+    pub qend: u32,
+    /// Is the region a strict overlap, i.e. do all hits have pairwise alignment in this region?
+    pub all_hits_overlap: bool,
 }
 
 impl Cluster {

@@ -1,6 +1,6 @@
 use super::default::FILTER_REGEXS;
 use super::default::SPLIT_DESCRIPTION_REGEX;
-use super::models::{filter_stitle, overlap_with_query};
+use super::model_funcs::{filter_stitle, overlap_with_query};
 use eq_float::F64;
 use std::cmp::{max, min, Ordering};
 use std::collections::HashSet;
@@ -171,7 +171,6 @@ impl Hit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::default::*;
     use crate::query::*;
     use assert_approx_eq::assert_approx_eq;
 

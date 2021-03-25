@@ -6,7 +6,7 @@ use clap::{App, Arg};
 mod cluster;
 mod default;
 mod hit;
-mod models;
+mod model_funcs;
 mod query;
 mod query_tests;
 mod seq_sim_clustering;

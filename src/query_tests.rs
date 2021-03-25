@@ -3,6 +3,7 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::default::SPLIT_DESCRIPTION_REGEX;
     use crate::hit::*;
     use crate::query::*;
     use eq_float::F64;

@@ -9,8 +9,8 @@ use std::collections::HashSet;
 #[derive(PartialEq, Eq, Debug, Clone, Default)]
 pub struct Hit {
     pub id: String,
-    pub qstart: i64,
-    pub qend: i64,
+    pub qstart: u32,
+    pub qend: u32,
     pub bitscore: F64,
     pub overlap_with_query: F64,
     pub description: String,

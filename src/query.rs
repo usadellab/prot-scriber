@@ -277,6 +277,21 @@ impl Query {
             .collect::<Vec<String>>()
             .join(" ")
     }
+
+    pub fn cluster_aligned_query_region(&self, hit_ids: &Vec<String>) -> (u32, u32) {
+        let mut max_qstart = 0u32;
+        let mut min_qend = 0u32;
+        for hit_id in hit_ids {
+            let hit_i = self.hits.get(hit_id).unwrap();
+            if hit_i.qstart > max_qstart {
+                max_qstart = hit_i.qstart;
+            }
+            if hit_i.qend < min_qend {
+                min_qend = hit_i.qend;
+            }
+        }
+        (max_qstart, min_qend)
+    }
 }
 
 // For unit tests of struct Query see separate module `./src/query_tests.rs`. This file grew too

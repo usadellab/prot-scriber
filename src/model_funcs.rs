@@ -37,12 +37,12 @@ pub fn filter_stitle(stitle: &str, regexs: &Vec<Regex>) -> String {
 /// * qend - The end position of the local alignment in the query
 /// * qlen - The overall sequence length of the query
 pub fn overlap_with_query(
-    sstart: i64,
-    send: i64,
-    slen: i64,
-    qstart: i64,
-    qend: i64,
-    qlen: i64,
+    sstart: u32,
+    send: u32,
+    slen: u32,
+    qstart: u32,
+    qend: u32,
+    qlen: u32,
 ) -> F64 {
     F64((((qend - qstart + 1) + (send - sstart + 1)) as f64) / ((qlen + slen) as f64))
 }

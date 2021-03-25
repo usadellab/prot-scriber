@@ -163,6 +163,10 @@ mod tests {
             query.hits.get("Hit_One").unwrap().query_similarity_score
                 > query.hits.get("Hit_Two").unwrap().query_similarity_score
         );
+        assert_eq!(
+            query.clusters.get(0).unwrap().aligned_query_region,
+            Some((1, 50))
+        );
         // Test query that has NO hits:
         let mut query_no_hits = Query::from_qacc("Query_So_Lonely".to_string());
         query_no_hits.qlen = 123;
@@ -210,11 +214,27 @@ mod tests {
                     .unwrap()
                     .query_similarity_score
         );
+        assert_eq!(
+            query_frivolous
+                .clusters
+                .get(0)
+                .unwrap()
+                .aligned_query_region,
+            Some((1, 50))
+        );
         assert!(query_frivolous
             .clusters
             .get(1)
             .unwrap()
             .contains(&"Hit_Five".to_string()));
+        assert_eq!(
+            query_frivolous
+                .clusters
+                .get(1)
+                .unwrap()
+                .aligned_query_region,
+            Some((51, 100))
+        );
     }
 
     #[test]

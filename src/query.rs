@@ -47,6 +47,7 @@ impl Query {
                         })
                         .collect();
                     let score = self.calculate_cluster_score(&hits);
+                    let aligned_query_region = self.cluster_aligned_query_region(&hits);
                     // Sort hit identifier (in `hits`) by their respective
                     // Hit.query_similarity_score descending:
                     hits.sort_by(|a, b| {
@@ -55,7 +56,11 @@ impl Query {
                         // See Ord implementation for struct Query:
                         b_hit.cmp(a_hit)
                     });
-                    Cluster { hits, score }
+                    Cluster {
+                        hits,
+                        score,
+                        aligned_query_region,
+                    }
                 })
                 .collect();
             // Sort by score descending:

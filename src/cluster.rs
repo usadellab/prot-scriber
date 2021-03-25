@@ -6,6 +6,7 @@ use std::cmp::Ordering;
 pub struct Cluster {
     pub hits: Vec<String>,
     pub score: F64,
+    pub aligned_query_region: Option<(u32, u32)>,
 }
 
 impl Cluster {

@@ -100,7 +100,8 @@ impl Hit {
 
     /// Overlap between hits `o.hits( h1, h2 )` is defined as the overlap between the query's
     /// region the two respective hits aligned to. _Note_: Make sure both hits belong to the same
-    /// query! Returns the overlap (`f64`) calculated as follows:
+    /// query! Returns zero (0.0) or the arithmetic-overlap (`f64`), if it is greater or equal to
+    /// zero. The arithmetic overlap is calculated as follows:
     ///
     /// o.hits( h1, h2 ) =
     ///   ( min(qend.h1, qend.h2) - max(qstart.h1, qstart.h2) + 1.0 ) / qlen
@@ -120,8 +121,14 @@ impl Hit {
                 qlen
             );
         }
-        (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64 + 1.0)
-            / *qlen as f64
+        let arithmetic_overlap =
+            (min(self.qend, with.qend) as f64 - max(self.qstart, with.qstart) as f64 + 1.0)
+                / *qlen as f64;
+        if arithmetic_overlap < 0.0 {
+            0.0
+        } else {
+            arithmetic_overlap
+        }
     }
 
     /// Splits the Hit's description into words using the argument regular expression.
@@ -164,8 +171,8 @@ impl Hit {
     /// * `qlen: &u32` - The length of the query the two argument hits were found for.
     pub fn similarity(&self, to: &Hit, qlen: &u32) -> f64 {
         let o = self.overlap_with_hit(to, qlen);
-        let dd = self.description_similarity(to);
-        (o + dd) / 2.0
+        let d = self.description_similarity(to);
+        (o + d) / 2.0
     }
 }
 
@@ -202,6 +209,16 @@ mod tests {
             );
         let o = h1.overlap_with_hit(&h2, &100);
         assert_eq!(o, 0.25);
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "45", "100", "51", "100", "500.0",
+            "sp|C0LGP4|Y3475_ARATH serine/threonine-protein kinase OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "90", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Late blight detection OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let h3_h5 = h3.overlap_with_hit(&h5, &100);
+        assert_eq!(h3_h5, 0.0);
     }
 
     #[test]
@@ -247,6 +264,20 @@ mod tests {
         //     h4.description_similarity(&h3)
         // );
         assert_eq!(d2, 0.75);
+
+        // Assure no negative similarity scores are generated:
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "45", "100", "51", "100", "500.0",
+            "sp|C0LGP4|Y3475_ARATH serine/threonine-protein kinase OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "90", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Late blight detection OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        assert!(h3.similarity(&h4, &100) > 0.0);
+        let h3_h5_sim = h3.similarity(&h5, &100);
+        // println!("h3_h5_sim = {:?}", h3_h5_sim);
+        assert!(h3_h5_sim == 0.0);
     }
 
     #[test]

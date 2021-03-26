@@ -1,4 +1,5 @@
 use super::cluster::*;
+use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
 use super::hit::*;
 use super::seq_sim_clustering::*;
 use eq_float::F64;
@@ -300,6 +301,14 @@ impl Query {
     ///                             present among this query's hits. The region returned by this
     ///                             function will be calculated for these argument hit identifiers.
     pub fn cluster_aligned_query_region(&self, hit_ids: &Vec<String>) -> AlignedQueryRegion {
+        // Look for both a strict as well as a relaxed AlignedQueryRegion for the cluster
+        // (`hit_ids`):
+        // * Strict would be [max_qstart, min_qend],
+        //   but might not exit (min_qend - max_qstart < 0).
+        // * Relaxed will be used, if a strict region cannot be found; it spans:
+        //   [min_qstart, max_qend].
+        //   Note that with valid alignment data the following statement should always be true:
+        //   max_qend - min_qstart >= 0
         let mut min_qstart = self.qlen;
         let mut max_qstart = 0;
         let mut min_qend = self.qlen;
@@ -339,26 +348,57 @@ impl Query {
         }
     }
 
-    // pub fn next_best_disjoint_cluster_indx(&self, cluster_indx: usize) -> Option<usize> {
-    //     // If there is one or less clusters, or the argument cluster already is the last, no next
-    //     // best scoring cluster exists:
-    //     if self.clusters.len() < 2 || cluster_indx == self.clusters.len() - 1 {
-    //         None
-    //     } else {
-    //         let cluster_region = self
-    //             .clusters
-    //             .get(cluster_indx)
-    //             .unwrap()
-    //             .aligned_query_region;
-    //         match cluster_region {
-    //             // The argument cluster does not align to a conserved region of the query
-    //             None => None,
-    //             Some(aligned_query_region) => {
-    //                 let mut next_cluster_indx: usize;
-    //             }
-    //         }
-    //     }
-    // }
+    pub fn annotate(&self) -> String {
+        if self.clusters.len() > 0 {
+            let mut human_readable_description = String::new();
+            let mut annotated_regions: Vec<AlignedQueryRegion> = Vec::new();
+            let mut curr_clstr_indx = 0;
+            let mut has_disjoint_clstr_to_process = true;
+            while has_disjoint_clstr_to_process {
+                let curr_cluster = self.clusters.get(curr_clstr_indx).unwrap();
+                // Next iteration?
+                curr_clstr_indx += 1;
+                has_disjoint_clstr_to_process = curr_clstr_indx < self.clusters.len();
+            }
+            "".to_string()
+        } else {
+            (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
+        }
+    }
+
+    pub fn next_best_disjoint_cluster_indx(&self, cluster_indx: usize) -> Option<usize> {
+        // If there is one or less clusters, or the argument cluster already is the last, no next
+        // best scoring cluster exists:
+        if self.clusters.len() < 2 || cluster_indx >= self.clusters.len() - 1 {
+            return None;
+        } else {
+            // Collect all AlignedQueryRegions of the clusters up to argument cluster_indx. Note
+            // that clusters are sorted by their score.
+            let mut cluster_regions: Vec<AlignedQueryRegion> = (0..=cluster_indx)
+                .map(|i| self.clusters.get(i).unwrap().aligned_query_region.clone())
+                .collect();
+            // Iterate over the remaining clusters (after argument cluster_indx) and see, if you
+            // find one that is disjoint with _all_ clusters up and including the argument
+            // cluster_indx:
+            for i in (cluster_indx + 1)..self.clusters.len() {
+                // Process the current cluster _i_:
+                let clstr_i = self.clusters.get(i).unwrap();
+                if cluster_regions
+                    .iter()
+                    .all(|cr| cr.is_disjoint(&clstr_i.aligned_query_region))
+                {
+                    // break and return the found index:
+                    return Some(i);
+                } else {
+                    // continue search but include the current cluster's AlignedQueryRegion:
+                    cluster_regions.push(clstr_i.aligned_query_region.clone());
+                }
+            }
+            // None of the clusters following argument cluster_indx was disjoint with the clusters
+            // up to and including cluster_indx:
+            return None;
+        }
+    }
 }
 
 // For unit tests of struct Query see separate module `./src/query_tests.rs`. This file grew too

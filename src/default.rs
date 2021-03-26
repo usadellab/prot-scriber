@@ -51,4 +51,12 @@ lazy_static! {
 
     /// The default number of digits to round stochastic matrices' decimal values to
     pub static ref ROUND_DECIMAL_DIGITS: i32 = 4;
+
+    /// The default short description to be used for queries for which no reasonable description
+    /// can be generated
+    pub static ref UNKNOWN_PROTEIN_DESCRIPTION: &'static str = "unknown protein";
+
+    /// The default string is used to collapse (join) consensus descriptions of disjoint
+    /// hit-clusters:
+    pub static ref CLUSTER_CONSENSUS_DESCRIPTIONS_JOIN: &'static str = "; ";
 }

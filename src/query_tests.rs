@@ -4,7 +4,9 @@
 #[cfg(test)]
 mod tests {
     use crate::cluster::*;
-    use crate::default::SPLIT_DESCRIPTION_REGEX;
+    use crate::default::{
+        CLUSTER_CONSENSUS_DESCRIPTIONS_JOIN, SPLIT_DESCRIPTION_REGEX, UNKNOWN_PROTEIN_DESCRIPTION,
+    };
     use crate::hit::*;
     use crate::query::*;
     use eq_float::F64;
@@ -404,5 +406,123 @@ mod tests {
             all_hits_overlap: false,
         };
         assert_eq!(clstr_three_five_query_region, exp_clstr_five_query_reg);
+    }
+
+    #[test]
+    fn test_annotate() {
+        let mut query_no_hits = Query::from_qacc("Query_So_Lonely".to_string());
+        query_no_hits.qlen = 123;
+        query_no_hits.cluster_hits();
+        assert_eq!(
+            query_no_hits.annotate(),
+            (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
+        );
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "45", "100", "51", "100", "500.0",
+            "sp|C0LGP4|Y3475_ARATH serine/threonine-protein kinase OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Four", "100", "10", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "100", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Late blight detection OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
+        query_frivolous.qlen = 100;
+        query_frivolous.add_hit(&h3);
+        query_frivolous.add_hit(&h4);
+        query_frivolous.add_hit(&h5);
+        query_frivolous.cluster_hits();
+        let exp_query_frivolous_annotation = vec![
+            "serine/threonine-protein kinase".to_string(),
+            "Late blight detection".to_string(),
+        ]
+        .join(*CLUSTER_CONSENSUS_DESCRIPTIONS_JOIN);
+        assert_eq!(query_frivolous.annotate(), exp_query_frivolous_annotation);
+    }
+
+    #[test]
+    fn test_next_best_disjoint_cluster_indx() {
+        let mut query_no_hits = Query::from_qacc("Query_So_Lonely".to_string());
+        query_no_hits.qlen = 123;
+        query_no_hits.cluster_hits();
+        assert_eq!(query_no_hits.next_best_disjoint_cluster_indx(0), None);
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "45", "100", "51", "100", "500.0",
+            "sp|C0LGP4|Y3475_ARATH serine/threonine-protein kinase OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Four", "100", "10", "50", "200", "101", "200", "100.0",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h5 = Hit::new(
+            "Hit_Five", "100", "51", "90", "300", "201", "300", "10.0",
+            "sp|P15538|C11B1_HUMAN Late blight detection OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let h6 = Hit::new(
+            "Hit_Six",
+            "100",
+            "91",
+            "95",
+            "300",
+            "201",
+            "208",
+            "5.0",
+            "sp|P15538|C11B1_HUMAN Grizzly Gummy Bear OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5",
+        );
+        let h7 = Hit::new(
+            "Hit_Seven",
+            "100",
+            "96",
+            "100",
+            "300",
+            "201",
+            "208",
+            "5.0",
+            "sp|P15538|C11B1_HUMAN Grizzly Gummy Bear OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5",
+        );
+        let h8 = Hit::new(
+            "Hit_Eight(Four_Prime)", "100", "50", "50", "200", "101", "200", "100.0",
+            "sp|P15538|C11B1_HUMAN Completely different description than Hit Four so they do not cluster OS=Homo sapiens OX=9606 GN=CYP11B1 PE=1 SV=5"
+            );
+        let mut query_frivolous = Query::from_qacc("Query_Frivolous".to_string());
+        query_frivolous.qlen = 100;
+        query_frivolous.add_hit(&h3);
+        query_frivolous.add_hit(&h4);
+        query_frivolous.add_hit(&h5);
+        query_frivolous.add_hit(&h6);
+        query_frivolous.add_hit(&h7);
+        query_frivolous.add_hit(&h8);
+        //
+        //query_frivolous.find_bitscore_scaling_factor();
+        // println!(
+        //     "Hit_Five.similarity(Hit_Eight) = {}",
+        //     query_frivolous.hits.get("Hit_Five").unwrap().similarity(
+        //         &query_frivolous.hits.get("Hit_Eight(Four_Prime)").unwrap(),
+        //         &100
+        //     )
+        // );
+        //println!(
+        //    "query_frivolous.to_similarity_matrix() = {:?}",
+        //    query_frivolous.to_similarity_matrix()
+        //);
+        query_frivolous.cluster_hits();
+        // println!(
+        //     "Testing next_best_disjoint_cluster_indx. query_frivolous:\n{:?}",
+        //     query_frivolous
+        // );
+        assert_eq!(query_frivolous.next_best_disjoint_cluster_indx(0), Some(1));
+        assert_eq!(query_frivolous.next_best_disjoint_cluster_indx(1), Some(2));
+        assert_eq!(
+            query_frivolous.next_best_disjoint_cluster_indx(query_frivolous.clusters.len() - 1),
+            None
+        );
+        assert_eq!(
+            query_frivolous.next_best_disjoint_cluster_indx(query_frivolous.clusters.len()),
+            None
+        );
+        assert_eq!(query_frivolous.next_best_disjoint_cluster_indx(10), None);
     }
 }

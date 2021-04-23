@@ -64,3 +64,18 @@ parseSeqSimSearchTable <- function(path.to.table, col.names = c("qseqid",
     }
     sss.tbl
 }
+
+#' Reads in a mercator4 table and parses its 
+#'
+#' @param path.to.table - A valid path to a seq-sim-search result table. Separator MUST be TAB.
+#' @param col.names - A character vector with column names. Default is
+#' c("BINCODE", "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE"))
+#
+#'
+#' @return
+#' @export
+parseMercator4Tbl <- function(path.to.table, col.names = c("BINCODE", "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE")) {
+   m.dt <- fread(path.to.table, sep = "\t", header = TRUE, stringsAsFactors = FALSE,na.strings = "", quote = "")
+   m.dt$TYPE <- ifelse(is.na(dt$TYPE), FALSE, TRUE)
+   m.dt
+}

@@ -46,7 +46,8 @@ pc.mercator <- parseMercator4Tblout(args$`mercator-table`)
 pc.pfamA <- parseHmmer3Tblout(args$`hmmer3-vs-pfamA-tblout`)
 
 #' Save results:
-save(pc.mercator, pc.pfamA, file = file.path(args$`data-dir`, "p_coccineus_pfamA_Mercator4.RData"))
+save(pc.mercator, pc.pfamA, file = file.path(args$`data-dir`, 
+    "p_coccineus_pfamA_Mercator4.RData"))
 
 #' DONE
 message("DONE")

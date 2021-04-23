@@ -68,17 +68,20 @@ parseSeqSimSearchTable <- function(path.to.table, col.names = c("qseqid",
 
 #' Reads in a mercator4 table and parses it into a data.table
 #'
-#' @param path.to.table - A valid path to a seq-sim-search result table. Separator MUST be TAB.
+#' @param path.to.table - A valid path to a seq-sim-search result table.
+#' Separator MUST be TAB.
 #' @param col.names - A character vector with column names. Default is
-#' c("BINCODE", "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE"))
+#' c('BINCODE', 'NAME', 'IDENTIFIER', 'DESCRIPTION', 'TYPE'))
 #'
 #' @return  An instance of `data.table::data.table` containing the Mercator4
 #' `--tblout` content.
 #' @export
-parseMercator4Tblout <- function(path.to.table, col.names = c("BINCODE", "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE")) {
-   m.dt <- fread(path.to.table, sep = "\t", header = TRUE, stringsAsFactors = FALSE,na.strings = "", quote = "")
-   m.dt$TYPE <- !is.na(m.dt$TYPE)
-   m.dt
+parseMercator4Tblout <- function(path.to.table, col.names = c("BINCODE", 
+    "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE")) {
+    m.dt <- fread(path.to.table, sep = "\t", header = TRUE, stringsAsFactors = FALSE, 
+        na.strings = "", quote = "")
+    m.dt$TYPE <- !is.na(m.dt$TYPE)
+    m.dt
 }
 
 #' Parse HMMER3 `--tblout` tabular output. Because this is a fixed width table
@@ -115,13 +118,13 @@ parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d'
 #' @param in.desc - The input HRD
 #' @param split.regex - A regular expression used to split the argument HRD
 #' (see base::strsplit). Default is
-#' getOption("splitDescriptionIntoWordSet.spit.regex", "\\s+|\\.")
+#' getOption('splitDescriptionIntoWordSet.spit.regex', '\\s+|\\.')
 #' @param blacklist.regex - A character vector of regular expressions to be used to
 #' identify non meaningful words, i.e. those to be excluded from the result.
-#' Default is getOption("splitDescriptionIntoWordSet.spit.regex", "\\s+|\\.")
+#' Default is getOption('splitDescriptionIntoWordSet.spit.regex', '\\s+|\\.')
 #' @param lowercase.words - A boolean flag indicating whether to return all
 #' words in lower case. Default is
-#' getOption("splitDescriptionIntoWordSet.lowercase.words", TRUE)
+#' getOption('splitDescriptionIntoWordSet.lowercase.words', TRUE)
 #'
 #' @return A character vector of informative words extracted from the argument
 #' `in.desc` HRD.

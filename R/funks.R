@@ -101,7 +101,7 @@ parseMercator4Tblout <- function(path.to.table, col.names = c("BINCODE",
 #' `--tblout` content.
 #' @export
 parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d' @FILE@ | awk -F \"\" 'match($0,/^(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(.+)$/,a){print a[1] \"\\t\" a[2] \"\\t\" a[3] \"\\t\" a[4] \"\\t\" a[5] \"\\t\" a[6] \"\\t\" a[7] \"\\t\" a[8] \"\\t\" a[9] \"\\t\" a[10] \"\\t\" a[11] \"\\t\" a[12] \"\\t\" a[13] \"\\t\" a[14] \"\\t\" a[15] \"\\t\" a[16] \"\\t\" a[17] \"\\t\" a[18] \"\\t\" a[19]}'", 
-    col.names = c("target.name", "accession", "query.name", "accession", 
+    col.names = c("target.name", "accession", "query.name", "accession.2", 
         "E-value", "score", "bias", "E-value", "score", "bias", 
         "exp", "reg", "clu", "ov", "env", "dom", "rep", "inc", 
         "description.of.target")) {

@@ -8,8 +8,6 @@ Maintainer: Dr. Asis Hallab <a.hallab@fz-juelich.de>
 Description: Assesses the quality of candidate short human readable protein descriptions.
 License: GPL-3
 Encoding: UTF-8
-LazyData: true
-LazyLoad: true
 Depends:
     R (>= 3.6.0),
     parallel (>= 3.6.0),

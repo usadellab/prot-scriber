@@ -1,0 +1,18 @@
+Package: prot.scriber
+Type: Package
+Title: Assesses the quality of candidate short human readable protein descriptions.
+Version: 0.1
+Date: 2021-04-22
+Author: Dr. Asis Hallab <a.hallab@fz-juelich.de>
+Maintainer: Dr. Asis Hallab <a.hallab@fz-juelich.de>
+Description: Assesses the quality of candidate short human readable protein descriptions.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+LazyLoad: true
+Depends:
+    R (>= 3.6.0),
+    parallel (>= 3.6.0),
+    data.table (>= 1.12.8),
+    optparse (>= 1.6.4)
+RoxygenNote: 7.1.0

@@ -1,0 +1,196 @@
+>sp|O80931|AS1_ARATH Transcription factor AS1 OS=Arabidopsis thaliana GN=AS1 PE=1 SV=1
+>sp|P22035|BAS1_YEAST Myb-like DNA-binding protein BAS1 OS=Saccharomyces cerevisiae (strain ATCC 204508 / S288c) GN=BAS1 PE=1 SV=1
+>sp|P92948|CDC5L_ARATH Cell division cycle 5-like protein OS=Arabidopsis thaliana GN=CDC5 PE=1 SV=2
+>sp|Q2KJC1|CDC5L_BOVIN Cell division cycle 5-like protein OS=Bos taurus GN=CDC5L PE=2 SV=1
+>sp|Q54WZ0|CDC5L_DICDI Cell division cycle 5-like protein OS=Dictyostelium discoideum GN=cdc5l PE=3 SV=1
+>sp|Q99459|CDC5L_HUMAN Cell division cycle 5-like protein OS=Homo sapiens GN=CDC5L PE=1 SV=2
+>sp|Q6A068|CDC5L_MOUSE Cell division cycle 5-like protein OS=Mus musculus GN=Cdc5l PE=1 SV=2
+>sp|A7SD85|CDC5L_NEMVE Cell division cycle 5-related protein OS=Nematostella vectensis GN=cdc5l PE=3 SV=1
+>sp|O08837|CDC5L_RAT Cell division cycle 5-like protein OS=Rattus norvegicus GN=Cdc5l PE=1 SV=2
+>sp|Q756C3|CEF1_ASHGO Pre-mRNA-splicing factor CEF1 OS=Ashbya gossypii (strain ATCC 10895 / CBS 109.51 / FGSC 9923 / NRRL Y-1056) GN=CEF1 PE=3 SV=1
+>sp|Q4WHG0|CEF1_ASPFU Pre-mRNA-splicing factor cef1 OS=Neosartorya fumigata (strain ATCC MYA-4609 / Af293 / CBS 101355 / FGSC A1100) GN=cef1 PE=3 SV=1
+>sp|Q5APG6|CEF1_CANAL Pre-mRNA-splicing factor CEF1 OS=Candida albicans (strain SC5314 / ATCC MYA-2876) GN=CEF1 PE=3 SV=2
+>sp|Q6FUG1|CEF1_CANGA Pre-mRNA-splicing factor CEF1 OS=Candida glabrata (strain ATCC 2001 / CBS 138 / JCM 3761 / NBRC 0622 / NRRL Y-65) GN=CEF1 PE=3 SV=1
+>sp|P0CO95|CEF1_CRYNB Pre-mRNA-splicing factor CEF1 OS=Cryptococcus neoformans var. neoformans serotype D (strain B-3501A) GN=CEF1 PE=3 SV=1
+>sp|P0CO94|CEF1_CRYNJ Pre-mRNA-splicing factor CEF1 OS=Cryptococcus neoformans var. neoformans serotype D (strain JEC21 / ATCC MYA-565) GN=CEF1 PE=3 SV=1
+>sp|Q6BLT3|CEF1_DEBHA Pre-mRNA-splicing factor CEF1 OS=Debaryomyces hansenii (strain ATCC 36239 / CBS 767 / JCM 1990 / NBRC 0083 / IGC 2968) GN=CEF1 PE=3 SV=2
+>sp|C8VBH3|CEF1_EMENI Pre-mRNA-splicing factor cef1 OS=Emericella nidulans (strain FGSC A4 / ATCC 38163 / CBS 112.46 / NRRL 194 / M139) GN=cef1 PE=3 SV=1
+>sp|Q6CU65|CEF1_KLULA Pre-mRNA-splicing factor CEF1 OS=Kluyveromyces lactis (strain ATCC 8585 / CBS 2359 / DSM 70799 / NBRC 1267 / NRRL Y-1140 / WM37) GN=CEF1 PE=3 SV=1
+>sp|Q52G60|CEF1_MAGO7 Pre-mRNA-splicing factor CEF1 OS=Magnaporthe oryzae (strain 70-15 / ATCC MYA-4617 / FGSC 8958) GN=CEF1 PE=3 SV=1
+>sp|Q7SAF6|CEF1_NEUCR Pre-mRNA-splicing factor cef-1 OS=Neurospora crassa (strain ATCC 24698 / 74-OR23-1A / CBS 708.71 / DSM 1257 / FGSC 987) GN=cef-1 PE=3 SV=1
+>sp|P39964|CEF1_SCHPO Pre-mRNA-splicing factor cdc5 OS=Schizosaccharomyces pombe (strain 972 / ATCC 24843) GN=cdc5 PE=1 SV=1
+>sp|Q4P652|CEF1_USTMA Pre-mRNA-splicing factor CEF1 OS=Ustilago maydis (strain 521 / FGSC 9021) GN=CEF1 PE=3 SV=1
+>sp|Q6C8F5|CEF1_YARLI Pre-mRNA-splicing factor CEF1 OS=Yarrowia lipolytica (strain CLIB 122 / E 150) GN=CEF1 PE=3 SV=1
+>sp|Q03654|CEF1_YEAST Pre-mRNA-splicing factor CEF1 OS=Saccharomyces cerevisiae (strain ATCC 204508 / S288c) GN=CEF1 PE=1 SV=1
+>sp|P32657|CHD1_YEAST Chromo domain-containing protein 1 OS=Saccharomyces cerevisiae (strain ATCC 204508 / S288c) GN=CHD1 PE=1 SV=1
+>sp|O22059|CPC_ARATH Transcription factor CPC OS=Arabidopsis thaliana GN=CPC PE=1 SV=1
+>sp|Q6DG03|DMTF1_DANRE Cyclin-D-binding Myb-like transcription factor 1 OS=Danio rerio GN=dmtf1 PE=2 SV=1
+>sp|Q9Y222|DMTF1_HUMAN Cyclin-D-binding Myb-like transcription factor 1 OS=Homo sapiens GN=DMTF1 PE=1 SV=1
+>sp|Q8CE22|DMTF1_MOUSE Cyclin-D-binding Myb-like transcription factor 1 OS=Mus musculus GN=Dmtf1 PE=1 SV=2
+>sp|Q66HG1|DMTF1_RAT Cyclin-D-binding Myb-like transcription factor 1 OS=Rattus norvegicus GN=Dmtf1 PE=2 SV=2
+>sp|A0A178VEK7|DUO1_ARATH Transcription factor DUO1 OS=Arabidopsis thaliana GN=DUO1 PE=1 SV=1
+>sp|Q9LNI5|ETC1_ARATH MYB-like transcription factor ETC1 OS=Arabidopsis thaliana GN=ETC1 PE=2 SV=1
+>sp|Q84RD1|ETC2_ARATH MYB-like transcription factor ETC2 OS=Arabidopsis thaliana GN=ETC2 PE=1 SV=1
+>sp|Q9M157|ETC3_ARATH MYB-like transcription factor ETC3 OS=Arabidopsis thaliana GN=ETC3 PE=2 SV=1
+>sp|C5BB03|FDHE_EDWI9 Protein FdhE homolog OS=Edwardsiella ictaluri (strain 93-146) GN=fdhE PE=3 SV=1
+>sp|A2WW87|GAM1_ORYSI Transcription factor GAMYB OS=Oryza sativa subsp. indica GN=GAM1 PE=2 SV=1
+>sp|Q0JIC2|GAMYB_ORYSJ Transcription factor GAMYB OS=Oryza sativa subsp. japonica GN=GAMYB PE=1 SV=1
+>sp|Q947R4|GL1_ARALY Trichome differentiation protein GL1 OS=Arabidopsis lyrata GN=GL1 PE=3 SV=2
+>sp|P27900|GL1_ARATH Trichome differentiation protein GL1 OS=Arabidopsis thaliana GN=GL1 PE=1 SV=2
+>sp|Q9US25|HRP1_SCHPO Chromodomain helicase hrp1 OS=Schizosaccharomyces pombe (strain 972 / ATCC 24843) GN=hrp1 PE=1 SV=1
+>sp|Q2QZJ8|JAMYB_ORYSJ Transcription factor JAMYB OS=Oryza sativa subsp. japonica GN=JAMYB PE=2 SV=1
+>sp|Q9M0K4|LAF1_ARATH Transcription factor LAF1 OS=Arabidopsis thaliana GN=LAF1 PE=1 SV=2
+>sp|O80883|MB101_ARATH Transcription factor MYB101 OS=Arabidopsis thaliana GN=MYB101 PE=2 SV=1
+>sp|Q9S7G7|MB3R1_ARATH Transcription factor MYB3R-1 OS=Arabidopsis thaliana GN=MYB3R1 PE=2 SV=1
+>sp|Q9SPN3|MB3R2_ARATH Transcription factor MYB3R-2 OS=Arabidopsis thaliana GN=MYB3R2 PE=2 SV=1
+>sp|Q0JHU7|MB3R2_ORYSJ Transcription factor MYB3R-2 OS=Oryza sativa subsp. japonica GN=MYB3R-2 PE=2 SV=1
+>sp|Q8H1P9|MB3R3_ARATH Transcription factor MYB3R-3 OS=Arabidopsis thaliana GN=MYB3R3 PE=1 SV=1
+>sp|Q94FL9|MB3R4_ARATH Transcription factor MYB3R-4 OS=Arabidopsis thaliana GN=MYB3R4 PE=1 SV=1
+>sp|Q6R032|MB3R5_ARATH Transcription factor MYB3R-5 OS=Arabidopsis thaliana GN=MYB3R5 PE=2 SV=1
+>sp|Q9LDR8|MY102_ARATH Transcription factor MYB102 OS=Arabidopsis thaliana GN=MYB102 PE=2 SV=1
+>sp|Q9SM27|MY104_ARATH Transcription factor MYB104 OS=Arabidopsis thaliana GN=MYB104 PE=2 SV=3
+>sp|Q9SEZ4|MY105_ARATH Transcription factor MYB105 OS=Arabidopsis thaliana GN=MYB105 PE=2 SV=1
+>sp|Q9LE63|MY106_ARATH Transcription factor MYB106 OS=Arabidopsis thaliana GN=MYB106 PE=2 SV=1
+>sp|Q9LDE1|MY108_ARATH Transcription factor MYB108 OS=Arabidopsis thaliana GN=MYB108 PE=1 SV=1
+>sp|Q9FJ07|MY111_ARATH Transcription factor MYB111 OS=Arabidopsis thaliana GN=MYB111 PE=1 SV=1
+>sp|Q9FNV9|MY113_ARATH Transcription factor MYB113 OS=Arabidopsis thaliana GN=MYB113 PE=1 SV=1
+>sp|Q9FNV8|MY114_ARATH Transcription factor MYB114 OS=Arabidopsis thaliana GN=MYB114 PE=1 SV=1
+>sp|Q1PDP9|MY115_ARATH Transcription factor MYB115 OS=Arabidopsis thaliana GN=MYB115 PE=2 SV=1
+>sp|Q9LQX5|MY117_ARATH Transcription factor MYB117 OS=Arabidopsis thaliana GN=MYB117 PE=2 SV=1
+>sp|Q9LVW4|MY118_ARATH Transcription factor MYB118 OS=Arabidopsis thaliana GN=MYB118 PE=2 SV=1
+>sp|Q94FL7|MY120_ARATH Transcription factor MYB120 OS=Arabidopsis thaliana GN=MYB120 PE=2 SV=1
+>sp|Q9C9C8|MY122_ARATH Transcription factor MYB122 OS=Arabidopsis thaliana GN=MYB122 PE=1 SV=1
+>sp|Q94FL6|MY124_ARATH Transcription factor MYB124 OS=Arabidopsis thaliana GN=MYB124 PE=1 SV=1
+>sp|P81391|MYB05_ANTMA Myb-related protein 305 OS=Antirrhinum majus GN=MYB305 PE=2 SV=1
+>sp|P81392|MYB06_ANTMA Myb-related protein 306 OS=Antirrhinum majus GN=MYB306 PE=2 SV=1
+>sp|P81393|MYB08_ANTMA Myb-related protein 308 OS=Antirrhinum majus GN=MYB308 PE=2 SV=1
+>sp|Q9LZK4|MYB11_ARATH Transcription factor MYB11 OS=Arabidopsis thaliana GN=MYB11 PE=1 SV=1
+>sp|O22264|MYB12_ARATH Transcription factor MYB12 OS=Arabidopsis thaliana GN=MYB12 PE=1 SV=1
+>sp|Q9LNC9|MYB13_ARATH Transcription factor MYB13 OS=Arabidopsis thaliana GN=MYB13 PE=2 SV=1
+>sp|Q9SJX8|MYB14_ARATH Transcription factor MYB14 OS=Arabidopsis thaliana GN=MYB14 PE=2 SV=1
+>sp|P81394|MYB15_ANTMA Myb-related protein 315 OS=Antirrhinum majus GN=MYB315 PE=2 SV=1
+>sp|Q9LTC4|MYB15_ARATH Transcription factor MYB15 OS=Arabidopsis thaliana GN=MYB15 PE=1 SV=1
+>sp|Q9LXF1|MYB16_ARATH Transcription factor MYB16 OS=Arabidopsis thaliana GN=MYB16 PE=2 SV=1
+>sp|Q9M2D9|MYB17_ARATH Transcription factor MYB41 OS=Arabidopsis thaliana GN=MYB17 PE=1 SV=1
+>sp|M1ETA5|MYB1R_BETVU Transcription factor MYB1 OS=Beta vulgaris GN=MYB1 PE=1 SV=1
+>sp|M1ETK3|MYB1W_BETVU Transcription factor MYB1 OS=Beta vulgaris GN=MYB1 PE=2 SV=1
+>sp|Q42575|MYB1_ARATH Transcription factor MYB1 OS=Arabidopsis thaliana GN=MYB1 PE=2 SV=1
+>sp|P20026|MYB1_HORVU Myb-related protein Hv1 OS=Hordeum vulgare GN=MYB1 PE=2 SV=1
+>sp|P20024|MYB1_MAIZE Myb-related protein Zm1 OS=Zea mays PE=2 SV=1
+>sp|O13493|MYB1_NEUCR Myb-like DNA-binding protein myb-1 OS=Neurospora crassa (strain ATCC 24698 / 74-OR23-1A / CBS 708.71 / DSM 1257 / FGSC 987) GN=rca-1 PE=3 SV=2
+>sp|P80074|MYB1_PHYPA Myb-related protein Pp1 (Fragment) OS=Physcomitrella patens subsp. patens GN=PP1 PE=2 SV=1
+>sp|Q9LK95|MYB21_ARATH Transcription factor MYB21 OS=Arabidopsis thaliana GN=MYB21 PE=1 SV=1
+>sp|Q96276|MYB23_ARATH Transcription factor MYB23 OS=Arabidopsis thaliana GN=MYB23 PE=1 SV=1
+>sp|Q9SPG9|MYB24_ARATH Transcription factor MYB24 OS=Arabidopsis thaliana GN=MYB24 PE=1 SV=1
+>sp|O04192|MYB25_ARATH Transcription factor MYB25 OS=Arabidopsis thaliana GN=MYB25 PE=2 SV=1
+>sp|Q9SPG3|MYB26_ARATH Transcription factor MYB26 OS=Arabidopsis thaliana GN=MYB26 PE=2 SV=1
+>sp|Q9SCP1|MYB27_ARATH Transcription factor MYB27 OS=Arabidopsis thaliana GN=MYB27 PE=2 SV=1
+>sp|Q9SPG2|MYB28_ARATH Transcription factor MYB28 OS=Arabidopsis thaliana GN=MYB28 PE=1 SV=1
+>sp|Q9FLR1|MYB29_ARATH Transcription factor MYB29 OS=Arabidopsis thaliana GN=MYB29 PE=1 SV=1
+>sp|Q10MB4|MYB2_ORYSJ Transcription factor MYB2 OS=Oryza sativa subsp. japonica GN=MYB2 PE=2 SV=1
+>sp|P80073|MYB2_PHYPA Myb-related protein Pp2 OS=Physcomitrella patens subsp. patens GN=PP2 PE=2 SV=1
+>sp|P81395|MYB30_ANTMA Myb-related protein 330 OS=Antirrhinum majus GN=MYB330 PE=2 SV=1
+>sp|Q9SCU7|MYB30_ARATH Transcription factor MYB30 OS=Arabidopsis thaliana GN=MYB30 PE=1 SV=1
+>sp|Q6K1S6|MYB30_ORYSJ Transcription factor MYB30 OS=Oryza sativa subsp. japonica GN=MYB30 PE=1 SV=1
+>sp|O49608|MYB32_ARATH Transcription factor MYB32 OS=Arabidopsis thaliana GN=MYB32 PE=2 SV=1
+>sp|Q8W1W6|MYB33_ARATH Transcription factor MYB33 OS=Arabidopsis thaliana GN=MYB33 PE=2 SV=1
+>sp|O64399|MYB34_ARATH Transcription factor MYB34 OS=Arabidopsis thaliana GN=MYB34 PE=1 SV=1
+>sp|Q9LSI7|MYB35_ARATH Transcription factor MYB35 OS=Arabidopsis thaliana GN=MYB35 PE=2 SV=1
+>sp|Q9FKL2|MYB36_ARATH Transcription factor MYB36 OS=Arabidopsis thaliana GN=MYB36 PE=1 SV=1
+>sp|P20025|MYB38_MAIZE Myb-related protein Zm38 OS=Zea mays PE=2 SV=1
+>sp|Q8GWP0|MYB39_ARATH Transcription factor MYB39 OS=Arabidopsis thaliana GN=MYB39 PE=2 SV=1
+>sp|Q9S9K9|MYB3_ARATH Transcription factor MYB3 OS=Arabidopsis thaliana GN=MYB3 PE=1 SV=1
+>sp|P20027|MYB3_HORVU Myb-related protein Hv33 OS=Hordeum vulgare GN=MYB2 PE=2 SV=3
+>sp|P81396|MYB40_ANTMA Myb-related protein 340 OS=Antirrhinum majus GN=MYB340 PE=2 SV=1
+>sp|Q9M0J5|MYB41_ARATH Transcription factor MYB41 OS=Arabidopsis thaliana GN=MYB41 PE=1 SV=1
+>sp|Q9FDW1|MYB44_ARATH Transcription factor MYB44 OS=Arabidopsis thaliana GN=MYB44 PE=2 SV=1
+>sp|Q9LXV2|MYB46_ARATH Transcription factor MYB46 OS=Arabidopsis thaliana GN=MYB46 PE=2 SV=1
+>sp|Q9LX82|MYB48_ARATH Transcription factor MYB48 OS=Arabidopsis thaliana GN=MYB48 PE=2 SV=1
+>sp|Q9SZP1|MYB4_ARATH Transcription repressor MYB4 OS=Arabidopsis thaliana GN=MYB4 PE=1 SV=1
+>sp|Q7XBH4|MYB4_ORYSJ Transcription factor MYB4 OS=Oryza sativa subsp. japonica GN=MYB4 PE=2 SV=2
+>sp|O49782|MYB51_ARATH Transcription factor MYB51 OS=Arabidopsis thaliana GN=MYB51 PE=1 SV=2
+>sp|Q6R0C4|MYB52_ARATH Transcription factor MYB52 OS=Arabidopsis thaliana GN=MYB52 PE=2 SV=1
+>sp|Q6R053|MYB56_ARATH Transcription factor MYB56 OS=Arabidopsis thaliana GN=MYB56 PE=1 SV=1
+>sp|Q9SSA1|MYB57_ARATH Transcription factor MYB57 OS=Arabidopsis thaliana GN=MYB57 PE=2 SV=1
+>sp|Q9SA47|MYB58_ARATH Transcription factor MYB58 OS=Arabidopsis thaliana GN=MYB58 PE=2 SV=1
+>sp|Q0JB89|MYB58_ORYSJ Probable transcription factor MYB58 OS=Oryza sativa subsp. japonica GN=MYB58 PE=3 SV=1
+>sp|Q4JL84|MYB59_ARATH Transcription factor MYB59 OS=Arabidopsis thaliana GN=MYB59 PE=2 SV=2
+>sp|Q38850|MYB5_ARATH Transcription repressor MYB5 OS=Arabidopsis thaliana GN=MYB5 PE=1 SV=1
+>sp|Q8VZQ2|MYB61_ARATH Transcription factor MYB61 OS=Arabidopsis thaliana GN=MYB61 PE=2 SV=1
+>sp|Q9C9G7|MYB62_ARATH Transcription factor MYB62 OS=Arabidopsis thaliana GN=MYB62 PE=2 SV=1
+>sp|Q6R0A6|MYB63_ARATH Transcription factor MYB63 OS=Arabidopsis thaliana GN=MYB63 PE=2 SV=1
+>sp|Q9FR97|MYB65_ARATH Transcription factor MYB65 OS=Arabidopsis thaliana GN=MYB65 PE=2 SV=1
+>sp|Q38851|MYB6_ARATH Transcription repressor MYB6 OS=Arabidopsis thaliana GN=MYB6 PE=1 SV=1
+>sp|Q9M0Y5|MYB74_ARATH Transcription factor MYB74 OS=Arabidopsis thaliana GN=MYB74 PE=2 SV=1
+>sp|Q9FE25|MYB75_ARATH Transcription factor MYB75 OS=Arabidopsis thaliana GN=MYB75 PE=1 SV=1
+>sp|Q9SPG5|MYB76_ARATH Transcription factor MYB76 OS=Arabidopsis thaliana GN=MYB76 PE=1 SV=1
+>sp|Q9FGY3|MYB78_ARATH Transcription factor MYB78 OS=Arabidopsis thaliana GN=MYB78 PE=2 SV=1
+>sp|Q42379|MYB7_ARATH Transcription factor MYB7 OS=Arabidopsis thaliana GN=MYB7 PE=1 SV=1
+>sp|Q9XHV0|MYB80_ARATH Transcription factor MYB80 OS=Arabidopsis thaliana GN=MYB80 PE=1 SV=1
+>sp|Q7XQN1|MYB80_ORYSJ Transcription factor MYB80 OS=Oryza sativa subsp. japonica GN=MYB80 PE=2 SV=2
+>sp|Q9LTF7|MYB82_ARATH Transcription factor MYB82 OS=Arabidopsis thaliana GN=MYB82 PE=1 SV=1
+>sp|Q8LPH6|MYB86_ARATH Transcription factor MYB86 OS=Arabidopsis thaliana GN=MYB86 PE=2 SV=1
+>sp|F4JSU0|MYB87_ARATH Transcription factor MYB87 OS=Arabidopsis thaliana GN=MYB87 PE=2 SV=1
+>sp|F4IRB4|MYB88_ARATH Transcription factor MYB88 OS=Arabidopsis thaliana GN=MYB88 PE=1 SV=1
+>sp|Q9SDS8|MYB8_ARATH Transcription factor MYB8 OS=Arabidopsis thaliana GN=MYB8 PE=2 SV=1
+>sp|Q9ZTC3|MYB90_ARATH Transcription factor MYB90 OS=Arabidopsis thaliana GN=MYB90 PE=1 SV=1
+>sp|Q9S773|MYB97_ARATH Transcription factor MYB97 OS=Arabidopsis thaliana GN=MYB97 PE=2 SV=1
+>sp|Q9S7L2|MYB98_ARATH Transcription factor MYB98 OS=Arabidopsis thaliana GN=MYB98 PE=2 SV=1
+>sp|Q53NK6|MYBA1_ORYSJ Myb-related protein MYBAS1 OS=Oryza sativa subsp. japonica GN=MYBAS1 PE=2 SV=1
+>sp|Q4JL76|MYBA2_ORYSJ Myb-related protein MYBAS2 OS=Oryza sativa subsp. japonica GN=MYBAS2 PE=2 SV=1
+>sp|B0G0Y5|MYBAA_DICDI Myb-like protein AA OS=Dictyostelium discoideum GN=mybAA PE=3 SV=1
+>sp|P52550|MYBA_CHICK Myb-related protein A OS=Gallus gallus GN=MYBL1 PE=2 SV=1
+>sp|P34127|MYBA_DICDI Myb-like protein A OS=Dictyostelium discoideum GN=mybA PE=4 SV=2
+>sp|P10243|MYBA_HUMAN Myb-related protein A OS=Homo sapiens GN=MYBL1 PE=1 SV=2
+>sp|P51960|MYBA_MOUSE Myb-related protein A OS=Mus musculus GN=Mybl1 PE=1 SV=2
+>sp|Q05935|MYBA_XENLA Myb-related protein A OS=Xenopus laevis GN=mybl1 PE=2 SV=1
+>sp|Q03237|MYBB_CHICK Myb-related protein B OS=Gallus gallus GN=MYBL2 PE=1 SV=1
+>sp|O15816|MYBB_DICDI Myb-like protein B OS=Dictyostelium discoideum GN=mybB PE=2 SV=2
+>sp|P10244|MYBB_HUMAN Myb-related protein B OS=Homo sapiens GN=MYBL2 PE=1 SV=1
+>sp|P48972|MYBB_MOUSE Myb-related protein B OS=Mus musculus GN=Mybl2 PE=1 SV=1
+>sp|P52551|MYBB_XENLA Myb-related protein B OS=Xenopus laevis GN=mybl2 PE=2 SV=2
+>sp|Q54TN2|MYBC_DICDI Myb-like protein C OS=Dictyostelium discoideum GN=mybC PE=1 SV=1
+>sp|P10290|MYBC_MAIZE Anthocyanin regulatory C1 protein OS=Zea mays GN=C1 PE=2 SV=1
+>sp|Q869R9|MYBJ_DICDI Myb-like protein J OS=Dictyostelium discoideum GN=mybJ PE=3 SV=1
+>sp|Q54NA6|MYBL_DICDI Myb-like protein L OS=Dictyostelium discoideum GN=mybL PE=3 SV=1
+>sp|Q55GK3|MYBM_DICDI Myb-like protein M OS=Dictyostelium discoideum GN=mybM PE=3 SV=1
+>sp|Q54CT1|MYBN_DICDI Myb-like protein N OS=Dictyostelium discoideum GN=mybN PE=3 SV=1
+>sp|P27898|MYBP_MAIZE Myb-related protein P OS=Zea mays GN=P PE=2 SV=1
+>sp|Q54HP1|MYBQ_DICDI Myb-like protein Q OS=Dictyostelium discoideum GN=mybQ PE=3 SV=1
+>sp|P01104|MYB_AVIMB Transforming protein Myb OS=Avian myeloblastosis virus GN=V-MYB PE=1 SV=2
+>sp|P46200|MYB_BOVIN Transcriptional activator Myb OS=Bos taurus GN=MYB PE=2 SV=1
+>sp|P01103|MYB_CHICK Transcriptional activator Myb OS=Gallus gallus GN=MYB PE=1 SV=1
+>sp|P04197|MYB_DROME Myb protein OS=Drosophila melanogaster GN=Myb PE=1 SV=2
+>sp|P10242|MYB_HUMAN Transcriptional activator Myb OS=Homo sapiens GN=MYB PE=1 SV=2
+>sp|P06876|MYB_MOUSE Transcriptional activator Myb OS=Mus musculus GN=Myb PE=1 SV=2
+>sp|Q08759|MYB_XENLA Transcriptional activator Myb OS=Xenopus laevis GN=myb PE=2 SV=1
+>sp|Q69Z66|MYSM1_MOUSE Histone H2A deubiquitinase MYSM1 OS=Mus musculus GN=Mysm1 PE=1 SV=2
+>sp|A0JMR6|MYSM1_XENLA Histone H2A deubiquitinase MYSM1 OS=Xenopus laevis GN=mysm1 PE=2 SV=1
+>sp|Q12457|NSI1_YEAST RNA polymerase I termination factor OS=Saccharomyces cerevisiae (strain ATCC 204508 / S288c) GN=NSI1 PE=1 SV=1
+>sp|Q50EX6|ODO1_PETHY Protein ODORANT1 OS=Petunia hybrida GN=ODO1 PE=2 SV=1
+>sp|Q8K124|PKHO2_MOUSE Pleckstrin homology domain-containing family O member 2 OS=Mus musculus GN=Plekho2 PE=1 SV=1
+>sp|Q9FG68|RAX1_ARATH Transcription factor RAX1 OS=Arabidopsis thaliana GN=RAX1 PE=2 SV=1
+>sp|Q9SJL7|RAX2_ARATH Transcription factor RAX2 OS=Arabidopsis thaliana GN=RAX2 PE=1 SV=1
+>sp|Q9M2Y9|RAX3_ARATH Transcription factor RAX3 OS=Arabidopsis thaliana GN=RAX3 PE=2 SV=1
+>sp|Q05950|REB1_KLULA DNA-binding protein REB1 OS=Kluyveromyces lactis (strain ATCC 8585 / CBS 2359 / DSM 70799 / NBRC 1267 / NRRL Y-1140 / WM37) GN=REB1 PE=3 SV=2
+>sp|Q9P6H9|REB1_SCHPO DNA-binding protein reb1 OS=Schizosaccharomyces pombe (strain 972 / ATCC 24843) GN=reb1 PE=1 SV=1
+>sp|P21538|REB1_YEAST DNA-binding protein REB1 OS=Saccharomyces cerevisiae (strain ATCC 204508 / S288c) GN=REB1 PE=1 SV=2
+>sp|Q1ML15|RLME_RHIL3 Ribosomal RNA large subunit methyltransferase E OS=Rhizobium leguminosarum bv. viciae (strain 3841) GN=rlmE PE=3 SV=1
+>sp|Q4UKG2|RLME_RICFE Ribosomal RNA large subunit methyltransferase E OS=Rickettsia felis (strain ATCC VR-1525 / URRWXCal2) GN=rlmE PE=3 SV=1
+>sp|Q9S7B2|RS2_MAIZE Protein rough sheath 2 OS=Zea mays GN=RS2 PE=1 SV=1
+>sp|Q94IB1|RS2_ORYSJ Protein rough sheath 2 homolog OS=Oryza sativa subsp. japonica GN=RS2 PE=2 SV=1
+>sp|P91868|SNPC4_CAEEL snRNA-activating protein complex subunit 4 homolog OS=Caenorhabditis elegans GN=snpc-4 PE=2 SV=1
+>sp|Q5SXM2|SNPC4_HUMAN snRNA-activating protein complex subunit 4 OS=Homo sapiens GN=SNAPC4 PE=1 SV=1
+>sp|Q8BP86|SNPC4_MOUSE snRNA-activating protein complex subunit 4 OS=Mus musculus GN=Snapc4 PE=1 SV=2
+>sp|Q97FJ7|SYH_CLOAB Histidine--tRNA ligase OS=Clostridium acetobutylicum (strain ATCC 824 / DSM 792 / JCM 1419 / LMG 5710 / VKM B-1787) GN=hisS PE=3 SV=1
+>sp|D3GKW6|TCL1_ARATH MYB-like transcription factor TCL1 OS=Arabidopsis thaliana GN=TCL1 PE=2 SV=1
+>sp|B3H4X8|TCL2_ARATH MYB-like transcription factor TCL2 OS=Arabidopsis thaliana GN=TCL2 PE=1 SV=1
+>sp|Q10274|TEB1_SCHPO Telobox protein 1 OS=Schizosaccharomyces pombe (strain 972 / ATCC 24843) GN=teb1 PE=1 SV=1
+>sp|C5CHB8|THYX_KOSOT Flavin-dependent thymidylate synthase OS=Kosmotoga olearia (strain TBF 19.5.1) GN=thyX PE=3 SV=1
+>sp|F4I7L1|TRB4_ARATH Telomere repeat-binding factor 4 OS=Arabidopsis thaliana GN=At1g17520 PE=2 SV=2
+>sp|F4IEY4|TRB5_ARATH Telomere repeat-binding factor 5 OS=Arabidopsis thaliana GN=At1g72740 PE=2 SV=1
+>sp|Q8GV05|TRY_ARATH Transcription factor TRY OS=Arabidopsis thaliana GN=TRY PE=1 SV=1
+>sp|Q9FJA2|TT2_ARATH Transcription factor TT2 OS=Arabidopsis thaliana GN=TT2 PE=1 SV=1
+>sp|Q9SEI0|WER_ARATH Transcription factor WER OS=Arabidopsis thaliana GN=WER PE=1 SV=1
+>sp|Q8TQ05|Y1747_METAC Putative ABC transporter ATP-binding protein MA_1747 OS=Methanosarcina acetivorans (strain ATCC 35395 / DSM 2834 / JCM 12185 / C2A) GN=MA_1747 PE=3 SV=1
+>sp|O34549|YLBO_BACSU Uncharacterized protein YlbO OS=Bacillus subtilis (strain 168) GN=ylbO PE=4 SV=1

@@ -108,7 +108,8 @@ parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d'
 #' words in lower case. Default is
 #' getOption("splitDescriptionIntoWordSet.lowercase.words", TRUE)
 #'
-#' @return return_value
+#' @return A character vector of informative words extracted from the argument
+#' `in.desc` HRD.
 #' @export
 wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSet.spit.regex", 
     "\\s+|\\."), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 

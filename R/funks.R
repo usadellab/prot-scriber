@@ -66,20 +66,21 @@ parseSeqSimSearchTable <- function(path.to.table, col.names = c("qseqid",
     sss.tbl
 }
 
-#' Reads in a mercator4 table and parses its 
+#' Reads in a mercator4 table and parses it into a data.table
 #'
 #' @param path.to.table - A valid path to a seq-sim-search result table. Separator MUST be TAB.
 #' @param col.names - A character vector with column names. Default is
 #' c("BINCODE", "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE"))
-#
 #'
-#' @return
+#' @return  An instance of `data.table::data.table` containing the Mercator4
+#' `--tblout` content.
 #' @export
-parseMercator4Tbl <- function(path.to.table, col.names = c("BINCODE", "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE")) {
+parseMercator4Tblout <- function(path.to.table, col.names = c("BINCODE", "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE")) {
    m.dt <- fread(path.to.table, sep = "\t", header = TRUE, stringsAsFactors = FALSE,na.strings = "", quote = "")
-   m.dt$TYPE <- ifelse(is.na(dt$TYPE), FALSE, TRUE)
+   m.dt$TYPE <- !is.na(m.dt$TYPE)
    m.dt
 }
+
 #' Parse HMMER3 `--tblout` tabular output. Because this is a fixed width table
 #' and no quoting is done, parsing it is quite a challange. This function uses
 #' `data.table::fread` with a sophisticated combination of `sed` and `awk` to

@@ -73,8 +73,8 @@ parseSeqSimSearchTable <- function(path.to.table, col.names = c("qseqid",
 #' @param col.names - A character vector with column names. Default is
 #' c('BINCODE', 'NAME', 'IDENTIFIER', 'DESCRIPTION', 'TYPE'))
 #'
-#' @return  An instance of `data.table::data.table` containing the Mercator4
-#' `--tblout` content.
+#' @return An instance of `data.table::data.table` containing the Mercator4
+#' tabular output.
 #' @export
 parseMercator4Tblout <- function(path.to.table, col.names = c("BINCODE", 
     "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE")) {
@@ -164,17 +164,25 @@ testWordSet <- function() {
     all(t1, t2, t3)
 }
 
+#' The Map-Man4 Bin Ontology has a root Bin '50' spanning a sub-tree of Bins
+#' whose classification has been extracted from KEGG's enzyme classification,
+#' which in their DESCRIPTION field also refer to the human readable
+#' description (HRD) of a Best Blast Hit (BBH). As we want to use both the
+#' NAME and the DESCRIPTION fields as reference and want to outcompete the Best
+#' Blast method, we need to exclude the HRD of the BBH from all Map-Man4 Bin
+#' '50' DESCRIPTIONs. This is done by this function.
+#'
+#' @param mm4.anno.tbl - An instance of `data.table` and the result of e.g.
+#' calling function `parseMercator4Tblout`.
+#'
+#' @return A modified version of argument `mm4.anno.tbl` in which HRD from BBH
+#' have been removed from the respective MapMan4 Bins' DESCRIPTION fields.
+#' @export
 curateMercator4Annos <- function(mm4.anno.tbl) {
-    enzyme.classification.regex <- "(^\\s*enzyme classification.+\\s+&\\s+)|(\\s+&\\s+enzyme classification.*$)"
-    bin.50.annos <- grepl("^50", mm4.anno.tbl$BINCODE) & mm4.anno.tbl$TYPE & 
-        grepl(enzyme.classification.regex, mm4.anno.tbl$DESCRIPTION, 
-            perl = TRUE, ignore.case = TRUE)
-    mm4.anno.tbl$DESCRIPTION[bin.50.annos] <- unlist(lapply(mm4.anno.tbl$DESCRIPTION[bin.50.annos], 
-        function(bin.50.desc) {
-            r.m <- regexec(enzyme.classification.regex, bin.50.desc, 
-                perl = TRUE, ignore.case = TRUE)
-            sub("\\s*&\\s*", "", regmatches(bin.50.desc, r.m)[[1]][[1]])
-        }))
+    bin.50.annos <- grepl("^50", mm4.anno.tbl$BINCODE) & mm4.anno.tbl$TYPE
+    #' The DESCRIPTIONs contain also those of the Best Blast Hit, but the NAMEs do
+    #' not:
+    mm4.anno.tbl$DESCRIPTION[bin.50.annos] <- mm4.anno.tbl$NAME[bin.50.annos]
     mm4.anno.tbl
 }
 
@@ -205,13 +213,58 @@ referenceWordListFromMercator4Annos <- function(mm4.anno.tbl,
     exclude.mm4.root.bins = getOption("referenceWordListFromMercator4Annos.exclude.mm4.root.bins", 
         c("35")), curate.annos.funk = getOption("referenceWordListFromMercator4Annos.curate.annos.funk", 
         curateMercator4Annos)) {
-    filter.i <- mm4.anno.tbl$TYPE & !grepl(paste0("^", paste(exclude.mm4.root.bins, 
+    mm4.curated.tbl <- curate.annos.funk(mm4.anno.tbl)
+    filter.i <- mm4.curated.tbl$TYPE & !grepl(paste0("^", paste(exclude.mm4.root.bins, 
         collapse = "|")), pc.mercator$BINCODE)
-    mm4.fltrd.tbl <- mm4.anno.tbl[filter.i, ]
-    uniq.prot.ids <- unique(mm4.fltrd.tbl[filter.i, ]$IDENTIFIER)
+    mm4.fltrd.tbl <- mm4.curated.tbl[filter.i, ]
+    uniq.prot.ids <- unique(mm4.fltrd.tbl$IDENTIFIER)
     setNames(mclapply(uniq.prot.ids, function(prot.id) {
         i <- which(mm4.fltrd.tbl$IDENTIFIER == prot.id)
-        mm4.descs <- as.character(mm4.fltrd.tbl[i, "DESCRIPTION"])
+        mm4.descs <- unlist(mm4.fltrd.tbl[i, c("NAME", "DESCRIPTION")])
         unique(unlist(lapply(mm4.descs, wordSet)))
     }), uniq.prot.ids)
+}
+
+
+#' Extract all Pfam-A descriptions from the protein function annotations
+#' in the argument table `pfamA.tbl`, split them into words and return them
+#' as references for performance evaluation. See function `wordSet` for
+#' details, particularly on how to provide its respective arguments as
+#' environment options.
+#'
+#' @param pfamA.tbl - An instance of `data.table` result from using function
+#' `parseMercator4Tblout`.
+#'
+#' @return A list with names being the protein identifiers and values character
+#' vectors of reference words.
+#' @export
+referenceWordListFromPfamAAnnos <- function(pfamA.tbl) {
+    uniq.prot.ids <- unique(pfamA.tbl$query.name)
+    setNames(mclapply(uniq.prot.ids, function(prot.id) {
+        i <- which(pfamA.tbl$query.name == prot.id)
+        mm4.descs <- unlist(pfamA.tbl[i, "description.of.target"])
+        unique(unlist(lapply(mm4.descs, wordSet)))
+    }), uniq.prot.ids)
+}
+
+#' Merges the two references obtained from Mercator4 and PfamA annotations.
+#' Note that, because Mercator4 lowercases protein identifiers the result of
+#' this function will use lowercase protein identifiers, too. It's just easier
+#' that way - Sorry!
+#'
+#' @param ref.mercator - A list and the result of calling function
+#' `referenceWordListFromMercator4Annos`.
+#' @param ref.pfamA - A list and the result of calling function
+#' `referenceWordListFromPfamAAnnos`
+#'
+#' @return A merged list containing the set union of reference word sets found
+#' for protein identifiers in both argument references. Note that protein IDs
+#' will be always in lowercase (see above for the reason).
+#' @export
+mergeMercatorAndPfamAReferences <- function(ref.mercator, ref.pfamA) {
+    names(ref.pfamA) <- tolower(names(ref.pfamA))
+    prot.ids <- union(names(ref.mercator), names(ref.pfamA))
+    setNames(mclapply(prot.ids, function(prot.id) {
+        union(ref.mercator[[prot.id]], ref.pfamA[[prot.id]])
+    }), prot.ids)
 }

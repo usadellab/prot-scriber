@@ -2,15 +2,36 @@
 
 require(prot.scriber)
 
-option_list <- list(make_option(c("-m", "--mercator-table"), 
-    type = "character", default = NULL, help = "Valid file path to the result of running Mercator4", 
-    metavar = "character"), make_option(c("-p", "--hmmer3-vs-pfamA-tblout"), 
-    type = "character", default = NULL, help = "Valid file path to `--tblout` result of running HMMER3 PfamA", 
-    metavar = "character"), make_option(c("-d", "--data-dir"), 
-    type = "character", default = NULL, help = "The directory into which to write the result binary 'p_coccineus_seq_sin_search.RData'", 
-    metavar = "character"), make_option(c("-n", "--n-cores"), 
-    type = "numeric", default = detectCores(), help = "The number of cores to use in parallel processes.", 
-    metavar = "numeric"))
+option_list <- list(
+  make_option(
+    c("-m", "--mercator-table"),
+    type = "character",
+    default = NULL,
+    help = "Valid file path to the result of running Mercator4",
+    metavar = "character"
+  ),
+  make_option(
+    c("-p", "--hmmer3-vs-pfamA-tblout"),
+    type = "character",
+    default = NULL,
+    help = "Valid file path to `--tblout` result of running HMMER3 PfamA",
+    metavar = "character"
+  ),
+  make_option(
+    c("-d", "--data-dir"),
+    type = "character",
+    default = NULL,
+    help = "The directory into which to write the result binary 'p_coccineus_seq_sin_search.RData'",
+    metavar = "character"
+  ),
+  make_option(
+    c("-n", "--n-cores"),
+    type = "numeric",
+    default = detectCores(),
+    help = "The number of cores to use in parallel processes.",
+    metavar = "numeric"
+  )
+)
 
 opt_parser <- OptionParser(option_list = option_list)
 args <- parse_args(opt_parser)

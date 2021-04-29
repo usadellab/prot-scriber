@@ -25,3 +25,6 @@
 (?i)\brelated\b
 (?i)\bremark\b
 (?i)\b\w?orf(\w?|\d+)\b
+(?i)\bof\b
+(?i)\bor\b
+(?i)\band\b

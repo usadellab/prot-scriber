@@ -81,6 +81,14 @@ parseMercator4Tblout <- function(path.to.table, col.names = c("BINCODE",
     m.dt <- fread(path.to.table, sep = "\t", header = TRUE, stringsAsFactors = FALSE, 
         na.strings = "", quote = "")
     m.dt$TYPE <- !is.na(m.dt$TYPE)
+    #' Remove leading and trailing single quotes from the respective columns.
+    #' Note usage of the argument `quote = '\''` to the above `fread` command
+    #' will actually not solve this issue, because some of the Map Man Bin
+    #' DESCRIPTIONS actually _conatain_ a single quote. Hence, the manual
+    #' removal of leading and trailing single quotes.
+    for (col.i in c("BINCODE", "NAME", "IDENTIFIER", "DESCRIPTION")) {
+        m.dt[[col.i]] <- sub("^'", "", sub("'$", "", m.dt[[col.i]]))
+    }
     m.dt
 }
 
@@ -129,8 +137,8 @@ parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d'
 #' @return A character vector of informative words extracted from the argument
 #' `in.desc` HRD.
 #' @export
-wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSet.spit.regex", 
-    "-|/|;|\\\\|,|:|\"|'|\\.|\\s+|\\||\\(|\\)"), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
+wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSet.split.regex", 
+    "\\s+|\\."), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
     blacklist.word.regexs), lowercase.words = getOption("splitDescriptionIntoWordSet.lowercase.words", 
     TRUE)) {
     desc.words <- strsplit(in.desc, split = split.regex, perl = TRUE)[[1]]
@@ -140,7 +148,7 @@ wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSe
     if (lowercase.words) {
         dw.set <- tolower(dw.set)
     }
-    sort(unique(dw.set))
+    unique(dw.set)
 }
 
 #' Function tests its namesake `wordSet`.
@@ -150,8 +158,60 @@ wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSe
 testWordSet <- function() {
     x.test <- c("World Hello", "Phototransferase", "Alien contig similar product subfamily predicted")
     t1 <- identical(wordSet(x.test[[1]], lowercase.words = FALSE), 
-        c("Hello", "World"))
+        c("World", "Hello"))
     t2 <- identical(wordSet(x.test[[2]]), "phototransferase")
     t3 <- identical(wordSet(x.test[[3]]), "alien")
     all(t1, t2, t3)
+}
+
+curateMercator4Annos <- function(mm4.anno.tbl) {
+    enzyme.classification.regex <- "(^\\s*enzyme classification.+\\s+&\\s+)|(\\s+&\\s+enzyme classification.*$)"
+    bin.50.annos <- grepl("^50", mm4.anno.tbl$BINCODE) & mm4.anno.tbl$TYPE & 
+        grepl(enzyme.classification.regex, mm4.anno.tbl$DESCRIPTION, 
+            perl = TRUE, ignore.case = TRUE)
+    mm4.anno.tbl$DESCRIPTION[bin.50.annos] <- unlist(lapply(mm4.anno.tbl$DESCRIPTION[bin.50.annos], 
+        function(bin.50.desc) {
+            r.m <- regexec(enzyme.classification.regex, bin.50.desc, 
+                perl = TRUE, ignore.case = TRUE)
+            sub("\\s*&\\s*", "", regmatches(bin.50.desc, r.m)[[1]][[1]])
+        }))
+    mm4.anno.tbl
+}
+
+#' Extract all Map-Man Bin descriptions from the protein function annotations
+#' in the argument table `mm4.anno.tbl`, split them into words and return them
+#' as references for performance evaluation. See function `wordSet` for
+#' details, particularly on how to provide its respective arguments as
+#' environment options.
+#'
+#' @param mm4.anno.tbl - An instance of `data.table` result from using function
+#' `parseMercator4Tblout`.
+#' @param exclude.mm4.root.bins - A character vector of Map-Man 4 root Bins to
+#' be excluded as reference annotations. Default is
+#' getOption('referenceWordListFromMercator4Annos.exclude.mm4.root.bins',
+#' c('35'))
+#' @param curate.annos.funk - A function receiving the single argument
+#' `mm4.anno.tbl` and returning a subset of it. Can be used to preprocess e.g.
+#' annotation of BIN 50 to filter out best Blast Hit descriptions. Default does
+#' exactly that and is
+#' getOption('referenceWordListFromMercator4Annos.curate.annos.funk',
+#' curateMercator4Annos). Use `base::identity` to avoid anything being done to
+#' the argument `mm4.anno.tbl`.
+#'
+#' @return A list with names being the protein identifiers and values character
+#' vectors of reference words.
+#' @export
+referenceWordListFromMercator4Annos <- function(mm4.anno.tbl, 
+    exclude.mm4.root.bins = getOption("referenceWordListFromMercator4Annos.exclude.mm4.root.bins", 
+        c("35")), curate.annos.funk = getOption("referenceWordListFromMercator4Annos.curate.annos.funk", 
+        curateMercator4Annos)) {
+    filter.i <- mm4.anno.tbl$TYPE & !grepl(paste0("^", paste(exclude.mm4.root.bins, 
+        collapse = "|")), pc.mercator$BINCODE)
+    mm4.fltrd.tbl <- mm4.anno.tbl[filter.i, ]
+    uniq.prot.ids <- unique(mm4.fltrd.tbl[filter.i, ]$IDENTIFIER)
+    setNames(mclapply(uniq.prot.ids, function(prot.id) {
+        i <- which(mm4.fltrd.tbl$IDENTIFIER == prot.id)
+        mm4.descs <- as.character(mm4.fltrd.tbl[i, "DESCRIPTION"])
+        unique(unlist(lapply(mm4.descs, wordSet)))
+    }), uniq.prot.ids)
 }

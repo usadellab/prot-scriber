@@ -130,12 +130,12 @@ parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d'
 #' `in.desc` HRD.
 #' @export
 wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSet.spit.regex", 
-    "\\s+|\\."), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
+    "-|/|;|\\\\|,|:|\"|'|\\.|\\s+|\\||\\(|\\)"), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
     blacklist.word.regexs), lowercase.words = getOption("splitDescriptionIntoWordSet.lowercase.words", 
     TRUE)) {
     desc.words <- strsplit(in.desc, split = split.regex, perl = TRUE)[[1]]
     dw.retain.bool <- "" != lapply(desc.words, applyRegexList, 
-        regexs = blacklist.word.regexs)
+        regexs = blacklist.regexs)
     dw.set <- desc.words[dw.retain.bool]
     if (lowercase.words) {
         dw.set <- tolower(dw.set)

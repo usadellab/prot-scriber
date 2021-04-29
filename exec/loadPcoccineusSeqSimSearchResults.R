@@ -46,7 +46,7 @@ pc.sprot <- parseSeqSimSearchTable(args$`seq-sim-search-vs-swissprot-tbl`)
 pc.trembl <- parseSeqSimSearchTable(args$`seq-sim-search-vs-trembl-tbl`)
 
 #' Save results:
-save(pc.sprot, pc.trembl, file = file.path(args$`data-dir`, "p_coccineus_seq_sin_search.RData"))
+save(pc.sprot, pc.trembl, file = file.path(args$`data-dir`, "p_coccineus_seq_sim_search.RData"))
 
 #' DONE
 message("DONE")

@@ -14,6 +14,7 @@
 (?i)\bexpressed\b
 (?i)\bpredicted\b
 (?i)\bputative\b
+(?i)\bhypothetical\b
 (?i)\buncharacterized\b
 (?i)\bprobable\b
 (?i)\bprotein\b

@@ -126,10 +126,12 @@ parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d'
 #' @param in.desc - The input HRD
 #' @param split.regex - A regular expression used to split the argument HRD
 #' (see base::strsplit). Default is
-#' getOption('splitDescriptionIntoWordSet.spit.regex', '\\s+|\\.')
-#' @param blacklist.regex - A character vector of regular expressions to be used to
-#' identify non meaningful words, i.e. those to be excluded from the result.
-#' Default is getOption('splitDescriptionIntoWordSet.spit.regex', '\\s+|\\.')
+#' getOption("splitDescriptionIntoWordSet.split.regex", "\\s+|\\.|,|\\(|\\)")
+#' @param blacklist.regex - A character vector of regular expressions to be
+#' used to identify non meaningful words, i.e. those to be excluded from the
+#' result.  Default is
+#' getOption("splitDescriptionIntoWordSet.blacklist.regexs",
+#' blacklist.word.regexs)
 #' @param lowercase.words - A boolean flag indicating whether to return all
 #' words in lower case. Default is
 #' getOption('splitDescriptionIntoWordSet.lowercase.words', TRUE)
@@ -138,7 +140,7 @@ parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d'
 #' `in.desc` HRD.
 #' @export
 wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSet.split.regex", 
-    "\\s+|\\."), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
+    "\\s+|\\.|,|\\(|\\)"), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
     blacklist.word.regexs), lowercase.words = getOption("splitDescriptionIntoWordSet.lowercase.words", 
     TRUE)) {
     desc.words <- strsplit(in.desc, split = split.regex, perl = TRUE)[[1]]

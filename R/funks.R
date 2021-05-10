@@ -146,7 +146,8 @@ wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSe
     "-|/|;|\\\\|,|:|\"|'|\\.|\\s+|\\||\\(|\\)"), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
     blacklist.word.regexs), lowercase.words = getOption("splitDescriptionIntoWordSet.lowercase.words", 
     TRUE)) {
-    if (is.null(in.desc) || is.na(in.desc) || !is.character(in.desc) || nchar(in.desc) == 0) {
+    if (is.null(in.desc) || is.na(in.desc) || !is.character(in.desc) || 
+        nchar(in.desc) == 0) {
         character(0)
     } else {
         desc.words <- strsplit(in.desc, split = split.regex, 
@@ -284,4 +285,66 @@ mergeMercatorAndPfamAReferences <- function(ref.mercator, ref.pfamA) {
     setNames(mclapply(prot.ids, function(prot.id) {
         union(ref.mercator[[prot.id]], ref.pfamA[[prot.id]])
     }), prot.ids)
+}
+
+#' Analyzes the argument sequence similarity search (SSS) results 'sssr.tbl'
+#' for the argument query 'prot.id' and identifies the regions in the query
+#' sequence for which the SSS generated local alignments. Local alignments that
+#' overlap are going to be merged.
+#'
+#' @param prot.id - A string representing the query protein identifier (qseqid)
+#' @param sssr.tbl - An instance of data.table holding the tabular sequence
+#' similarity search results to be analyzed. See function
+#' 'parseSeqSimSearchTable' for details.
+#'
+#' @return An instance of base::data.frame with the following columns:
+#' Protein.ID, start.pos, end.pos. One row for each local alignment region
+#' covered by at least a single hit.
+#' @export
+findAlignmentRegions <- function(prot.id, sssr.tbl) {
+    if (!is.null(sssr.tbl) && !is.na(sssr.tbl) && nrow(sssr.tbl) > 
+        0) {
+        p.tbl <- sssr.tbl[which(sssr.tbl$qseqid == prot.id), 
+            ]
+        hit.ids <- unique(p.tbl$sseqid)
+        p.seq <- rep(0, p.tbl$qlen[[1]])
+        for (h.i in hit.ids) {
+            hit.tbl <- p.tbl[which(p.tbl$sseqid == h.i), ]
+            if (nrow(hit.tbl) > 1) {
+                hit.tbl <- hit.tbl[order(hit.tbl$bitscore, decreasing = TRUE), 
+                  ]
+            }
+            hit.algn.region <- hit.tbl[[1, "qstart"]]:hit.tbl[[1, 
+                "qend"]]
+            p.seq[hit.algn.region] <- p.seq[hit.algn.region] + 
+                1
+        }
+        in.gap <- TRUE
+        reg.start <- -1
+        prot.regions <- list()
+        for (pos.i in 1:length(p.seq)) {
+            n.hits.at.pos <- p.seq[[pos.i]]
+            if (in.gap && n.hits.at.pos > 0) {
+                reg.start <- pos.i
+            }
+            if (n.hits.at.pos == 0 || pos.i == length(p.seq)) {
+                if (!in.gap) {
+                  prot.regions[[length(prot.regions) + 1]] <- data.frame(Protein.ID = prot.id, 
+                    start.pos = reg.start, end.pos = pos.i, stringsAsFactors = FALSE)
+                }
+                in.gap <- TRUE
+            } else in.gap <- FALSE
+        }
+        do.call(rbind, prot.regions)
+    }
+}
+
+allQueriesAlignmentRegions <- function(sssr) {
+    prot.ids <- unique(unlist(lapply(sssr, function(sssr.tbl) {
+        unique(sssr.tbl$qseqid)
+    })))
+    all.sssr.tbl <- do.call(rbind, sssr)
+    do.call(rbind, mclapply(prot.ids, function(p.id) {
+        findAlignmentRegions(p.id, all.sssr.tbl)
+    }))
 }

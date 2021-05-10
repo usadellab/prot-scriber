@@ -126,31 +126,43 @@ parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d'
 #' @param in.desc - The input HRD
 #' @param split.regex - A regular expression used to split the argument HRD
 #' (see base::strsplit). Default is
-#' getOption("splitDescriptionIntoWordSet.split.regex", "\\s+|\\.|,|\\(|\\)")
+#' getOption('splitDescriptionIntoWordSet.split.regex',
+#' '-|/|;|\\\\|,|:|\'|'|\\.|\\s+|\\||\\(|\\)')
 #' @param blacklist.regex - A character vector of regular expressions to be
 #' used to identify non meaningful words, i.e. those to be excluded from the
-#' result.  Default is
-#' getOption("splitDescriptionIntoWordSet.blacklist.regexs",
+#' result. Set to 'NULL', 'c()', or 'NA' if you do not want blacklist
+#' filtering. Default is
+#' getOption('splitDescriptionIntoWordSet.blacklist.regexs',
 #' blacklist.word.regexs)
 #' @param lowercase.words - A boolean flag indicating whether to return all
 #' words in lower case. Default is
 #' getOption('splitDescriptionIntoWordSet.lowercase.words', TRUE)
 #'
 #' @return A character vector of informative words extracted from the argument
-#' `in.desc` HRD.
+#' `in.desc` HRD. Returns 'character(0)' if 'is.null(in.desc) || is.na(in.desc)
+#' || !is.character(in.desc) || nchar(in.desc) == 0'.
 #' @export
 wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSet.split.regex", 
-    "\\s+|\\.|,|\\(|\\)"), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
+    "-|/|;|\\\\|,|:|\"|'|\\.|\\s+|\\||\\(|\\)"), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
     blacklist.word.regexs), lowercase.words = getOption("splitDescriptionIntoWordSet.lowercase.words", 
     TRUE)) {
-    desc.words <- strsplit(in.desc, split = split.regex, perl = TRUE)[[1]]
-    dw.retain.bool <- "" != lapply(desc.words, applyRegexList, 
-        regexs = blacklist.regexs)
-    dw.set <- desc.words[dw.retain.bool]
-    if (lowercase.words) {
-        dw.set <- tolower(dw.set)
+    if (is.null(in.desc) || is.na(in.desc) || !is.character(in.desc) || nchar(in.desc) == 0) {
+        character(0)
+    } else {
+        desc.words <- strsplit(in.desc, split = split.regex, 
+            perl = TRUE)[[1]]
+        dw.retain.bool <- if (length(blacklist.regexs) > 0 && 
+            !is.na(blacklist.regexs)) {
+            "" != lapply(desc.words, applyRegexList, regexs = blacklist.regexs)
+        } else {
+            rep(TRUE, length(desc.words))
+        }
+        dw.set <- desc.words[dw.retain.bool]
+        if (lowercase.words) {
+            dw.set <- tolower(dw.set)
+        }
+        unique(dw.set)
     }
-    unique(dw.set)
 }
 
 #' Function tests its namesake `wordSet`.
@@ -163,7 +175,10 @@ testWordSet <- function() {
         c("World", "Hello"))
     t2 <- identical(wordSet(x.test[[2]]), "phototransferase")
     t3 <- identical(wordSet(x.test[[3]]), "alien")
-    all(t1, t2, t3)
+    t4 <- identical(wordSet("Protein REDOX 1"), "redox")
+    t5 <- identical(wordSet("Probable mannitol dehydrogenase"), 
+        c("mannitol", "dehydrogenase"))
+    all(t1, t2, t3, t4, t5)
 }
 
 #' The Map-Man4 Bin Ontology has a root Bin '50' spanning a sub-tree of Bins

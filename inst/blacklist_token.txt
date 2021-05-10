@@ -29,3 +29,4 @@
 (?i)\bof\b
 (?i)\bor\b
 (?i)\band\b
+\b\d+\b

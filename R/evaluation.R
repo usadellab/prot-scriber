@@ -115,12 +115,16 @@ bestBlastHrds <- function(prot.id, sssr, hrd.ref, lowercase.hrd = getOption("bes
                 bb.hrd <- tolower(bb.hrd)
             }
             bb.hrd.word.set <- wordSet(bb.hrd, blacklist.regexs = NULL)
-            bb.hrd.f.score.df <- fScore(bb.hrd.word.set, hrd.ref, 
-                prot.id)
-            bb.hrd.f.score.df$Method <- paste0("BB.", ref.db.name)
-            bb.hrd.f.score.df$Method.Score <- q.hits.best$bitscore
-            bb.hrd.lst[[length(bb.hrd.lst) + 1]] <- bb.hrd.f.score.df
+            method.score <- q.hits.best$bitscore
+        } else {
+            bb.hrd.word.set <- character(0)
+            method.score <- NA
         }
+        bb.hrd.f.score.df <- fScore(bb.hrd.word.set, hrd.ref, 
+            prot.id)
+        bb.hrd.f.score.df$Method <- paste0("BB.", ref.db.name)
+        bb.hrd.f.score.df$Method.Score <- method.score
+        bb.hrd.lst[[length(bb.hrd.lst) + 1]] <- bb.hrd.f.score.df
     }
     do.call(rbind, bb.hrd.lst)
 }

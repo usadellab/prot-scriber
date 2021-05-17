@@ -139,15 +139,17 @@ parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d'
 #' getOption('splitDescriptionIntoWordSet.lowercase.words', TRUE)
 #'
 #' @return A character vector of informative words extracted from the argument
-#' `in.desc` HRD. Returns 'character(0)' if 'is.null(in.desc) || is.na(in.desc)
-#' || !is.character(in.desc) || nchar(in.desc) == 0'.
+#' `in.desc` HRD. Returns 'character(0)' if identical(character(0), in.desc) ||
+#' is.null(in.desc) || is.na(in.desc) || !is.character(in.desc) ||
+#' nchar(in.desc) == 0.
 #' @export
 wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSet.split.regex", 
     "-|/|;|\\\\|,|:|\"|'|\\.|\\s+|\\||\\(|\\)"), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
     blacklist.word.regexs), lowercase.words = getOption("splitDescriptionIntoWordSet.lowercase.words", 
     TRUE)) {
-    if (is.null(in.desc) || is.na(in.desc) || !is.character(in.desc) || 
-        nchar(in.desc) == 0) {
+    if (identical(character(0), in.desc) || is.null(in.desc) || 
+        is.na(in.desc) || !is.character(in.desc) || nchar(in.desc) == 
+        0) {
         character(0)
     } else {
         desc.words <- strsplit(in.desc, split = split.regex, 
@@ -339,6 +341,10 @@ findAlignmentRegions <- function(prot.id, sssr.tbl) {
     }
 }
 
+#' function_description
+#'
+#' @return <`2:return_value`>
+#' @export
 allQueriesAlignmentRegions <- function(sssr) {
     prot.ids <- unique(unlist(lapply(sssr, function(sssr.tbl) {
         unique(sssr.tbl$qseqid)

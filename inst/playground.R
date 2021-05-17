@@ -3,6 +3,7 @@ options(mc.cores = detectCores() - 1)
 
 data("p_coccineus_seq_sim_search")
 data("p_coccineus_reference_words")
+data("p_coccineus_HRDs")
 
 #' OVERLAP
 #' currently not in use
@@ -60,7 +61,7 @@ bb.trembl.hrd.fscore <- fScore(tolower(strsplit(bb.trembl.hrd,
 
 
 #' Test another query 'Pc53_1'
-q.2 <- 'Pc53_1'
+q.2 <- "Pc53_1"
 sssr <- list(Swissprot = pc.sprot, trEMBL = pc.trembl)
 q.2.phrases <- phrasesForQuery(q.2, sssr)
 q.2.phrases.stats <- statsOfPhrasesForQuery(q.2, q.2.phrases, 
@@ -69,8 +70,33 @@ q.2.phrases.stats <- statsOfPhrasesForQuery(q.2, q.2.phrases,
 
 #' Test time requirement to annotate P.coccineus:
 sssr.orig <- sssr
-sssr <- setNames(lapply(sssr.orig, function(x) x[1:1000,]), names(sssr))
+sssr <- setNames(lapply(sssr.orig, function(x) x[1:1000, ]), 
+    names(sssr))
 t.start <- Sys.time()
 pc.annos <- annotateProteinsAndEvaluatePerformance(sssr, pc.ref)
-t.duration <- as.numeric(Sys.time()) * 1000 - as.numeric(t.start) * 1000
+t.duration <- as.numeric(Sys.time()) * 1000 - as.numeric(t.start) * 
+    1000
 sssr <- sssr.orig
+
+
+#' P.coccineus annotations centered linear vs centered inverse inf. contnt.: 
+pc.hrds.ic <- pc.hrds[which(pc.hrds$Method == "centered.inverse.inf.cntnt"), 
+    ]
+pc.hrds.cf <- pc.hrds[which(pc.hrds$Method == "centered.frequencies"), 
+    ]
+pc.hrds.ic.vs.cf <- merge(pc.hrds.ic, pc.hrds.cf, by = "Protein.ID")
+pc.hrds.ic.vs.cf$F.Score.x.min.y <- pc.hrds.ic.vs.cf$F.Score.x - 
+    pc.hrds.ic.vs.cf$F.Score.y
+pc.hrds.ic.vs.cf.ind <- which(pc.hrds.ic.vs.cf$F.Score.x.min.y != 
+    0)
+write.table(pc.hrds.ic.vs.cf[pc.hrds.ic.vs.cf.ind, ], "../evaluation/p_coccineus_HRDs_inverse_inf_contnt_vs_centered_frequencies.txt", 
+    row.names = FALSE, sep = "\t", quote = TRUE)
+
+
+#' Visualize the P. coccineus HRD annotations:
+prot.ids <- unique(pc.hrds.ic.vs.cf[pc.hrds.ic.vs.cf.ind, "Protein.ID"])
+ps.hrd.df <- pc.hrds[which(pc.hrds$Protein.ID %in% prot.ids), 
+    ]
+ps.hrd.ref <- pc.ref[tolower(prot.ids)]
+visualizeHrdResults(ps.hrd.df, ps.hrd.ref, output.file = "../evaluation/p_coccineus_HRDs.html", 
+    brew.template = "./inst/hrds_visualization_html_brew.txt")

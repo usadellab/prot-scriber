@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+
+    .refWords { 
+      color: #377EB8;
+      font-weight: bold;
+    }
+    .truePos { 
+      color: #4DAF4A;
+      font-weight: bold;
+    }
+    .falsePos { 
+      color: #E41A1C;
+      font-weight: bold;
+    }
+    .naHrd {
+      color: #984EA3;
+      font-weight: bold;
+    }
+    .small {
+      font-size: 10pt;
+    }
+    body {
+      font-size: 14pt;
+    }
+    dd {
+      word-spacing: 2px;
+    }
+
+    </style>
+  </head>
+  <body>
+
+    <div id="data-container">
+      <% for (prot.id in unique(ps.hrd.df$Protein.ID)) { %>
+        <% prot.hrds = ps.hrd.df[which(ps.hrd.df$Protein.ID == prot.id),] %>
+        <% prot.ref = ps.hrd.ref[[tolower(prot.id)]] %>
+        <% ph.cf = prot.hrds[which(prot.hrds$Method == "centered.frequencies"), ] %>
+        <% ph.ic = prot.hrds[which(prot.hrds$Method == "centered.inverse.inf.cntnt"), ] %>
+        <% ph.pn = prot.hrds[which(prot.hrds$Method == "polynomial.word.scores"), ] %>
+        <% ph.bb.sprot = prot.hrds[which(prot.hrds$Method == "BB.Swissprot"), ] %>
+        <% ph.bb.trembl = prot.hrds[which(prot.hrds$Method == "BB.trEMBL"), ] %>
+        <h4><%= prot.id %></h4>
+        <dl>
+          <dt>Reference Words</dt>
+          <dd><span class="refWords"><%= paste(prot.ref, collapse=" ") %></span></dd>
+          <dt>centered frequencies <span class="small">(F-Score: <%= sprintf("%.3f", ph.cf$F.Score) %>, precision: <%= sprintf("%.3f", ph.cf$precision) %> , recall: <%= sprintf("%.3f", ph.cf$recall) %>)</span></dt>
+          <dd><%= hrdToHtmlHelper(ph.cf$HRD, prot.ref) %></dd>
+
+          <dt>centered inverse information content <span class="small">(F-Score: <%= sprintf("%.3f", ph.ic$F.Score) %>, precision: <%= sprintf("%.3f", ph.ic$precision) %> , recall: <%= sprintf("%.3f", ph.ic$recall) %>)</span></dt>
+          <dd><%= hrdToHtmlHelper(ph.ic$HRD, prot.ref) %></dd>
+
+          <dt>polynomial <span class="small">(F-Score: <%= sprintf("%.3f", ph.pn$F.Score) %>, precision: <%= sprintf("%.3f", ph.pn$precision) %> , recall: <%= sprintf("%.3f", ph.pn$recall) %>)</span></dt>
+          <dd><%= hrdToHtmlHelper(ph.pn$HRD, prot.ref) %></dd>
+
+          <dt>Best Blast SwissProt <span class="small">(F-Score: <%= sprintf("%.3f", ph.bb.sprot$F.Score) %>, precision: <%= sprintf("%.3f", ph.bb.sprot$precision) %> , recall: <%= sprintf("%.3f", ph.bb.sprot$recall) %>)</span></dt>
+          <dd><%= hrdToHtmlHelper(ph.bb.sprot$HRD, prot.ref) %></dd>
+
+          <dt>Best Blast trEMBL <span class="small">(F-Score: <%= sprintf("%.3f", ph.bb.trembl$F.Score) %>, precision: <%= sprintf("%.3f", ph.bb.trembl$precision) %> , recall: <%= sprintf("%.3f", ph.bb.trembl$recall) %>)</span></dt>
+          <dd><%= hrdToHtmlHelper(ph.bb.trembl$HRD, prot.ref) %></dd>
+        </dl>
+      <% } %>
+    </div>
+  </body>
+</html>

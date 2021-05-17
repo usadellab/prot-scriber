@@ -14,7 +14,9 @@ phraseScore <- function(phrase, wrd.scores) {
 }
 
 #' Computes the score of a word using 'inverse information content' calculated
-#' as -log( (1-p.word) ).
+#' as -log( (1-p.word) ). In order to avoid infinite values for a word that is
+#' the single element of the word-set, i.e. it has a frequency of one, the
+#' score of one is returned.
 #'
 #' @param word - A string representing the word
 #' @param wrd.frequencies - An instance of base::table holding the frequencies
@@ -29,7 +31,29 @@ inverseInformationContent <- function(word, wrd.frequencies,
     log.base = getOption("inverseInformationContent.log.base", 
         exp(1))) {
     x.s <- sum(wrd.frequencies)
-    -log(1 - wrd.frequencies[[tolower(word)]]/x.s, base = log.base)
+    if (length(wrd.frequencies) > 1) {
+        y.iic <- -log(1 - wrd.frequencies[[tolower(word)]]/x.s, 
+            base = log.base)
+    } else if (length(wrd.frequencies) == 1 && tolower(word) %in% 
+        names(wrd.frequencies)) {
+        1
+    }
+}
+
+#' Tests its namesake 'inverseInformationContent'.
+#'
+#' @return TRUE if and only if all tests pass.
+#' @export
+testInverseInformationContent <- function() {
+    t.1.inp <- table(c(letters[1:3], letters[1:2], letters[1], 
+        letters[3:6]))
+    t.1.res <- inverseInformationContent("a", t.1.inp, log.base = exp(1))
+    t.1.exp <- -log(1 - 3/sum(t.1.inp), base = exp(1))
+    t.1 <- identical(t.1.res, t.1.exp)
+    t.2.inp <- table(letters[1])
+    t.2.res <- inverseInformationContent("a", t.2.inp, log.base = exp(1))
+    t.2 <- identical(1, t.2.res)
+    all(t.1, t.2)
 }
 
 #' Computes the centered word scores using inverse information content and

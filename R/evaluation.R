@@ -1,3 +1,96 @@
+#' Computes Matthew's correlation coefficient to assess the performance of the
+#' predicted Human Readable Description (HRD).
+#'
+#' @param pred - A vector of predictions
+#' @param ref - A vector holding the truth (references)
+#' @param univ.words - A character vector holding all non blacklisted words
+#' @param prot.id - A string identifying the query protein for which the
+#' prediction has been made.
+#' @param pred.to.string.funk - A function receiving as input the argument
+#' 'pred', i.e. a character vector and set of words, returning a single scalar
+#' string the human readable description generated from the ordered set of
+#' words ('pred'). Default is getOption('fScore.pred.to.string.funk',
+#' function(wrds) {paste(wrds, collapse=' ')})
+#'
+#' @return An instance of base::data.frame with the following columns:
+#' Protein.ID, HRD, n.words (number of words in the argument 'pred'),
+#' univ.words (number of words in the argument 'univ.words'), ref.words (number
+#' of words in the argument 'ref'), univ.ref.words (number of words in the
+#' intersection of arguments 'ref' and 'univ.words') and MCC.
+#' @export
+matthewsCorrelationCoefficient <- function(pred, ref, univ.words, 
+    prot.id, pred.to.string.funk = getOption("fScore.pred.to.string.funk", 
+        function(wrds) {
+            paste(wrds, collapse = " ")
+        })) {
+    hrd <- if (length(pred) > 0) {
+        pred.to.string.funk(pred)
+    } else {
+        as.character(NA)
+    }
+    if (length(ref) == 0 || is.na(ref)) {
+        #' No references means we cannot compute a MCC:
+        data.frame(Protein.ID = prot.id, HRD = hrd, n.words = length(pred), 
+            univ.words = length(univ.words), ref.words = length(ref), 
+            univ.ref.words = length(intersect(univ.words, ref)), 
+            MCC = NA, stringsAsFactors = FALSE)
+    } else {
+        true.pos <- length(intersect(pred, ref))
+        true.neg <- length(setdiff(univ.words, union(pred, ref)))
+        false.pos <- length(setdiff(pred, ref))
+        false.neg <- length(setdiff(ref, pred))
+        mcc.denominator <- sqrt((true.pos + false.pos) * (true.pos + 
+            false.neg) * (true.neg + false.pos) * (true.neg + 
+            false.neg))
+        if (mcc.denominator == 0) {
+            mcc.denominator <- 1
+        }
+        m.c.c <- if (identical(pred, ref)) {
+            1
+        } else {
+            tp.tn <- if (length(setdiff(univ.words, ref)) == 
+                0) {
+                #' Do not punish not having any false negative candidate words in
+                #' the current setting:
+                true.pos
+            } else {
+                true.pos * true.neg
+            }
+            (tp.tn - false.pos * false.neg)/mcc.denominator
+        }
+        data.frame(Protein.ID = prot.id, HRD = hrd, n.words = length(pred), 
+            univ.words = length(univ.words), ref.words = length(ref), 
+            univ.ref.words = length(intersect(univ.words, ref)), 
+            MCC = m.c.c, stringsAsFactors = FALSE)
+    }
+}
+
+#' Function tests its namesake `matthewsCorrelationCoefficient`.
+#'
+#' @return TRUE if and only if all tests pass.
+#' @export
+testMatthewsCorrelationCoefficient <- function() {
+    p1 <- c("Hello", "World")
+    r1 <- p1
+    u1 <- p1
+    t1 <- identical(matthewsCorrelationCoefficient(p1, r1, u1, 
+        "P1")$MCC, 1)
+    p2 <- c("Hello", "World")
+    r2 <- c("Not", "a", "single", "word")
+    u2 <- union(p2, r2)
+    t2 <- identical(matthewsCorrelationCoefficient(p2, r2, u2, 
+        "P2")$MCC, -1)
+    p3 <- c("Hello", "World", "Hola", "Mundo")
+    r3 <- c("Some", "words", "Hello", "World")
+    u3 <- union(p3, r3)
+    t3 <- identical(matthewsCorrelationCoefficient(p3, r3, u3, 
+        "P3")$MCC, -0.5)
+    t4.res <- matthewsCorrelationCoefficient(p3, NULL, NULL, 
+        "P3")
+    t4 <- is.na(t4.res$MCC)
+    all(t1, t2, t3, t4)
+}
+
 #' Computes the F-Score of a prediction given the truth (reference). For
 #' details see Wikipedia, here:
 #' https://en.wikipedia.org/wiki/F-score
@@ -7,8 +100,8 @@
 #' @param prot.id - A string identifying the query protein for which the
 #' prediction has been made.
 #' @param beta - recall is considered beta times as important as precision.
-#' Default is getOption('fScore.beta', 0.25) thus emphazising precision four times
-#' more than recall. 
+#' Default is getOption('fScore.beta', 1) thus emphazising precision
+#' and recall equally. 
 #' @param pred.to.string.funk - A function receiving as input the argument
 #' 'pred', i.e. a character vector and set of words, returning a single scalar
 #' string the human readable description generated from the ordered set of
@@ -20,7 +113,7 @@
 #' beta
 #' @export
 fScore <- function(pred, ref, prot.id, beta = getOption("fScore.beta", 
-    0.25), pred.to.string.funk = getOption("fScore.pred.to.string.funk", 
+    1), pred.to.string.funk = getOption("fScore.pred.to.string.funk", 
     function(wrds) {
         paste(wrds, collapse = " ")
     })) {
@@ -91,6 +184,8 @@ testFScore <- function() {
 #' sequence databases and values the read in tabular output (see function
 #' parseSeqSimSearchTable).
 #' @param hrd.ref - A vector holding the truth (references)
+#' @param univ.words - A character vector holding all non blacklisted words
+#' found in all considered candidate descriptions, the universe of words.
 #' @param lowercase.hrd - A boolean flag indicating whether to return the found
 #' HRD in lowercase or not. Default is getOption('bestBlastHrds.lowercase.hrd',
 #' TRUE)
@@ -98,8 +193,9 @@ testFScore <- function() {
 #' @return An instance of base::data.frame with the following columns:
 #' Protein.ID, HRD, precision, recall, F.Score, beta, Method, Method.Score
 #' @export
-bestBlastHrds <- function(prot.id, sssr, hrd.ref, lowercase.hrd = getOption("bestBlastHrds.lowercase.hrd", 
-    TRUE)) {
+bestBlastHrds <- function(prot.id, sssr, hrd.ref, univ.words, 
+    lowercase.hrd = getOption("bestBlastHrds.lowercase.hrd", 
+        TRUE)) {
     bb.hrd.lst <- list()
     for (ref.db.name in names(sssr)) {
         seq.sim.search.tbl <- sssr[[ref.db.name]]
@@ -122,9 +218,14 @@ bestBlastHrds <- function(prot.id, sssr, hrd.ref, lowercase.hrd = getOption("bes
         }
         bb.hrd.f.score.df <- fScore(bb.hrd.word.set, hrd.ref, 
             prot.id)
-        bb.hrd.f.score.df$Method <- paste0("BB.", ref.db.name)
-        bb.hrd.f.score.df$Method.Score <- method.score
-        bb.hrd.lst[[length(bb.hrd.lst) + 1]] <- bb.hrd.f.score.df
+        bb.hrd.mcc.df <- matthewsCorrelationCoefficient(bb.hrd.word.set, 
+            hrd.ref, univ.words, prot.id)[, c("Protein.ID", "MCC", 
+            "univ.words", "ref.words", "univ.ref.words")]
+        bb.hrd.eval.df <- merge(bb.hrd.f.score.df, bb.hrd.mcc.df, 
+            by = "Protein.ID")
+        bb.hrd.eval.df$Method <- paste0("BB.", ref.db.name)
+        bb.hrd.eval.df$Method.Score <- method.score
+        bb.hrd.lst[[length(bb.hrd.lst) + 1]] <- bb.hrd.eval.df
     }
     do.call(rbind, bb.hrd.lst)
 }
@@ -140,12 +241,14 @@ bestBlastHrds <- function(prot.id, sssr, hrd.ref, lowercase.hrd = getOption("bes
 #' of argument 'phrases.stats' to use to find the highest scoring phrase.
 #' Refers to the different tested prot.scriber scoring methods.
 #' @param hrd.ref - A vector holding the truth (references)
+#' @param univ.words - A character vector holding all non blacklisted words
+#' found in all considered candidate descriptions, the universe of words.
 #'
 #' @return An instance of base::data.frame with the following columns:
 #' Protein.ID, HRD, precision, recall, F.Score, beta, Method, Method.Score
 #' @export
 bestProtScriberPhrases <- function(prot.id, phrases.stats, prot.scriber.score.col, 
-    hrd.ref) {
+    hrd.ref, univ.words) {
     if (nrow(phrases.stats) > 0) {
         ps.best <- phrases.stats[order(phrases.stats[, prot.scriber.score.col], 
             phrases.stats$n.words, decreasing = TRUE), ][1, ]
@@ -154,10 +257,45 @@ bestProtScriberPhrases <- function(prot.id, phrases.stats, prot.scriber.score.co
         ps.best.word.set <- wordSet(ps.best$HRD, blacklist.regexs = NULL)
         ps.best.f.score.df <- fScore(ps.best.word.set, hrd.ref, 
             prot.id)
-        ps.best.f.score.df$Method <- prot.scriber.score.col
-        ps.best.f.score.df$Method.Score <- ps.best[, prot.scriber.score.col]
-        ps.best.f.score.df
+        ps.best.mcc.df <- matthewsCorrelationCoefficient(ps.best.word.set, 
+            hrd.ref, univ.words, prot.id)[, c("Protein.ID", "MCC", 
+            "univ.words", "ref.words", "univ.ref.words")]
+        ps.best.eval.df <- merge(ps.best.f.score.df, ps.best.mcc.df, 
+            by = "Protein.ID")
+        ps.best.eval.df$Method <- prot.scriber.score.col
+        ps.best.eval.df$Method.Score <- ps.best[, prot.scriber.score.col]
+        ps.best.eval.df
     }
+}
+
+#' Splits all human readable descriptions (HRD) of sequences similarity search
+#' result Hits for the argument query 'prot.id' into words and returns them as
+#' a set (unique). These words can be used to estimate e.g. the true negative
+#' rate.
+#'
+#' @param prot.id - A string representing the query protein identifier (qseqid)
+#' @param sssr - A named list, in which names represent searched reference
+#' sequence databases and values the read in tabular output (see function
+#' parseSeqSimSearchTable).
+#' @param to.lower - A boolean flag indicating whether to return the found HRD
+#' in lowercase or not. Default is getOption('wordUniverse.to.lower', TRUE)
+#'
+#' @return A character vector of unique words found in the HRDs of the argument
+#' query sequence's ('prot.id') sequence similarity search Hits.
+#' @export
+wordUniverse <- function(prot.id, sssr, to.lower = getOption("wordUniverse.to.lower", 
+    TRUE)) {
+    univ.words <- unique(unlist(lapply(sssr, function(seq.sim.tbl) {
+        hits.ind <- which(seq.sim.tbl$qseqid == prot.id)
+        if (length(hits.ind) > 0) {
+            unlist(lapply(seq.sim.tbl[hits.ind, ]$HRD, wordSet))
+        } else {
+            character(0)
+        }
+    })))
+    if (to.lower) {
+        tolower(univ.words)
+    } else univ.words
 }
 
 #' Generate short human readable descriptions (HRD) for all query proteins in
@@ -172,6 +310,13 @@ bestProtScriberPhrases <- function(prot.id, phrases.stats, prot.scriber.score.co
 #' @param ref.word.sets - A named list in which the names are query protein
 #' identifiers ('qseqid') in lowercase and the values are character vectors
 #' holding reference words ('the truth').
+#' @param alignmnt.regions - An instance of base::data.frame result of calling
+#' function 'allQueriesAlignmentRegions'. The data.frame has three columns
+#' 'Protein.ID', 'start.pos', and 'end.pos' indicating to which sequence region
+#' in the query the sequence similarity searches generated local alignments
+#' for. If non intersecting regions for the same query are found the
+#' prot-scriber annotation is carried out independently for these and results
+#' are concatonated, in the order of the regions.
 #' @param prot.scriber.score.funks - A named list of two member lists (see
 #' default value below for more details). Each first level member must contain
 #' two entries 'word.score.funk' and 'phrase.score.funk'. 'word.score.funk' is
@@ -186,19 +331,38 @@ bestProtScriberPhrases <- function(prot.id, phrases.stats, prot.scriber.score.co
 #' respective 'word.score.funk', i.e. this vector's names are words and values
 #' their respective scores. The default of this argument is rather long:
 #' getOption('statsOfPhrasesForQuery.score.funks',
-#' list(centered.inverse.inf.cntnt = list(word.score.funk = centeredWordScores,
-#' phrase.score.funk = sumWordScores), polynomial.word.scores =
-#' list(word.score.funk = polynomicWordScores, phrase.score.funk =
-#' sumWordScores), centered.frequencies = list(word.score.funk =
-#' centeredLinearWordScores, phrase.score.funk = sumWordScores)))
+#'  list(
+#'    centered.inverse.inf.cntnt.mean = list(word.score.funk = function(x) {
+#'          centeredWordScores(x, level.funk = mean)
+#'      }, phrase.score.funk = sumWordScores),
+#'    centered.inverse.inf.cntnt.median = list(word.score.funk = function(x) {
+#'          centeredWordScores(x, level.funk = median)
+#'      }, phrase.score.funk = sumWordScores),
+#'    centered.inverse.inf.cntnt.quarterQuantile = list(word.score.funk = function(x) {
+#'          centeredWordScores(x, level.funk = function(y) {
+#'              quantile(y, probs = 0.25)
+#'          })
+#'      }, phrase.score.funk = sumWordScores),
+#'    polynomial.word.scores = list(word.score.funk = polynomicWordScores, 
+#'          phrase.score.funk = sumWordScores),
+#'    centered.frequencies = list(word.score.funk = centeredLinearWordScores, 
+#'          phrase.score.funk = sumWordScores)
+#'  ))
 #'
 #' @return An instance of base::data.table with the following columns:
 #' Protein.ID, HRD, precision, recall, F.Score, beta, Method, Method.Score
 #' @export
 annotateProteinsAndEvaluatePerformance <- function(sssr, ref.word.sets, 
-    prot.scriber.score.funks = getOption("statsOfPhrasesForQuery.score.funks", 
-        list(centered.inverse.inf.cntnt = list(word.score.funk = centeredWordScores, 
-            phrase.score.funk = sumWordScores), polynomial.word.scores = list(word.score.funk = polynomicWordScores, 
+    alignmnt.regions, prot.scriber.score.funks = getOption("statsOfPhrasesForQuery.score.funks", 
+        list(centered.inverse.inf.cntnt.mean = list(word.score.funk = function(x) {
+            centeredWordScores(x, level.funk = mean)
+        }, phrase.score.funk = sumWordScores), centered.inverse.inf.cntnt.median = list(word.score.funk = function(x) {
+            centeredWordScores(x, level.funk = median)
+        }, phrase.score.funk = sumWordScores), centered.inverse.inf.cntnt.quarterQuantile = list(word.score.funk = function(x) {
+            centeredWordScores(x, level.funk = function(y) {
+                quantile(y, probs = 0.25)
+            })
+        }, phrase.score.funk = sumWordScores), polynomial.word.scores = list(word.score.funk = polynomicWordScores, 
             phrase.score.funk = sumWordScores), centered.frequencies = list(word.score.funk = centeredLinearWordScores, 
             phrase.score.funk = sumWordScores)))) {
     prot.ids <- unique(unlist(lapply(sssr, function(seq.sim.search.tbl) {
@@ -208,17 +372,30 @@ annotateProteinsAndEvaluatePerformance <- function(sssr, ref.word.sets,
         length(prot.ids), " query sequences.")
     do.call(rbind, lapply(prot.ids, function(qseqid) {
         tryCatch({
+            univ.words <- wordUniverse(qseqid, sssr)
+            #' Best Blast:
             ref.words <- ref.word.sets[[tolower(qseqid)]]
-            q.phrases <- phrasesForQuery(qseqid, sssr)
-            q.phrases.stats <- statsOfPhrasesForQuery(qseqid, 
-                q.phrases, ref.word.sets, score.funks = prot.scriber.score.funks)
-            rbind(bestBlastHrds(qseqid, sssr, ref.words), do.call(rbind, 
-                lapply(names(prot.scriber.score.funks), function(ps.score.method) {
-                  bestProtScriberPhrases(qseqid, q.phrases.stats, 
-                    ps.score.method, ref.words)
-                })))
+            bb.hrds <- bestBlastHrds(qseqid, sssr, ref.words, 
+                univ.words)
+            #' Prot Scriber:
+            qseqid.sssr.per.alignment.regions <- sssrForRegions(qseqid, 
+                alignmnt.regions, sssr)
+            alignmnt.regions.phrases.stats <- lapply(qseqid.sssr.per.alignment.regions, 
+                function(sssr.i) {
+                  q.phrases <- phrasesForQuery(qseqid, sssr.i)
+                  q.phrases.stats <- statsOfPhrasesForQuery(qseqid, 
+                    q.phrases, ref.word.sets, score.funks = prot.scriber.score.funks)
+                  setNames(lapply(names(prot.scriber.score.funks), 
+                    function(ps.score.method) {
+                      bestProtScriberPhrases(qseqid, q.phrases.stats, 
+                        ps.score.method, ref.words, univ.words)
+                    }), names(prot.scriber.score.funks))
+                })
+            prot.scribr.hrds <- joinMultiRegionStatsOfPhrasesForQuery(alignmnt.regions.phrases.stats, 
+                ref.words, univ.words)
+            rbind(bb.hrds, prot.scribr.hrds)
         }, error = function(e) {
-            # browser()
+            #' browser()
             warning("Query '", qseqid, "' caused an error:\n", 
                 e)
         })

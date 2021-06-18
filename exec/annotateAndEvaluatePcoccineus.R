@@ -5,6 +5,7 @@ require(prot.scriber)
 #' Load data:
 data("p_coccineus_seq_sim_search")
 data("p_coccineus_reference_words")
+data("p_coccineus_alignment_regions")
 
 #' Parse command line options:
 option_list <- list(
@@ -33,7 +34,7 @@ options(mc.cores = args$`n-cores`)
 #' Generate human readable descriptions (HRDs) and evaluate their performance
 #' for the P. coccineus query proteins:
 pc.sssr <- list(Swissprot = pc.sprot, trEMBL = pc.trembl)
-pc.hrds <- annotateProteinsAndEvaluatePerformance(pc.sssr, pc.ref)
+pc.hrds <- annotateProteinsAndEvaluatePerformance(pc.sssr, pc.ref, pc.alignment.regions.df)
 
 #' Save results:
 save(pc.hrds, file = file.path(args$`data-dir`, "p_coccineus_HRDs.RData"))

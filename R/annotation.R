@@ -207,11 +207,23 @@ phrasesForQuery <- function(prot.id, seq.sim.search.rslts) {
 #' 'word.score.funk', i.e. this vector's names are words and values their
 #' respective scores. The default of this argument is rather long:
 #' getOption('statsOfPhrasesForQuery.score.funks',
-#' list(centered.inverse.inf.cntnt = list(word.score.funk = centeredWordScores,
-#' phrase.score.funk = sumWordScores), polynomial.word.scores =
-#' list(word.score.funk = polynomicWordScores, phrase.score.funk =
-#' sumWordScores), centered.frequencies = list(word.score.funk =
-#' centeredLinearWordScores, phrase.score.funk = sumWordScores)))
+#'  list(
+#'    centered.inverse.inf.cntnt.mean = list(word.score.funk = function(x) {
+#'          centeredWordScores(x, level.funk = mean)
+#'      }, phrase.score.funk = sumWordScores),
+#'    centered.inverse.inf.cntnt.median = list(word.score.funk = function(x) {
+#'          centeredWordScores(x, level.funk = median)
+#'      }, phrase.score.funk = sumWordScores),
+#'    centered.inverse.inf.cntnt.quarterQuantile = list(word.score.funk = function(x) {
+#'          centeredWordScores(x, level.funk = function(y) {
+#'              quantile(y, probs = 0.25)
+#'          })
+#'      }, phrase.score.funk = sumWordScores),
+#'    polynomial.word.scores = list(word.score.funk = polynomicWordScores, 
+#'          phrase.score.funk = sumWordScores),
+#'    centered.frequencies = list(word.score.funk = centeredLinearWordScores, 
+#'          phrase.score.funk = sumWordScores)
+#'  ))
 #'
 #' @return An instance of base::data.frame with the default columns Protein.ID,
 #' precision, recall, F.Score, beta, Phrase, n.words, and one column for each
@@ -219,8 +231,15 @@ phrasesForQuery <- function(prot.id, seq.sim.search.rslts) {
 #' @export
 statsOfPhrasesForQuery <- function(prot.id, phrases.for.query, 
     hrd.references, score.funks = getOption("statsOfPhrasesForQuery.score.funks", 
-        list(centered.inverse.inf.cntnt = list(word.score.funk = centeredWordScores, 
-            phrase.score.funk = sumWordScores), polynomial.word.scores = list(word.score.funk = polynomicWordScores, 
+        list(centered.inverse.inf.cntnt.mean = list(word.score.funk = function(x) {
+            centeredWordScores(x, level.funk = mean)
+        }, phrase.score.funk = sumWordScores), centered.inverse.inf.cntnt.median = list(word.score.funk = function(x) {
+            centeredWordScores(x, level.funk = median)
+        }, phrase.score.funk = sumWordScores), centered.inverse.inf.cntnt.quarterQuantile = list(word.score.funk = function(x) {
+            centeredWordScores(x, level.funk = function(y) {
+                quantile(y, probs = 0.25)
+            })
+        }, phrase.score.funk = sumWordScores), polynomial.word.scores = list(word.score.funk = polynomicWordScores, 
             phrase.score.funk = sumWordScores), centered.frequencies = list(word.score.funk = centeredLinearWordScores, 
             phrase.score.funk = sumWordScores)))) {
     word.freqs <- wordFrequenciesFromPhrasesList(phrases.for.query)
@@ -270,5 +289,40 @@ statsOfPhrasesForQuery <- function(prot.id, phrases.for.query,
             f.score.df[, score.name] <- NA
         }
         f.score.df
+    }
+}
+
+joinMultiRegionStatsOfPhrasesForQuery <- function(alignmnt.regions.phrases.stats, 
+    hrd.ref, univ.words) {
+    if (length(alignmnt.regions.phrases.stats) == 1) {
+        alignmnt.regions.phrases.stats[[1]]
+    } else if (length(alignmnt.regions.phrases.stats) > 1) {
+        prot.scriber.score.funks <- names(alignmnt.regions.phrases.stats[[1]])
+        do.call(rbind, lapply(prot.scriber.score.funks, function(ps.sf) {
+            hrd.lst <- list()
+            method.score <- 0
+            for (ar.ps in alignmnt.regions.phrases.stats) {
+                ar.ps.i <- ar.ps[[ps.sf]]
+                hrd.lst[[length(hrd.lst) + 1]] <- ar.ps.i$HRD
+                #' print(ar.ps.i)
+                method.score <- method.score + ar.ps.i$Method.Score
+            }
+            hrd.concat.words <- wordSet(paste(hrd.lst, collapse = " "), 
+                blacklist.regexs = NULL)
+            #' All tables holding the results for the current ps.sf have
+            #' constant columns, so use the first for the constant data:
+            ar.ps.tbl <- alignmnt.regions.phrases.stats[[1]][[ps.sf]]
+            prot.id <- ar.ps.tbl$Protein.ID
+            ps.best.f.score.df <- fScore(hrd.concat.words, hrd.ref, 
+                prot.id)
+            ps.best.mcc.df <- matthewsCorrelationCoefficient(hrd.concat.words, 
+                hrd.ref, univ.words, prot.id)[, c("Protein.ID", 
+                "MCC", "univ.words", "ref.words", "univ.ref.words")]
+            ps.best.eval.df <- merge(ps.best.f.score.df, ps.best.mcc.df, 
+                by = "Protein.ID")
+            ps.best.eval.df$Method <- ar.ps.tbl$Method
+            ps.best.eval.df$Method.Score <- method.score
+            ps.best.eval.df
+        }))
     }
 }

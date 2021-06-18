@@ -341,9 +341,16 @@ findAlignmentRegions <- function(prot.id, sssr.tbl) {
     }
 }
 
-#' function_description
+#' Identifies the regions sequence similarity search local alignments (Blast
+#' Hits) cluster to. This is done for each query sequence in argument 'sssr'.
 #'
-#' @return <`2:return_value`>
+#' @param sssr - A named list, in which names represent searched reference
+#' sequence databases and values the read in tabular output (see function
+#' parseSeqSimSearchTable).
+#'
+#' @return An instance of base::data.frame with columns 'Protein.ID',
+#' 'start.pos', and 'end.pos' indicating for a given query each local alignment
+#' region any hits aligned to.
 #' @export
 allQueriesAlignmentRegions <- function(sssr) {
     prot.ids <- unique(unlist(lapply(sssr, function(sssr.tbl) {
@@ -353,4 +360,48 @@ allQueriesAlignmentRegions <- function(sssr) {
     do.call(rbind, mclapply(prot.ids, function(p.id) {
         findAlignmentRegions(p.id, all.sssr.tbl)
     }))
+}
+
+#' For the argument 'qseqid' identifies whether the sequence similarity
+#' searches have generated local alignments to disjoint regions of the query
+#' sequence. If so, for each region the respective sssr tables are returned.
+#' 
+#' @param qseqid - The query sequence's unique identifier in the form of a
+#' scalar string.
+#' @param alignmnt.regions - An instance of base::data.frame result of calling
+#' function 'allQueriesAlignmentRegions'. The data.frame has three columns
+#' 'Protein.ID', 'start.pos', and 'end.pos' indicating to which sequence region
+#' in the query the sequence similarity searches generated local alignments
+#' for. If non intersecting regions for the same query are found the
+#' prot-scriber annotation is carried out independently for these and results
+#' are concatonated, in the order of the regions.
+#' @param sssr - A named list, in which names represent searched reference
+#' sequence databases and values the read in tabular output (see function
+#' parseSeqSimSearchTable).
+#'
+#' @return Either a list with a single entry, the unchanged argument 'sssr' or
+#' a longer list, if and only if the argument query 'qseqid' has more than one
+#' alignment region in argument 'alignmnt.regions'. In that case a list of
+#' length equal to the number of disjoint alignment regions is returned. Each
+#' list entry is a subset of argument 'sssr' only containing the search results
+#' aligning to one region. Note that if the argument 'qseqid' is not found in
+#' any sequence similarity search result table, instead of returning 'NULL' the
+#' table is returned unchanged; so not to brake legacy code.
+#' @export
+sssrForRegions <- function(qseqid, alignmnt.regions, sssr) {
+    q.align.regs.i <- which(alignmnt.regions$Protein.ID == qseqid)
+    if (length(q.align.regs.i) < 2) {
+        list(sssr)
+    } else {
+        lapply(q.align.regs.i, function(a.r.i) {
+            a.r <- alignmnt.regions[a.r.i, ]
+            setNames(lapply(sssr, function(sssr.table) {
+                if (qseqid %in% sssr.table$qseqid) {
+                  sssr.table[which(sssr.table$qseqid == qseqid & 
+                    sssr.table$qstart >= a.r$start.pos & sssr.table$qend <= 
+                    a.r$end.pos), ]
+                } else sssr.table
+            }), names(sssr))
+        })
+    }
 }

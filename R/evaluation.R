@@ -35,31 +35,7 @@ matthewsCorrelationCoefficient <- function(pred, ref, univ.words,
             univ.ref.words = length(intersect(univ.words, ref)), 
             MCC = NA, stringsAsFactors = FALSE)
     } else {
-        true.pos <- length(intersect(pred, ref))
-        true.neg <- length(setdiff(univ.words, union(pred, ref)))
-        false.pos <- length(setdiff(pred, ref))
-        false.neg <- length(setdiff(ref, pred))
-        mcc.denominator <- sqrt((true.pos + false.pos) * (true.pos + 
-            false.neg) * (true.neg + false.pos) * (true.neg + 
-            false.neg))
-        if (mcc.denominator == 0) {
-            mcc.denominator <- 1
-        }
-        m.c.c <- if (identical(pred, ref)) {
-            1
-        } else {
-            tp.tn <- if (length(setdiff(univ.words, ref)) == 
-                0) {
-                #' Do not punish not having any false negative candidate words in
-                #' the current setting:
-                true.pos
-            } else {
-                true.pos * true.neg
-            }
-            (tp.tn - false.pos * false.neg)/mcc.denominator
-        }
-        if (m.c.c > 1)
-        browser()
+        m.c.c <- mltools::mcc(pred, ref)
         data.frame(Protein.ID = prot.id, HRD = hrd, n.words = length(pred), 
             univ.words = length(univ.words), ref.words = length(ref), 
             univ.ref.words = length(intersect(univ.words, ref)), 

@@ -13,5 +13,6 @@ Depends:
     parallel (>= 3.6.0),
     data.table (>= 1.12.8),
     optparse (>= 1.6.4),
-    brew (>= 1.0.6)
+    brew (>= 1.0.6),
+    mltools (>= 0.3.5.9000)
 RoxygenNote: 7.1.0

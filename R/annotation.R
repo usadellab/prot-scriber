@@ -292,6 +292,34 @@ statsOfPhrasesForQuery <- function(prot.id, phrases.for.query,
     }
 }
 
+#' For multi domain query sequences this function creates a single prot-scriber
+#' annotation for each disjoint alignment region and re-evaluates the
+#' performance scores for the now concatonated human readable description.
+#'
+#' @param alignmnt.regions.phrases.stats - The result of invoking the following
+#' code:
+#' lapply(qseqid.sssr.per.alignment.regions, 
+#'   function(sssr.i) {
+#'     q.phrases <- phrasesForQuery(qseqid, sssr.i)
+#'     q.phrases.stats <- statsOfPhrasesForQuery(qseqid, 
+#'       q.phrases, ref.word.sets, score.funks = prot.scriber.score.funks)
+#'     setNames(lapply(names(prot.scriber.score.funks), 
+#'       function(ps.score.method) {
+#'         bestProtScriberPhrases(qseqid, q.phrases.stats, 
+#'           ps.score.method, ref.words, univ.words)
+#'       }), names(prot.scriber.score.funks))
+#'   }
+#' )
+#' @param hrd.ref - A vector holding the truth (references)
+#' @param univ.words - A character vector holding all non blacklisted words
+#' found in all considered candidate descriptions, the universe of words.
+#' 
+#' @return An instance of base::data.frame with the following columns:
+#' Protein.ID, HRD, precision, recall, F.Score, beta, Method, Method.Score,
+#' univ.words (number of words in the argument 'univ.words'), ref.words (number
+#' of words in the argument 'ref'), univ.ref.words (number of words in the
+#' intersection of arguments 'ref' and 'univ.words') and MCC
+#' @export
 joinMultiRegionStatsOfPhrasesForQuery <- function(alignmnt.regions.phrases.stats, 
     hrd.ref, univ.words) {
     if (length(alignmnt.regions.phrases.stats) == 1) {

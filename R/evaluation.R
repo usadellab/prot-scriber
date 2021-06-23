@@ -58,6 +58,8 @@ matthewsCorrelationCoefficient <- function(pred, ref, univ.words,
             }
             (tp.tn - false.pos * false.neg)/mcc.denominator
         }
+        if (m.c.c > 1)
+        browser()
         data.frame(Protein.ID = prot.id, HRD = hrd, n.words = length(pred), 
             univ.words = length(univ.words), ref.words = length(ref), 
             univ.ref.words = length(intersect(univ.words, ref)), 
@@ -245,7 +247,10 @@ bestBlastHrds <- function(prot.id, sssr, hrd.ref, univ.words,
 #' found in all considered candidate descriptions, the universe of words.
 #'
 #' @return An instance of base::data.frame with the following columns:
-#' Protein.ID, HRD, precision, recall, F.Score, beta, Method, Method.Score
+#' Protein.ID, HRD, precision, recall, F.Score, beta, Method, Method.Score,
+#' univ.words (number of words in the argument 'univ.words'), ref.words (number
+#' of words in the argument 'ref'), univ.ref.words (number of words in the
+#' intersection of arguments 'ref' and 'univ.words') and MCC
 #' @export
 bestProtScriberPhrases <- function(prot.id, phrases.stats, prot.scriber.score.col, 
     hrd.ref, univ.words) {
@@ -302,7 +307,8 @@ wordUniverse <- function(prot.id, sssr, to.lower = getOption("wordUniverse.to.lo
 #' the argument sequence similarity search results 'sssr' using the Best Blast
 #' and registered argument 'prot.scriber.score.funks'. Evaluate the performance
 #' (F-Score) of the HRDs if reference word sets are available for the
-#' respective query proteins (qseqid).
+#' respective query proteins (qseqid). NOTE that this function does NOT
+#' annotate each domain separately, but treats all Blast Hits in a single go.
 #'
 #' @param sssr - A named list, in which names represent searched reference
 #' sequence databases and values the read in tabular output (see function
@@ -310,13 +316,6 @@ wordUniverse <- function(prot.id, sssr, to.lower = getOption("wordUniverse.to.lo
 #' @param ref.word.sets - A named list in which the names are query protein
 #' identifiers ('qseqid') in lowercase and the values are character vectors
 #' holding reference words ('the truth').
-#' @param alignmnt.regions - An instance of base::data.frame result of calling
-#' function 'allQueriesAlignmentRegions'. The data.frame has three columns
-#' 'Protein.ID', 'start.pos', and 'end.pos' indicating to which sequence region
-#' in the query the sequence similarity searches generated local alignments
-#' for. If non intersecting regions for the same query are found the
-#' prot-scriber annotation is carried out independently for these and results
-#' are concatonated, in the order of the regions.
 #' @param prot.scriber.score.funks - A named list of two member lists (see
 #' default value below for more details). Each first level member must contain
 #' two entries 'word.score.funk' and 'phrase.score.funk'. 'word.score.funk' is
@@ -353,7 +352,7 @@ wordUniverse <- function(prot.id, sssr, to.lower = getOption("wordUniverse.to.lo
 #' Protein.ID, HRD, precision, recall, F.Score, beta, Method, Method.Score
 #' @export
 annotateProteinsAndEvaluatePerformance <- function(sssr, ref.word.sets, 
-    alignmnt.regions, prot.scriber.score.funks = getOption("statsOfPhrasesForQuery.score.funks", 
+    prot.scriber.score.funks = getOption("statsOfPhrasesForQuery.score.funks", 
         list(centered.inverse.inf.cntnt.mean = list(word.score.funk = function(x) {
             centeredWordScores(x, level.funk = mean)
         }, phrase.score.funk = sumWordScores), centered.inverse.inf.cntnt.median = list(word.score.funk = function(x) {
@@ -370,30 +369,19 @@ annotateProteinsAndEvaluatePerformance <- function(sssr, ref.word.sets,
     })))
     message("Starting annotating human readable descriptions (HRD) for ", 
         length(prot.ids), " query sequences.")
-    do.call(rbind, lapply(prot.ids, function(qseqid) {
+    do.call(rbind, mclapply(prot.ids, function(qseqid) {
         tryCatch({
-            univ.words <- wordUniverse(qseqid, sssr)
-            #' Best Blast:
+            q.phrases <- phrasesForQuery(qseqid, sssr)
+            q.phrases.stats <- statsOfPhrasesForQuery(qseqid, 
+                q.phrases, ref.word.sets, score.funks = prot.scriber.score.funks)
             ref.words <- ref.word.sets[[tolower(qseqid)]]
-            bb.hrds <- bestBlastHrds(qseqid, sssr, ref.words, 
-                univ.words)
-            #' Prot Scriber:
-            qseqid.sssr.per.alignment.regions <- sssrForRegions(qseqid, 
-                alignmnt.regions, sssr)
-            alignmnt.regions.phrases.stats <- lapply(qseqid.sssr.per.alignment.regions, 
-                function(sssr.i) {
-                  q.phrases <- phrasesForQuery(qseqid, sssr.i)
-                  q.phrases.stats <- statsOfPhrasesForQuery(qseqid, 
-                    q.phrases, ref.word.sets, score.funks = prot.scriber.score.funks)
-                  setNames(lapply(names(prot.scriber.score.funks), 
-                    function(ps.score.method) {
-                      bestProtScriberPhrases(qseqid, q.phrases.stats, 
-                        ps.score.method, ref.words, univ.words)
-                    }), names(prot.scriber.score.funks))
-                })
-            prot.scribr.hrds <- joinMultiRegionStatsOfPhrasesForQuery(alignmnt.regions.phrases.stats, 
-                ref.words, univ.words)
-            rbind(bb.hrds, prot.scribr.hrds)
+            univ.words <- wordUniverse(qseqid, sssr)
+            rbind(bestBlastHrds(qseqid, sssr, ref.words, univ.words), 
+                do.call(rbind, lapply(names(prot.scriber.score.funks), 
+                  function(ps.score.method) {
+                    bestProtScriberPhrases(qseqid, q.phrases.stats, 
+                      ps.score.method, ref.words, univ.words)
+                  })))
         }, error = function(e) {
             #' browser()
             warning("Query '", qseqid, "' caused an error:\n", 

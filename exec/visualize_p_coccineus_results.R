@@ -78,7 +78,8 @@ ggsave(plot = g.p, filename = file.path(script.args[["plot-dir"]],
 pc.hrds.html <- file.path(script.args[["plot-dir"]], "p_coccineus_HRDs.html")
 visualizeHrdResults(pc.hrds, pc.ref, pc.hrds.html)
 #' Compress the document, as it is rather large:
-system(paste("bzip2", pc.hrds.html))
+system(paste("rm -f", paste0(pc.hrds.html, ".bz2"), "&& bzip2", 
+    pc.hrds.html))
 
 
 #' Generate a HTML document as above but for the multi region HRDs:
@@ -86,7 +87,8 @@ pc.hrds.mult.reg.html <- file.path(script.args[["plot-dir"]],
     "p_coccineus_HRDs_multi_region.html")
 visualizeHrdResults(pc.hrds.alignment.regions.df, pc.ref, pc.hrds.mult.reg.html)
 #' Compress the document, as it is rather large:
-system(paste("bzip2", pc.hrds.mult.reg.html))
+system(paste("rm -f", paste0(pc.hrds.mult.reg.html, ".bz2"), 
+    "&& bzip2", pc.hrds.mult.reg.html))
 
 
 #' The end

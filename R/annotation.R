@@ -224,10 +224,15 @@ phrasesForQuery <- function(prot.id, seq.sim.search.rslts) {
 #'    centered.frequencies = list(word.score.funk = centeredLinearWordScores, 
 #'          phrase.score.funk = sumWordScores)
 #'  ))
+#' @param phrase.to.string.funk - A function receiving as input the argument
+#' 'pred', i.e. a character vector and set of words, returning a single scalar
+#' string the human readable description generated from the ordered set of
+#' words ('pred'). Default is getOption('fScore.pred.to.string.funk',
+#' function(wrds) {paste(wrds, collapse=' ')})
 #'
 #' @return An instance of base::data.frame with the default columns Protein.ID,
-#' precision, recall, F.Score, beta, Phrase, n.words, and one column for each
-#' entry in argument 'word.score.funks' holding the respective phrase-score.
+#' Phrase, n.words, and one column for each entry in argument
+#' 'word.score.funks' holding the respective phrase-score.
 #' @export
 statsOfPhrasesForQuery <- function(prot.id, phrases.for.query, 
     hrd.references, score.funks = getOption("statsOfPhrasesForQuery.score.funks", 
@@ -241,7 +246,10 @@ statsOfPhrasesForQuery <- function(prot.id, phrases.for.query,
             })
         }, phrase.score.funk = sumWordScores), polynomial.word.scores = list(word.score.funk = polynomicWordScores, 
             phrase.score.funk = sumWordScores), centered.frequencies = list(word.score.funk = centeredLinearWordScores, 
-            phrase.score.funk = sumWordScores)))) {
+            phrase.score.funk = sumWordScores))), phrase.to.string.funk = getOption("fScore.pred.to.string.funk", 
+        function(wrds) {
+            paste(wrds, collapse = " ")
+        })) {
     word.freqs <- wordFrequenciesFromPhrasesList(phrases.for.query)
     all.phrases <- list()
     #' Any informative words found?
@@ -266,29 +274,32 @@ statsOfPhrasesForQuery <- function(prot.id, phrases.for.query,
             score.funk.lst[["word.score.funk"]](word.freqs)
         }), names(score.funks))
         do.call(rbind, lapply(uniq.phrases, function(phrase) {
-            f.score.df <- fScore(phrase, hrd.references[[tolower(prot.id)]], 
-                prot.id)
+            hrd <- if (length(phrase) > 0) {
+                phrase.to.string.funk(phrase)
+            } else {
+                as.character(NA)
+            }
+            phrase.score.df <- data.frame(Protein.ID = prot.id, 
+                HRD = hrd, n.words = length(phrase), stringsAsFactors = FALSE)
             #' Add prot.scriber phrase-scores as requested in argument
             #' 'word.score.funks':
             for (score.name in names(score.funks)) {
                 wrd.scrs <- word.scores[[score.name]]
-                f.score.df[, score.name] <- score.funks[[score.name]][["phrase.score.funk"]](phrase, 
+                phrase.score.df[, score.name] <- score.funks[[score.name]][["phrase.score.funk"]](phrase, 
                   wrd.scrs)
             }
-            f.score.df
+            phrase.score.df
         }))
     } else {
         #' No phrases to process by Prot-Scriber:
-        f.score.df <- fScore(character(0), hrd.references[[tolower(prot.id)]], 
-            prot.id)
-        f.score.df$HRD <- NA
-        f.score.df$n.words <- NA
+        phrase.score.df <- data.frame(Protein.ID = prot.id, HRD = as.character(NA), 
+            n.words = NA, stringsAsFactors = FALSE)
         #' Add prot.scriber phrase-scores as requested in argument
         #' 'word.score.funks':
         for (score.name in names(score.funks)) {
-            f.score.df[, score.name] <- NA
+            phrase.score.df[, score.name] <- NA
         }
-        f.score.df
+        phrase.score.df
     }
 }
 
@@ -342,7 +353,7 @@ joinMultiRegionStatsOfPhrasesForQuery <- function(alignmnt.regions.phrases.stats
             ar.ps.tbl <- alignmnt.regions.phrases.stats[[1]][[ps.sf]]
             prot.id <- ar.ps.tbl$Protein.ID
             ps.best.f.score.df <- fScore(hrd.concat.words, hrd.ref, 
-                prot.id)
+                univ.words, prot.id)
             ps.best.mcc.df <- matthewsCorrelationCoefficient(hrd.concat.words, 
                 hrd.ref, univ.words, prot.id)[, c("Protein.ID", 
                 "MCC", "univ.words", "ref.words", "univ.ref.words")]

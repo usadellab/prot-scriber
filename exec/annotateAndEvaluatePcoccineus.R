@@ -26,10 +26,10 @@ option_list <- list(
 )
 
 opt_parser <- OptionParser(option_list = option_list)
-args <- parse_args(opt_parser)
+script.args <- parse_args(opt_parser)
 
 #' Set mc.cores:
-options(mc.cores = args$`n-cores`)
+options(mc.cores = script.args$`n-cores`)
 
 #' Generate human readable descriptions (HRDs) and evaluate their performance
 #' for the P. coccineus query proteins:
@@ -37,7 +37,7 @@ pc.sssr <- list(Swissprot = pc.sprot, trEMBL = pc.trembl)
 pc.hrds <- annotateProteinsAndEvaluatePerformance(pc.sssr, pc.ref)
 
 #' Save results:
-save(pc.hrds, file = file.path(args$`data-dir`, "p_coccineus_HRDs.RData"))
+save(pc.hrds, file = file.path(script.args$`data-dir`, "p_coccineus_HRDs.RData"))
 
 #' DONE
 message("DONE")

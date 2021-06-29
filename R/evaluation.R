@@ -1,3 +1,41 @@
+#' Computes the Matthew's correlation coefficient.
+#'
+#' @param pred - A vector of predictions
+#' @param ref - A vector holding the truth (references)
+#' @param univ.words - A character vector holding all non blacklisted words
+#'
+#' @return A scalar numeric value between -1 and +1, the MCC.
+#' @export
+mcc <- function(pred, ref, univ.words) {
+    true.pos <- length(intersect(pred, ref))
+    true.neg <- length(setdiff(univ.words, union(pred, ref)))
+    false.pos <- length(setdiff(pred, ref))
+    false.neg <- length(setdiff(ref, pred))
+    mcc.denominator <- sqrt((true.pos + false.pos) * (true.pos + 
+        false.neg) * (true.neg + false.pos) * (true.neg + false.neg))
+    if ((true.pos + false.pos) == 0 || (true.pos + false.neg) == 
+        0 || (true.neg + false.pos) == 0 || (true.neg + false.neg) == 
+        0) {
+        mcc.denominator <- 1
+    }
+    m.c.c <- if (identical(pred, ref)) {
+        1
+    } else {
+        tp.tn <- if (length(setdiff(univ.words, ref)) == 0) {
+            #' Do not punish not having any false negative candidate words in
+            #' the current setting:
+            true.pos
+        } else {
+            true.pos * true.neg
+        }
+        (tp.tn - false.pos * false.neg)/mcc.denominator
+    }
+    if (m.c.c > 1) {
+        #' Did as well as possible:
+        1
+    } else m.c.c
+}
+
 #' Computes Matthew's correlation coefficient to assess the performance of the
 #' predicted Human Readable Description (HRD).
 #'
@@ -16,7 +54,10 @@
 #' Protein.ID, HRD, n.words (number of words in the argument 'pred'),
 #' univ.words (number of words in the argument 'univ.words'), ref.words (number
 #' of words in the argument 'ref'), univ.ref.words (number of words in the
-#' intersection of arguments 'ref' and 'univ.words') and MCC.
+#' intersection of arguments 'ref' and 'univ.words'), MCC (the Matthew's
+#' correlation coefficient), MCC.best.possible (the theoretically highest
+#' achievable MCC given the argument 'univ.words'), MCC.relative (the relative
+#' fraction of the MCC.best.possible achieved by the argument 'pred').
 #' @export
 matthewsCorrelationCoefficient <- function(pred, ref, univ.words, 
     prot.id, pred.to.string.funk = getOption("fScore.pred.to.string.funk", 
@@ -33,13 +74,24 @@ matthewsCorrelationCoefficient <- function(pred, ref, univ.words,
         data.frame(Protein.ID = prot.id, HRD = hrd, n.words = length(pred), 
             univ.words = length(univ.words), ref.words = length(ref), 
             univ.ref.words = length(intersect(univ.words, ref)), 
-            MCC = NA, stringsAsFactors = FALSE)
+            MCC = NA, MCC.relative = NA, MCC.best.possible = NA, 
+            stringsAsFactors = FALSE)
     } else {
-        m.c.c <- mltools::mcc(pred, ref)
+        m.c.c <- mcc(pred, ref, univ.words)
+        #' Best MCC achievable with the seq-sim-search results words:
+        m.c.c.best <- mcc(intersect(ref, univ.words), 
+            ref, univ.words)
+        if (m.c.c > m.c.c.best) {
+            warning("MCC.best.possible (", m.c.c.best, ") is smaller than MCC (", 
+                m.c.c, ")! This situation should NEVER arise.")
+        }
+        #' Fraction of the best MCC achievable actually reached:
+        m.c.c.rel <- 1 - (m.c.c.best - m.c.c)/(m.c.c.best - -1)
         data.frame(Protein.ID = prot.id, HRD = hrd, n.words = length(pred), 
             univ.words = length(univ.words), ref.words = length(ref), 
             univ.ref.words = length(intersect(univ.words, ref)), 
-            MCC = m.c.c, stringsAsFactors = FALSE)
+            MCC = m.c.c, MCC.relative = m.c.c.rel, MCC.best.possible = m.c.c.best, 
+            stringsAsFactors = FALSE)
     }
 }
 
@@ -69,12 +121,47 @@ testMatthewsCorrelationCoefficient <- function() {
     all(t1, t2, t3, t4)
 }
 
+#' Computes the F-Score from argument prediction and reference.
+#'
+#' @param pred - A vector of predictions
+#' @param ref - A vector holding the truth (references)
+#' @param beta - recall is considered beta times as important as precision.
+#' Default is getOption('fScore.beta', 1) thus emphazising precision
+#' and recall equally. 
+#'
+#' @return An instance of base::data.frame with columns F.Score, precision,
+#' recall, and fScore.beta.
+#' @export
+fScoreCalculator <- function(pred, ref, beta = getOption("fScore.beta", 
+    1)) {
+    true.pos <- intersect(pred, ref)
+    precision <- if (length(pred) > 0) {
+        length(true.pos)/length(pred)
+    } else {
+        #' Zero predicted words match any of the reference words,
+        #' means precision is zero:
+        0
+    }
+    recall <- length(true.pos)/length(ref)
+    #' Calculate the F.Score with constant beta:
+    f.c <- if ((beta * precision + recall) == 0) {
+        0
+    } else {
+        (1 + beta^2) * (precision * recall)/(beta * precision + 
+            recall)
+    }
+    data.frame(F.Score = f.c, precision = precision, recall = recall, 
+        fScore.beta = beta, stringsAsFactors = FALSE)
+}
+
 #' Computes the F-Score of a prediction given the truth (reference). For
 #' details see Wikipedia, here:
 #' https://en.wikipedia.org/wiki/F-score
 #' 
 #' @param pred - A vector of predictions
 #' @param ref - A vector holding the truth (references)
+#' @param univ.words - A character vector holding all non blacklisted words
+#' found in all considered candidate descriptions, the universe of words.
 #' @param prot.id - A string identifying the query protein for which the
 #' prediction has been made.
 #' @param beta - recall is considered beta times as important as precision.
@@ -88,9 +175,11 @@ testMatthewsCorrelationCoefficient <- function() {
 #'
 #' @return An instance of `base::data.frame` with exactly one row and the
 #' following columns: Protein.ID, HRD, n.words, precision, recall, F.Score,
-#' beta
+#' F.Score.best.possible (the theoretically highest achievable F.Score given
+#' the argument 'univ.words'), F.Score.relative (the relative fraction of the
+#' highest possibly achievable F.Score given the argument 'pred'), and beta
 #' @export
-fScore <- function(pred, ref, prot.id, beta = getOption("fScore.beta", 
+fScore <- function(pred, ref, univ.words, prot.id, beta = getOption("fScore.beta", 
     1), pred.to.string.funk = getOption("fScore.pred.to.string.funk", 
     function(wrds) {
         paste(wrds, collapse = " ")
@@ -103,27 +192,23 @@ fScore <- function(pred, ref, prot.id, beta = getOption("fScore.beta",
     if (length(ref) == 0 || is.na(ref)) {
         #' No references means we cannot compute a F-Score:
         data.frame(Protein.ID = prot.id, HRD = hrd, n.words = length(pred), 
-            precision = NA, recall = NA, F.Score = NA, fScore.beta = beta, 
-            stringsAsFactors = FALSE)
+            precision = NA, recall = NA, F.Score = NA, F.Score.relative = NA, 
+            F.Score.best.possible = NA, fScore.beta = beta, stringsAsFactors = FALSE)
     } else {
-        true.pos <- intersect(pred, ref)
-        precision <- if (length(pred) > 0) {
-            length(true.pos)/length(pred)
-        } else {
-            #' Zero predicted words match any of the reference words,
-            #' means precision is zero:
-            0
-        }
-        recall <- length(true.pos)/length(ref)
-        f.score <- if ((beta * precision + recall) == 0) {
-            0
-        } else {
-            (1 + beta^2) * (precision * recall)/(beta * precision + 
-                recall)
-        }
-        data.frame(Protein.ID = prot.id, HRD = hrd, n.words = length(pred), 
-            precision = precision, recall = recall, F.Score = f.score, 
-            fScore.beta = beta, stringsAsFactors = FALSE)
+        f.score.df <- fScoreCalculator(pred, ref, beta = beta)
+        #' Best possibly achievable F.Score given the seq-sim-search results'
+        #' words:
+        f.score.best <- fScoreCalculator(intersect(ref, univ.words), 
+            ref, beta = beta)$F.Score
+        #' How much of the best possible was achieved?
+        f.score.rel <- f.score.df$F.Score/f.score.best
+        #' Return results:
+        f.score.df$Protein.ID <- prot.id
+        f.score.df$HRD <- hrd
+        f.score.df$n.words <- length(pred)
+        f.score.df$F.Score.relative <- f.score.rel
+        f.score.df$F.Score.best.possible <- f.score.best
+        f.score.df
     }
 }
 
@@ -135,17 +220,20 @@ testFScore <- function() {
     beta <- 1
     p1 <- c("Hello", "World")
     r1 <- p1
-    t1 <- identical(fScore(p1, r1, "P1", beta = beta)$F.Score, 
+    u1 <- p1
+    t1 <- identical(fScore(p1, r1, u1, "P1", beta = beta)$F.Score, 
         1)
     p2 <- c("Hello", "World")
     r2 <- c("Not", "a", "single", "word")
-    t2 <- identical(fScore(p2, r2, "P2", beta = beta)$F.Score, 
+    u2 <- p2
+    t2 <- identical(fScore(p2, r2, u2, "P2", beta = beta)$F.Score, 
         0)
     p3 <- c("Hello", "World", "Hola", "Mundo")
     r3 <- c("Some", "words", "Hello", "World")
-    t3 <- identical(fScore(p3, r3, "P3", beta = beta)$F.Score, 
+    u3 <- p3
+    t3 <- identical(fScore(p3, r3, u3, "P3", beta = beta)$F.Score, 
         0.5)
-    t4.res <- fScore(p3, NULL, "P3", beta = beta)
+    t4.res <- fScore(p3, NULL, u3, "P3", beta = beta)
     t4 <- is.na(t4.res$F.Score) && is.na(t4.res$precision) && 
         is.na(t4.res$recall)
     all(t1, t2, t3, t4)
@@ -195,10 +283,11 @@ bestBlastHrds <- function(prot.id, sssr, hrd.ref, univ.words,
             method.score <- NA
         }
         bb.hrd.f.score.df <- fScore(bb.hrd.word.set, hrd.ref, 
-            prot.id)
+            univ.words, prot.id)
         bb.hrd.mcc.df <- matthewsCorrelationCoefficient(bb.hrd.word.set, 
             hrd.ref, univ.words, prot.id)[, c("Protein.ID", "MCC", 
-            "univ.words", "ref.words", "univ.ref.words")]
+            "MCC.relative", "MCC.best.possible", "univ.words", 
+            "ref.words", "univ.ref.words")]
         bb.hrd.eval.df <- merge(bb.hrd.f.score.df, bb.hrd.mcc.df, 
             by = "Protein.ID")
         bb.hrd.eval.df$Method <- paste0("BB.", ref.db.name)
@@ -237,10 +326,11 @@ bestProtScriberPhrases <- function(prot.id, phrases.stats, prot.scriber.score.co
         #' to 'NULL':
         ps.best.word.set <- wordSet(ps.best$HRD, blacklist.regexs = NULL)
         ps.best.f.score.df <- fScore(ps.best.word.set, hrd.ref, 
-            prot.id)
+            univ.words, prot.id)
         ps.best.mcc.df <- matthewsCorrelationCoefficient(ps.best.word.set, 
             hrd.ref, univ.words, prot.id)[, c("Protein.ID", "MCC", 
-            "univ.words", "ref.words", "univ.ref.words")]
+            "MCC.relative", "MCC.best.possible", "univ.words", 
+            "ref.words", "univ.ref.words")]
         ps.best.eval.df <- merge(ps.best.f.score.df, ps.best.mcc.df, 
             by = "Protein.ID")
         ps.best.eval.df$Method <- prot.scriber.score.col

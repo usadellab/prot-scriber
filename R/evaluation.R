@@ -79,8 +79,7 @@ matthewsCorrelationCoefficient <- function(pred, ref, univ.words,
     } else {
         m.c.c <- mcc(pred, ref, univ.words)
         #' Best MCC achievable with the seq-sim-search results words:
-        m.c.c.best <- mcc(intersect(ref, univ.words), 
-            ref, univ.words)
+        m.c.c.best <- mcc(intersect(ref, univ.words), ref, univ.words)
         if (m.c.c > m.c.c.best) {
             warning("MCC.best.possible (", m.c.c.best, ") is smaller than MCC (", 
                 m.c.c, ")! This situation should NEVER arise.")
@@ -448,6 +447,121 @@ annotateProteinsAndEvaluatePerformance <- function(sssr, ref.word.sets,
                     bestProtScriberPhrases(qseqid, q.phrases.stats, 
                       ps.score.method, ref.words, univ.words)
                   })))
+        }, error = function(e) {
+            #' browser()
+            warning("Query '", qseqid, "' caused an error:\n", 
+                e)
+        })
+    }))
+}
+
+#' Multiple alignment region version of the functions namesake
+#' 'annotateProteinsAndEvaluatePerformance'. It does the same as its namesake
+#' except prot scriber generates one human readable description per disjoint
+#' region of query sequence to which sequence similarity searches generated
+#' local alignments. Also Best Blast annotations are not generated, as this is
+#' already covered by the namesake function. Read its documentation for more
+#' details. Note that ONLY proteins with more than a single alignment region
+#' AND reference word sets will be processed.
+#'
+#' @param sssr - A named list, in which names represent searched reference
+#' sequence databases and values the read in tabular output (see function
+#' parseSeqSimSearchTable).
+#' @param ref.word.sets - A named list in which the names are query protein
+#' identifiers ('qseqid') in lowercase and the values are character vectors
+#' holding reference words ('the truth').
+#' @param alignment.regions.df - An instance of base::data.frame the result of
+#' calling function 'allQueriesAlignmentRegions'.
+#' @param prot.scriber.score.funks - A named list of two member lists (see
+#' default value below for more details). Each first level member must contain
+#' two entries 'word.score.funk' and 'phrase.score.funk'. 'word.score.funk' is
+#' a function expected to receive at least a single first argument, an instance
+#' of base::table holding the word frequencies. This function must return a
+#' named numeric vector, whose names are the words and values are their
+#' respective computed scores. This vector is used as basis to calculate
+#' prot.scriber phrase-scores as the sum of the scores of the words a phrase
+#' contains.  The second entry 'phrase.score.funk' is a function that receives
+#' at least two arguments, the first being a character vector representing a
+#' phrase and the second a named numeric vector result of invoking the
+#' respective 'word.score.funk', i.e. this vector's names are words and values
+#' their respective scores. The default of this argument is rather long:
+#' getOption('statsOfPhrasesForQuery.score.funks',
+#'  list(
+#'    centered.inverse.inf.cntnt.mean = list(word.score.funk = function(x) {
+#'          centeredWordScores(x, level.funk = mean)
+#'      }, phrase.score.funk = sumWordScores),
+#'    centered.inverse.inf.cntnt.median = list(word.score.funk = function(x) {
+#'          centeredWordScores(x, level.funk = median)
+#'      }, phrase.score.funk = sumWordScores),
+#'    centered.inverse.inf.cntnt.quarterQuantile = list(word.score.funk = function(x) {
+#'          centeredWordScores(x, level.funk = function(y) {
+#'              quantile(y, probs = 0.25)
+#'          })
+#'      }, phrase.score.funk = sumWordScores),
+#'    polynomial.word.scores = list(word.score.funk = polynomicWordScores, 
+#'          phrase.score.funk = sumWordScores),
+#'    centered.frequencies = list(word.score.funk = centeredLinearWordScores, 
+#'          phrase.score.funk = sumWordScores)
+#'  ))
+#'
+#' @return An instance of base::data.table with the following columns:
+#' Protein.ID, HRD, precision, recall, F.Score, beta, Method, Method.Score
+#' @export
+annotateProteinsAndEvaluatePerformance.MultiRegion <- function(sssr, 
+    ref.word.sets, alignment.regions.df, prot.scriber.score.funks = getOption("statsOfPhrasesForQuery.score.funks", 
+        list(centered.inverse.inf.cntnt.mean = list(word.score.funk = function(x) {
+            centeredWordScores(x, level.funk = mean)
+        }, phrase.score.funk = sumWordScores), centered.inverse.inf.cntnt.median = list(word.score.funk = function(x) {
+            centeredWordScores(x, level.funk = median)
+        }, phrase.score.funk = sumWordScores), centered.inverse.inf.cntnt.quarterQuantile = list(word.score.funk = function(x) {
+            centeredWordScores(x, level.funk = function(y) {
+                quantile(y, probs = 0.25)
+            })
+        }, phrase.score.funk = sumWordScores), polynomial.word.scores = list(word.score.funk = polynomicWordScores, 
+            phrase.score.funk = sumWordScores), centered.frequencies = list(word.score.funk = centeredLinearWordScores, 
+            phrase.score.funk = sumWordScores)))) {
+    prot.id.cands <- unique(alignment.regions.df$Protein.ID[duplicated(alignment.regions.df$Protein.ID)])
+    prot.ids <- prot.id.cands[tolower(prot.id.cands) %in% names(ref.word.sets)]
+    rm(prot.id.cands)  #' Clean up
+    message("Starting annotating human readable descriptions (HRD) for ", 
+        length(prot.ids), " query sequences - one HRD per disjoint alignment region.")
+    do.call(rbind, mclapply(prot.ids, function(qseqid) {
+        tryCatch({
+            ref.words <- ref.word.sets[[tolower(qseqid)]]
+            qseqid.sssr.regions <- sssrForRegions(qseqid, alignment.regions.df, 
+                sssr)
+            qseqid.region.hrds <- do.call(rbind, lapply(qseqid.sssr.regions, 
+                function(sssr.i) {
+                  q.phrases <- phrasesForQuery(qseqid, sssr.i)
+                  q.phrases.stats <- statsOfPhrasesForQuery(qseqid, 
+                    q.phrases, ref.word.sets, score.funks = prot.scriber.score.funks)
+                  univ.words <- wordUniverse(qseqid, sssr.i)
+                  do.call(rbind, lapply(names(prot.scriber.score.funks), 
+                    function(ps.score.method) {
+                      bestProtScriberPhrases(qseqid, q.phrases.stats, 
+                        ps.score.method, ref.words, univ.words)
+                    }))
+                }))
+            univ.words <- wordUniverse(qseqid, sssr)
+            do.call(rbind, lapply(names(prot.scriber.score.funks), 
+                function(ps.score.method) {
+                  qrh.method <- qseqid.region.hrds[which(qseqid.region.hrds$Method == 
+                    ps.score.method), ]
+                  concat.hrd <- wordSet(paste(qrh.method$HRD, 
+                    collapse = " "), blacklist.regexs = NULL)
+                  concat.hrd.f.score.df <- fScore(concat.hrd, 
+                    ref.words, univ.words, qseqid)
+                  concat.hrd.mcc.df <- matthewsCorrelationCoefficient(concat.hrd, 
+                    ref.words, univ.words, qseqid)[, c("Protein.ID", 
+                    "MCC", "MCC.relative", "MCC.best.possible", 
+                    "univ.words", "ref.words", "univ.ref.words")]
+                  concat.hrd.eval.df <- merge(concat.hrd.f.score.df, 
+                    concat.hrd.mcc.df, by = "Protein.ID")
+                  concat.hrd.eval.df$Method <- paste0(ps.score.method, 
+                    ".concat.regions")
+                  concat.hrd.eval.df$Method.Score <- sum(qrh.method$Method.Score)
+                  concat.hrd.eval.df
+                }))
         }, error = function(e) {
             #' browser()
             warning("Query '", qseqid, "' caused an error:\n", 

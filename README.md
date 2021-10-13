@@ -47,7 +47,7 @@ In order to generate a simple table in which the query protein identifiers are m
 
 ```r
 load('./data/p_coccineus_HRDs.RData')
-x <- 'centered.inverse.inf.cntnt.quarterQuantile'
+x <- "centered.inverse.inf.cntnt.mean"
 write.table( pc.hrds[ pc.hrds$Method == x, c( 'Protein.ID', 'HRD' )],
   './data/faba_human_readable_descriptions.txt', sep="\t", row.names=FALSE,
   quote=F )

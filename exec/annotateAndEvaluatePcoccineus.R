@@ -31,9 +31,19 @@ script.args <- parse_args(opt_parser)
 #' Set mc.cores:
 options(mc.cores = script.args$`n-cores`)
 
+#' Ensure the LOCAL sequence similarity search results are read, and NOT the
+#' ones installed previously with `R INSTALL`:
+load('./data/p_coccineus_seq_sim_search.RData')
+
 #' Generate human readable descriptions (HRDs) and evaluate their performance
 #' for the P. coccineus query proteins:
 pc.sssr <- list(Swissprot = pc.sprot, trEMBL = pc.trembl)
+
+#' MOCK pc.ref - we do NOT want to evaluate performance, we JUST want to
+#' annotate the query proteins:
+pc.ref <- list()
+
+#' Annotate the query proteins with short human readable descriptions:
 pc.hrds <- annotateProteinsAndEvaluatePerformance(pc.sssr, pc.ref)
 
 #' Save results:

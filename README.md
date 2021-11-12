@@ -32,6 +32,25 @@ To generate the input for the various tested prot-scriber annotation methods seq
 
 ## Methods and results
 
+### Preparation of the MetaEuk dataset
+
+The MetaEuk proteins have complicated accessions (IDs), e.g.:
+```sh
+ERR1719198_68127|ERR868376_k119_661847|+|209|3.354e-53|1|1265|1576|1265[1265]:1576[1576]:312[312]
+```
+
+These query identifiers interfered with some of our analysis steps. Hence, we simplified the protein IDs by given them unique numbers according to their appearance in the reference file `MetaEuk_preds_Tara_vs_euk_profiles_uniqs.fas`. Each protein was given an ID consisting of the prefix "ME" and its number in the respective fasta file. The following command was used:
+
+```sh
+awk 'BEGIN{i=1}{if (/^>/) {print ">ME" i;i=i+1} else {print}}' MetaEuk_preds_Tara_vs_euk_profiles_uniqs.fas > \
+  MetaEuk_preds_Tara_vs_euk_profiles_uniqs_short_IDs.fas
+```
+
+The large fasta file holding all amino acid sequences of the MetaEuk project has been split into smaller fasta files using genometools (version 1.6.2; genometools.org) with the following command:
+```sh
+gt splitfasta -targetsize 200 ../MetaEuk_preds_Tara_vs_euk_profiles_uniqs_short_IDs.fas
+```
+
 ### Sequence similarity searches
 
 All sequence similarity searches were carried out using Diamond [9] with the following example command:

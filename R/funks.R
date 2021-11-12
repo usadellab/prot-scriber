@@ -61,7 +61,16 @@ parseSeqSimSearchTable <- function(path.to.table, col.names = c("qseqid",
         blank.lines.skip = TRUE, data.table = TRUE)
     if (parse.hrd) {
         sss.tbl$HRD <- as.character(unlist(mclapply(sss.tbl$stitle, 
-            applyRegexList)))
+            function(stitle) {
+                tryCatch({
+                  applyRegexList(stitle)
+                }, error = function(e) {
+                  message("stitle '", stitle, "' caused an error in function 'applyRegexList':\n", 
+                    e)
+                  #' leave the stitle unchanged:
+                  stitle
+                })
+            })))
     }
     sss.tbl
 }

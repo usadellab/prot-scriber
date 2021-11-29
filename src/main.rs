@@ -3,17 +3,19 @@ extern crate lazy_static;
 
 use clap::{App, Arg};
 
+mod annotation_process;
 mod cluster;
 mod default;
 mod hit;
 mod model_funcs;
+mod playground;
 mod query;
 mod query_tests;
 mod seq_sim_clustering;
 mod seq_sim_table_reader;
 
 fn main() {
-    let matches = App::new("Prot-Scribr")
+    let matches = App::new("Prot-Scriber")
         .version("0.1.0")
         .about("Assigns short human readable descriptions to query biological sequences using references. For this, it consumes sequence similarity search (Blast or Diamond) results in tabular format. See below on how to run your favorite sequence similarity search tool.")
         .arg(

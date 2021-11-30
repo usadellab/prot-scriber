@@ -1,4 +1,5 @@
 //! Code used to parse sequence similarity search result tables is implemented in this module.
+use super::annotation_process::AnnotationProcess;
 use super::hit::*;
 use super::query::*;
 use std::collections::HashMap;
@@ -15,20 +16,23 @@ use std::io::BufReader;
 /// * `separator: char` - The separator to use to split a line into an array of columns
 /// * `table_cols: &HashMap<String, usize>` - The header information, i.e. the column names and
 ///                                           their respective position in the table (`path`).
+/// * `annotation_process: &mut AnnotationProcess` - A mutable reference to an instance of
+///                                                  AnnotationProcess in which to gather the
+///                                                  parsed sequence similarity search results,
+///                                                  i.e. the Queries and the Hits.
 pub fn parse_table(
     path: &str,
     separator: char,
     table_cols: &HashMap<String, usize>,
-) -> HashMap<String, Query> {
+    annotation_process: &mut AnnotationProcess,
+) {
     // Open stream to the sequence similarity search result table:
     let file = File::open(path).unwrap();
     let reader = BufReader::new(file);
 
-    // return value:
-    let mut h = HashMap::<String, Query>::new();
     // The current query for which to read in hits:
     let mut curr_query = Query::new();
-    // Process line by line in stream read from table:
+    // Process line by line in streamed read from table:
     for line in reader.lines() {
         let record_line = line.unwrap();
         let record_cols: Vec<&str> = record_line.trim().split(separator).collect();
@@ -39,7 +43,7 @@ pub fn parse_table(
             // Is it the very first line?:
             if curr_query.id != String::new() {
                 // Insert the results collected for the last query:
-                insert_query(&mut h, &mut curr_query);
+                annotation_process.insert_query(&mut curr_query);
             }
             // Prepare gathering of results for the next query:
             curr_query = Query::from_qacc(qacc_i.to_string());
@@ -49,32 +53,7 @@ pub fn parse_table(
         curr_query.add_hit(&hit_i);
     }
     // Insert the last query, because we reached the end of the file:
-    insert_query(&mut h, &mut curr_query);
-    h
-}
-
-/// Inserts a new and completely parsed instance of `Query` into the in memory database
-/// `queries_db`. Makes sure that the query does not already exist in the database and panics if it
-/// does. Before insertion the parsing is finalized by invoking
-/// `query.find_bitscore_scaling_factor()`, which computes and stores the respective scaling factor
-/// in the query instance.
-///
-/// # Arguments
-///
-/// * `queries_db: &mut HashMap<String, Query>` - A mutable reference to the in memory database
-///                                               into which to insert the parsed query.
-/// * `query: &mut Query` - A mutable reference to the query to be inserted into the in memory
-///                         database.
-pub fn insert_query(queries_db: &mut HashMap<String, Query>, query: &mut Query) {
-    if queries_db.contains_key(&query.id) {
-        // Panic, so we can ensure that if the parsed sequence similarity search result table is
-        // not sorted by the `qacc` column, prot-scriber does not read in false data.
-        panic!("Query '{}' was already stored in the database.\nMake sure your table is sorted by the `qacc` column.", query.id);
-    }
-    // Now, that the query has been initialized with all its hits, we can compute the scaling
-    // bitscore factor:
-    query.find_bitscore_scaling_factor();
-    queries_db.insert(query.id.clone(), query.clone());
+    annotation_process.insert_query(&mut curr_query);
 }
 
 /// Parses a line in the respective sequence similarity search result table. The line is already
@@ -122,7 +101,14 @@ mod tests {
     #[test]
     fn parses_seq_sim_result_table() {
         let p = Path::new("misc").join("Two_Potato_Proteins_vs_trEMBL_blastpout.txt");
-        let h = parse_table(p.to_str().unwrap(), '\t', &(*SEQ_SIM_TABLE_COLUMNS));
+        let mut ap = AnnotationProcess::new();
+        parse_table(
+            p.to_str().unwrap(),
+            '\t',
+            &(*SEQ_SIM_TABLE_COLUMNS),
+            &mut ap,
+        );
+        let h = ap.queries;
         assert_eq!(h.len(), 2);
         assert!(h.contains_key("Soltu.DM.10G003150.1"));
         assert_eq!(h.get("Soltu.DM.10G003150.1").unwrap().hits.len(), 4);
@@ -133,13 +119,6 @@ mod tests {
                 .get("sp|P15538|C11B1_HUMAN")
                 .unwrap()
                 .bitscore
-                .0,
-            32.3
-        );
-        assert_eq!(
-            h.get("Soltu.DM.10G003150.1")
-                .unwrap()
-                .bitscore_scaling_factor
                 .0,
             32.3
         );
@@ -154,13 +133,6 @@ mod tests {
                 .bitscore
                 .0,
             560.0
-        );
-        assert_eq!(
-            h.get("Soltu.DM.02G015700.1")
-                .unwrap()
-                .bitscore_scaling_factor
-                .0,
-            580.0
         );
     }
 }

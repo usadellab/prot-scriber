@@ -1,109 +1,30 @@
-use super::cluster::*;
+use super::annotation_process::AnnotationProcess;
 use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
 use super::hit::*;
-use super::seq_sim_clustering::*;
-use eq_float::F64;
-use ndarray::{Array2, ArrayBase};
-use regex::Regex;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 // NOTE that unit tests for struct Query are located in `./src/query_tests.rs`.
 
 /// A sequence similarity search is executed for a query sequence, which is represented by `Query`.
-#[derive(PartialEq, Eq, Debug, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Query {
+    /// The sequence identifier
     pub id: String,
-    pub qlen: u32,
+    /// The sequence similarity search results (Blast Hits)
     pub hits: HashMap<String, Hit>,
-    // The calculation of similarity requires scaling the bit-scores by division by the maximum
-    // bit-score found in all Hits of a respective Query instance:
-    pub bitscore_scaling_factor: F64,
-    // The dimension names of the resulting markov clustered similarity matrix:
-    pub seq_sim_mtrx_node_names: Vec<String>,
-    // The resulting clusters, represented by the respective sequence identifiers (`String`):
-    pub clusters: Vec<Cluster>,
+    /// A counter of how many times this query was parsed in sequence similarity search results
+    pub n_parsed_from_sssr_tables: u16,
 }
 
+/// Representation of a query in a sequence similarity search (SSS), e.g. Blast or Diamond.
 impl Query {
-    /// Function translates the query's sequence similarity search results into a similarity matrix
-    /// and markov clusters it. The results are stored in the query (`&self.clusters`) itself.
-    /// Additionally, the cluster containing the query is marked in `self.querys_cluster_ind`.
-    /// _Note_ that the query's clusters will be *sorted* by their respective score _descending_,
-    /// i.e. the best scoring cluster will be the first.
-    ///
-    /// # Arguments
-    ///
-    /// * `&mut self` - A mutable reference to the query itself.
-    pub fn cluster_hits(&mut self) {
-        if self.hits.len() > 0 {
-            let mcl_matrix = cluster(self);
-            let mcl_clusters = get_clusters(&mcl_matrix);
-            self.clusters = mcl_clusters
-                .iter()
-                .map(|clstr| {
-                    let mut hits = clstr
-                        .iter()
-                        .map(|seq_node| {
-                            self.seq_sim_mtrx_node_names.get(*seq_node).unwrap().clone()
-                        })
-                        .collect();
-                    let score = self.calculate_cluster_score(&hits);
-                    let aligned_query_region = self.cluster_aligned_query_region(&hits);
-                    // Sort hit identifier (in `hits`) by their respective
-                    // Hit.query_similarity_score descending:
-                    hits.sort_by(|a, b| {
-                        let a_hit = self.hits.get(a).unwrap();
-                        let b_hit = self.hits.get(b).unwrap();
-                        // See Ord implementation for struct Query:
-                        b_hit.cmp(a_hit)
-                    });
-                    Cluster {
-                        hits,
-                        score,
-                        aligned_query_region,
-                    }
-                })
-                .collect();
-            // Sort by score descending:
-            self.clusters.sort_by(|a, b| b.cmp(&a));
+    /// Returns a new and initialized instance of struct `Query`.
+    pub fn new() -> Query {
+        Query {
+            id: Default::default(),
+            hits: HashMap::<String, Hit>::new(),
+            n_parsed_from_sssr_tables: 0,
         }
-    }
-
-    /// Calculates the score of a cluster of `Hit`s generated for a Query (`&self`). The score is
-    /// the arithmetic mean of two scoring measures. The first measure is the maximum similarity -
-    /// see function `Query::similarity(&self, to: &Hit)` - between the Query (`&self`) and any hit
-    /// contained in the cluster (`custer_index`). The second scoring measure is the fraction of
-    /// all the Query's (`&self`) hits contained in the cluster. Thus, the cluster score is
-    /// calculated as:
-    /// score( cluster ) =
-    ///   mean(
-    ///     max( Query.similarity( hit_i ) ),
-    ///     cluster.len() / Query.hits.len()
-    ///   )
-    /// Note that the score is returned as an instance of `F64`. Also _note_ that this function
-    /// initializes the field `query_similarity_score` of each instance of struct Hit referenced by
-    /// `hit_ids`.
-    ///
-    /// # Arguments
-    ///
-    /// * `&mut self` - A mutable reference to the query instance itself
-    /// * `hit_ids: &Vec<String>` - The Hit sequences identifiers.
-    pub fn calculate_cluster_score(&mut self, hit_ids: &Vec<String>) -> F64 {
-        let mut max_similarity_between_query_and_hit = 0.0;
-        for curr_hit_id in hit_ids.iter() {
-            let ch_score = self.similarity(self.hits.get(curr_hit_id).unwrap());
-            if ch_score > max_similarity_between_query_and_hit {
-                max_similarity_between_query_and_hit = ch_score;
-            }
-            // Remember the similarity score between the Query (`self`) this Hit (`curr_hit_id`)
-            // for future references:
-            self.hits
-                .get_mut(curr_hit_id)
-                .unwrap()
-                .query_similarity_score = F64(ch_score);
-        }
-        let cluster_hit_coverage = hit_ids.len() as f64 / self.hits.len() as f64;
-        F64((max_similarity_between_query_and_hit + cluster_hit_coverage) / 2.0)
     }
 
     /// Creates an empty Query with an initialized empty HashMap (`hits`) and initialized `Default`
@@ -116,17 +37,9 @@ impl Query {
     pub fn from_qacc(id: String) -> Query {
         Query {
             id,
-            qlen: Default::default(),
-            bitscore_scaling_factor: Default::default(),
             hits: HashMap::<String, Hit>::new(),
-            seq_sim_mtrx_node_names: Default::default(),
-            clusters: Default::default(),
+            n_parsed_from_sssr_tables: 0,
         }
-    }
-
-    /// Creates and empty (`Default`) instance of struct Query.
-    pub fn new() -> Query {
-        Default::default()
     }
 
     /// Adds a hit instance to the query's (`&self`) hits HashMap field. The hit is added only, if
@@ -147,259 +60,100 @@ impl Query {
         self.hits.len()
     }
 
-    /// Identifies the bitscore-scaling-factor as the maximum of all bitscores of the query
-    /// (`&self`) hits.
+    /// Simple helper method that iteratively adds the Hit instances of argument `query` to
+    /// self.hits.
     ///
     /// # Arguments
     ///
     /// * `&mut self` - mutable reference to self (the query)
-    pub fn find_bitscore_scaling_factor(&mut self) {
-        // find maximum bitscore
-        let bs_scl_fct = F64(self.hits.iter().fold(0.0, |accumulated, (_, hit)| {
-            if hit.bitscore.0 > accumulated {
-                hit.bitscore.0
-            } else {
-                accumulated
-            }
-        }));
-        if bs_scl_fct == F64(0.0) {
-            panic!("bitscore scaling factor for Query '{:?}' is zero. This would cause division by zero.", self.id);
+    /// * `&query` - reference to a Query whose hits to add to self
+    pub fn add_hits(&mut self, query: &Query) {
+        for h in query.hits.values() {
+            self.add_hit(&h);
+        }
+    }
+
+    /// Increments the counter `n_parsed_from_sssr_tables` of how many times this query was parsed
+    /// from input sequence similarity search result (SSSR) tables. If this number is equal to the
+    /// number of input SSSR tables the respective AnnotationProcess was started with, all possible
+    /// SSSR result data has been read and parsed and thus this function can start the generation
+    /// of a human readable description for this query. Returns the generated human readable
+    /// description (HRD) as `Option<String>`, being `None` if still more SSSR results might be
+    /// there to parse, or `Some` if all input SSSR tables have been parsed for this query and thus
+    /// a HRD could be generated.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A mutable reference to self, this instance of Query
+    /// * `n_input_sssr: u16` - The number of SSSR input tables the respective AnnotationProcess
+    ///                         was started with.
+    pub fn increment_times_parsed_and_annotate_if_indicated(
+        &mut self,
+        n_input_sssr: u16,
+    ) -> Option<String> {
+        self.n_parsed_from_sssr_tables += 1;
+        if self.n_parsed_from_sssr_tables == n_input_sssr {
+            Some(self.annotate())
         } else {
-            self.bitscore_scaling_factor = bs_scl_fct;
+            None
         }
     }
 
-    /// Calculates the similarity between the query (`self`) and the argument hit (`to`) as the mean
-    /// of overlap_with_query and bitscore, where the bitscore is scaled by dividing it with the max. bitscore
-    /// found for all the query's hits. Returns the similarity ranging from zero to one, inclusive.
+    /// Generates and returns a human readable description (`String`) for this biological query
+    /// sequence.
     ///
     /// # Arguments
     ///
-    /// * `&self` - the query
-    /// * `to: &Hit` - the hit (one of the query's) to which the calculate the similarity to
-    pub fn similarity(&self, to: &Hit) -> f64 {
-        if !self.hits.contains_key(&to.id) {
-            panic!(
-                "The query '{}' does not contain the hit '{}' to which calculate the similarity to.",
-                self.id, to.id
-            );
-        }
-        (to.overlap_with_query.0 + to.bitscore.0 / self.bitscore_scaling_factor.0) / 2.0
-    }
-
-    /// Calculates similarities between the query (`&self`) its `hits` and in between the hits.
-    /// Stores those in a quadratic two dimensional similarity matrix (`Array2<f64>`). Note that
-    /// similarities of a node (matrix-cell) to itself is not yet initialized. Use function
-    /// seq_sim_clustering::add_self_loops to do that. Returns a tupel, `(Vec<String>,
-    /// Array2<f64>)`, with first entry the sequence identifiers, i.e. the row and column names of
-    /// the second entry, which is the similarity matrix. The sequence IDs consist of the
-    /// alphabetically sorted hit IDs followed by the terminal Query ID. This order is guaranteed.
-    ///
-    /// # Arguments
-    ///
-    /// * `&self` - the query
-    pub fn to_similarity_matrix(&mut self) -> (Vec<String>, Array2<f64>) {
-        // find maximum bit-score and use it as scaling factor for all Hits' bit-scores:
-        self.find_bitscore_scaling_factor();
-        // the names of the rows and columns in the similarity matrix:
-        let mut seq_ids: Vec<String> = self.hits.keys().map(|k: &String| (*k).clone()).collect();
-        seq_ids.sort();
-        // remember the sequence identifiers for future reference:
-        self.seq_sim_mtrx_node_names = seq_ids.clone();
-        let mut mtrx: Array2<f64> = ArrayBase::zeros((seq_ids.len(), seq_ids.len()));
-        // Save time and iterate over the similarities of the upper triangle including the
-        // diagonal, but set each calculated similarity also in the lower one. Note that the inner
-        // loop starts at the outer loop's index and not at zero.
-        for row_ind in 0..seq_ids.len() {
-            // Similarities between hit "row_ind" and ...
-            for col_ind in row_ind..self.hits.len() {
-                // ... and hit "col_i"
-                // Note, that similarity to self will be set later using
-                // seq_sim_clustering::add_self_loops
-                if row_ind != col_ind {
-                    let hit_row_i = self.hits.get(&seq_ids[row_ind]).unwrap();
-                    let hit_col_i = self.hits.get(&seq_ids[col_ind]).unwrap();
-                    let d = hit_row_i.similarity(hit_col_i, &self.qlen);
-                    mtrx[[row_ind, col_ind]] = d;
-                    mtrx[[col_ind, row_ind]] = d;
-                }
-            }
-        }
-        (seq_ids, mtrx)
-    }
-
-    /// Generates a consensus description for a cluster (argument `cluster_indx`) of this query
-    /// (`&self`). Hits' descriptions, contained in the cluster, are split using argument regular
-    /// expression. The returned consensus description is composed of words in the intersection of
-    /// all Hits' descriptions in the order they appear in the best scoring (see
-    /// `Query::similarity(&self, to: &Hit)`) hit's description.
-    ///
-    /// # Arguments
-    ///
-    /// * `&self` - A reference to the Query containing the cluster `cluster_indx`
-    /// * `cluster_indx` - A usize indicating for which of the Query's cluster to generate the
-    ///                    consensus description.
-    /// * `splitting_axe` - A reference to the regular expression used to split Hit descriptions
-    ///                     into sets or vectors of words.
-    pub fn cluster_consensus_description(
-        &self,
-        cluster_indx: usize,
-        splitting_axe: &Regex,
-    ) -> String {
-        let cluster = self.clusters.get(cluster_indx).unwrap();
-        let best_scoring_hit_description: Vec<String> = splitting_axe
-            .split(
-                &self
-                    .hits
-                    .get(cluster.hits.get(0).unwrap())
-                    .unwrap()
-                    .description,
-            )
-            .into_iter()
-            .map(|x| String::from(x))
-            .collect();
-        let hits_description_words: Vec<HashSet<String>> = cluster
-            .hits
-            .iter()
-            .map(|hit_id| {
-                splitting_axe
-                    .split(&self.hits.get(hit_id).unwrap().description)
-                    .into_iter()
-                    .map(|x| String::from(x))
-                    .collect()
-            })
-            .collect();
-        let mut shared_words = hits_description_words.get(0).unwrap().clone();
-        for i in 1..hits_description_words.len() {
-            shared_words = shared_words
-                .intersection(hits_description_words.get(i).unwrap())
-                .into_iter()
-                .map(|x| String::from(x))
-                .collect();
-        }
-        best_scoring_hit_description
-            .into_iter()
-            .filter(|x| shared_words.contains(x))
-            .collect::<Vec<String>>()
-            .join(" ")
-    }
-
-    /// Function identifies the region in the pairwise local alignments between the hits and the
-    /// query. The region is defined in a strict and a relaxed sense. If a strict region can be
-    /// found, that is returned, otherwise the relaxed one. The strict region is the one _all_
-    /// argument hits' pairwise local alignments with the query overlap to. The relaxed region is
-    /// the maximally long stretch of the query sequence that is covered by any of the hits'
-    /// pairwise local alignments. Note that because of the nature of local sequence alignments
-    /// there will always be a relaxed region covered by one or more hits, even in case the two
-    /// pairwise local alignments (hits) do _not_ have an overlap! Return type is an instance of
-    /// struct `AlignedQueryRegion`.
-    ///
-    /// # Arguments
-    ///
-    /// * `&self` - A reference to the instance of Query.
-    /// * `hit_ids: &Vec<String>` - A reference to a vector of Hit identifiers that should be
-    ///                             present among this query's hits. The region returned by this
-    ///                             function will be calculated for these argument hit identifiers.
-    pub fn cluster_aligned_query_region(&self, hit_ids: &Vec<String>) -> AlignedQueryRegion {
-        // Look for both a strict as well as a relaxed AlignedQueryRegion for the cluster
-        // (`hit_ids`):
-        // * Strict would be [max_qstart, min_qend],
-        //   but might not exit (min_qend - max_qstart < 0).
-        // * Relaxed will be used, if a strict region cannot be found; it spans:
-        //   [min_qstart, max_qend].
-        //   Note that with valid alignment data the following statement should always be true:
-        //   max_qend - min_qstart >= 0
-        let mut min_qstart = self.qlen;
-        let mut max_qstart = 0;
-        let mut min_qend = self.qlen;
-        let mut max_qend = 0;
-        for hit_id in hit_ids {
-            let hit_i = self.hits.get(hit_id).unwrap();
-            if hit_i.qstart < min_qstart {
-                min_qstart = hit_i.qstart;
-            }
-            if hit_i.qstart > max_qstart {
-                max_qstart = hit_i.qstart;
-            }
-            if hit_i.qend > max_qend {
-                max_qend = hit_i.qend;
-            }
-            if hit_i.qend < min_qend {
-                min_qend = hit_i.qend;
-            }
-        }
-        if max_qstart <= min_qend {
-            AlignedQueryRegion {
-                qstart: max_qstart,
-                qend: min_qend,
-                all_hits_overlap: true,
-            }
-        } else if min_qstart <= max_qend {
-            AlignedQueryRegion {
-                qstart: min_qstart,
-                qend: max_qend,
-                all_hits_overlap: false,
-            }
-        } else {
-            panic!(
-                "Invalid data in cluster_aligned_query_region; the cluster '{:?}' does not cover a query sequence region of query:\n{:?}",
-                hit_ids, self
-            );
-        }
-    }
-
+    /// * `&self` - A mutable reference to self, this instance of Query
     pub fn annotate(&self) -> String {
-        if self.clusters.len() > 0 {
-            let mut human_readable_description = String::new();
-            let mut annotated_regions: Vec<AlignedQueryRegion> = Vec::new();
-            let mut curr_clstr_indx = 0;
-            let mut has_disjoint_clstr_to_process = true;
-            while has_disjoint_clstr_to_process {
-                let curr_cluster = self.clusters.get(curr_clstr_indx).unwrap();
-                // Next iteration?
-                curr_clstr_indx += 1;
-                has_disjoint_clstr_to_process = curr_clstr_indx < self.clusters.len();
-            }
-            "".to_string()
-        } else {
-            (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
-        }
-    }
-
-    pub fn next_best_disjoint_cluster_indx(&self, cluster_indx: usize) -> Option<usize> {
-        // If there is one or less clusters, or the argument cluster already is the last, no next
-        // best scoring cluster exists:
-        if self.clusters.len() < 2 || cluster_indx >= self.clusters.len() - 1 {
-            return None;
-        } else {
-            // Collect all AlignedQueryRegions of the clusters up to argument cluster_indx. Note
-            // that clusters are sorted by their score.
-            let mut cluster_regions: Vec<AlignedQueryRegion> = (0..=cluster_indx)
-                .map(|i| self.clusters.get(i).unwrap().aligned_query_region.clone())
-                .collect();
-            // Iterate over the remaining clusters (after argument cluster_indx) and see, if you
-            // find one that is disjoint with _all_ clusters up and including the argument
-            // cluster_indx:
-            for i in (cluster_indx + 1)..self.clusters.len() {
-                // Process the current cluster _i_:
-                let clstr_i = self.clusters.get(i).unwrap();
-                if cluster_regions
-                    .iter()
-                    .all(|cr| cr.is_disjoint(&clstr_i.aligned_query_region))
-                {
-                    // break and return the found index:
-                    return Some(i);
-                } else {
-                    // continue search but include the current cluster's AlignedQueryRegion:
-                    cluster_regions.push(clstr_i.aligned_query_region.clone());
-                }
-            }
-            // None of the clusters following argument cluster_indx was disjoint with the clusters
-            // up to and including cluster_indx:
-            return None;
-        }
+        UNKNOWN_PROTEIN_DESCRIPTION.to_string()
     }
 }
 
-// For unit tests of struct Query see separate module `./src/query_tests.rs`. This file grew too
-// large, so the tests were moved.
+#[cfg(test)]
+mod tests {
+    use crate::query::*;
+
+    #[test]
+    fn new_query_is_correctly_initialized() {
+        let nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        assert_eq!(nq1.n_parsed_from_sssr_tables, 0);
+        assert_eq!(nq1.id, "Soltu.DM.02G015700.1".to_string());
+        let nq2 = Query::new();
+        assert_eq!(nq2.n_parsed_from_sssr_tables, 0);
+    }
+
+    #[test]
+    fn query_add_hit_only_uses_higest_bitscore() {
+        let high = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let low = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "1.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let highest = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "666.6",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let other = Hit::new(
+            "Hit_Two", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let mut query = Query::from_qacc("Query_Curious".to_string());
+        query.add_hit(&high);
+        assert_eq!(query.hits.len(), 1);
+        query.add_hit(&low);
+        assert_eq!(query.hits.len(), 1);
+        assert_eq!(*query.hits.get("Hit_One").unwrap(), high);
+        query.add_hit(&other);
+        assert_eq!(query.hits.len(), 2);
+        assert_eq!(*query.hits.get("Hit_One").unwrap(), high);
+        assert_eq!(*query.hits.get("Hit_Two").unwrap(), other);
+        query.add_hit(&highest);
+        assert_eq!(query.hits.len(), 2);
+        assert_eq!(*query.hits.get("Hit_One").unwrap(), highest);
+        assert_eq!(*query.hits.get("Hit_Two").unwrap(), other);
+    }
+}

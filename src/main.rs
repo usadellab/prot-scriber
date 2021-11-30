@@ -4,14 +4,12 @@ extern crate lazy_static;
 use clap::{App, Arg};
 
 mod annotation_process;
-mod cluster;
 mod default;
 mod hit;
 mod model_funcs;
 mod playground;
 mod query;
-mod query_tests;
-mod seq_sim_clustering;
+mod seq_family;
 mod seq_sim_table_reader;
 
 fn main() {

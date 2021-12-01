@@ -106,7 +106,7 @@ impl Query {
     ///
     /// * `&self` - A mutable reference to self, this instance of Query
     pub fn annotate(&self) -> String {
-        UNKNOWN_PROTEIN_DESCRIPTION.to_string()
+        (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
     }
 }
 

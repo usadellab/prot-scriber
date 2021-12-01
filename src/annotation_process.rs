@@ -5,6 +5,9 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+/// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
+/// human readable descriptions, i.e. the annotation of queries or sets of these (biological
+/// sequence families) with short and concise textual descriptions.
 #[derive(Debug, Clone, Default)]
 pub struct AnnotationProcess {
     /// The valid file paths to tabular sequence similarity search results, the input.
@@ -101,7 +104,7 @@ impl AnnotationProcess {
         // panic! if query.id already in results, this means the input SSSR files were not sorted
         // by query identifiers (`qacc` in Blast terminology):
         if self.human_readable_descriptions.contains_key(&query.id) {
-            panic!( "Found an unexpected occurrence of query '{:?}' while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &query.id);
+            panic!( "Found an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &query.id);
         }
         let stored_query: &mut Query;
         if self.queries.contains_key(&query.id) {
@@ -139,7 +142,7 @@ impl AnnotationProcess {
             if self.query_id_to_seq_family_id_index.contains_key(query_id) {
                 let other_family_id = self.query_id_to_seq_family_id_index.get(query_id).unwrap();
                 if *other_family_id != seq_family_id {
-                    panic!("Biological sequence '{:?}' already set as member of family '{:?}'. But found '{:?}' again declared as member of another family '{:?}'.\nMake sure each biological sequence appears in one and only one family to avoid this problem.", query_id, other_family_id, query_id, seq_family_id);
+                    panic!("Biological sequence {:?} already set as member of family {:?}. But found {:?} again declared as member of another family {:?}.\nMake sure each biological sequence appears in one and only one family to avoid this problem.", query_id, other_family_id, query_id, seq_family_id);
                 }
             }
             self.query_id_to_seq_family_id_index
@@ -164,6 +167,16 @@ impl AnnotationProcess {
         }
     }
 
+    /// Function generates a human readable description (HRD) for the argument `query_id`. The
+    /// resulting HRD is stored in `self.human_readable_descriptions` and thus the query is marked
+    /// as processed. In order to optimize memory footprint the query and all of its contained
+    /// sequence similarity search result (Hits in Blast terminology) data is removed.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A mutable reference to the current instance of AnnotationProcess, which
+    ///                 serves as an in memory database into which to insert the parsed query.
+    /// * `query_id: String` - An instance of `String` representing the query identifier
     pub fn annotate_query(&mut self, query_id: String) {
         // Generate the desired result, i.e. a human readable description for the Query:
         let hrd = self.queries.get(&query_id).unwrap().annotate();
@@ -175,6 +188,48 @@ impl AnnotationProcess {
         self.queries.remove(&query_id);
     }
 
+    /// Function generates a human readable description (HRD) for the argument `seq_family_id`. The
+    /// resulting HRD is stored in `self.human_readable_descriptions` and thus the family is marked
+    /// as processed. In order to optimize memory footprint the family and all of its contained
+    /// query data is removed.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A mutable reference to the current instance of AnnotationProcess, which
+    ///                 serves as an in memory database into which to insert the parsed query.
+    /// * `seq_family_id: &String` - A reference to a `String` representing the biological sequence
+    ///                              family's (`SeqFamily`) identifier.
+    pub fn annotate_seq_family(&mut self, seq_family_id: &String) {
+        // Generate the desired result, i.e. a human readable description for the SeqFamily:
+        let seq_family = self.seq_families.get(seq_family_id).unwrap();
+        let hrd = seq_family.annotate();
+        // Add the new result to the in memory database, i.e.
+        // `self.human_readable_descriptions`:
+        self.human_readable_descriptions
+            .insert((*seq_family_id).clone(), hrd);
+        // need to clone, otherwise had problems with the compiler (E0599):
+        let query_ids = seq_family.query_ids.clone();
+        // Free memory by removing the parsed input data, no longer required:
+        for query_id in query_ids.iter() {
+            self.queries.remove(query_id);
+            self.query_id_to_seq_family_id_index.remove(query_id);
+            self.seq_families.remove(seq_family_id);
+        }
+    }
+
+    /// Invoked whenever a query instance has been supplied with results from _all_ sequence
+    /// similarity search result (SSSR) files, implying that for that particular instance of
+    /// `Query` no more SSSR results (Hits in Blast terminology) can be parsed. Thus, that query
+    /// can be processed and a human readable description can be generated for it. If this instance
+    /// of `AnnotationProcess` (`self`) is run in `AnnotationProcessMode::FamilyAnnotation` a
+    /// similar approach is triggered for the SeqFamily that contains the argument `query_id`. If
+    /// that family has SSSR result data for _all_ of its contained queries, the family will be
+    /// processed and annotated.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A mutable reference to the current instance of AnnotationProcess, which
+    ///                 serves as an in memory database into which to insert the parsed query.
     pub fn process_query_data_complete(&mut self, query_id: String) {
         let mode = self.mode();
         match mode {
@@ -184,16 +239,53 @@ impl AnnotationProcess {
             }
             // Handle annotation of sets of biological sequences, so called "Gene Families":
             AnnotationProcessMode::FamilyAnnotation => {
-                // Get SeqFamily for query sequence identifier (qs_id)
-
-                // - if no family for qs_id can be found, annotate query as in SequenceAnnotation
-                // mode
-                // Tell SeqFamily about the completed data
-                // Ask SeqFamily if all queries have complete data ...
-                // ... and if so, annotate,
-                // ... add resulting HRD to in memory database of results,
-                // ... and remove data for memory efficiency.
+                // Get SeqFamily for query sequence identifier (`query_id`):
+                if self.query_id_to_seq_family_id_index.contains_key(&query_id) {
+                    let seq_fam_id = self
+                        .query_id_to_seq_family_id_index
+                        .get(&query_id)
+                        .unwrap()
+                        .clone();
+                    if self.seq_families.contains_key(&seq_fam_id) {
+                        // Ask SeqFamily if all queries have complete data:
+                        if self
+                            .seq_families
+                            .get(&seq_fam_id)
+                            .unwrap()
+                            .all_query_data_complete()
+                        {
+                            self.annotate_seq_family(&seq_fam_id);
+                        }
+                    }
+                } else {
+                    // If no family for qs_id can be found, annotate query as in
+                    // SequenceAnnotation:
+                    self.annotate_query(query_id);
+                }
             }
+        }
+    }
+
+    /// Invoked after all parsing of input sequence similarity search result (SSSR) files has
+    /// finished to annotate those queries or biological sequence families that have not yet been
+    /// annotated. These are those that do not have results in each separate SSSR file.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A mutable reference to the current instance of AnnotationProcess, which
+    ///                 serves as an in memory database into which to insert the parsed query.
+    pub fn process_rest_data(&mut self) {
+        // Cannot get away without cloning the keys. Rust compiler complains about an immutable
+        // borrow and at the same time a mutable borrow of `self` in the call of
+        // process_query_data_complete.
+        for query_id in self
+            .queries
+            .iter()
+            .map(|(k, _v)| k.clone())
+            .collect::<Vec<String>>()
+            .iter()
+        {
+            self.process_query_data_complete(query_id.to_string());
         }
     }
 }
@@ -230,11 +322,11 @@ mod tests {
         let h1 = Hit::new(
             "Hit_One", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-            );
+        );
         let h2 = Hit::new(
             "Hit_Two", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-            );
+        );
         nq1.add_hit(&h1);
         nq1.add_hit(&h2);
         // Test insert_query
@@ -246,11 +338,11 @@ mod tests {
         let h3 = Hit::new(
             "Hit_Three", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-            );
+        );
         let h4 = Hit::new(
             "Hit_Four", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-            );
+        );
         nq2.add_hit(&h3);
         nq2.add_hit(&h4);
         // Test inserting the same `qacc` parsed from another input Blast result:
@@ -277,6 +369,7 @@ mod tests {
         // Should panic:
         ap.insert_query(&mut nq1);
     }
+
     #[test]
     fn insert_family_works() {
         let mut ap = AnnotationProcess::new();

@@ -43,13 +43,4 @@ mod tests {
 
         assert!(true);
     }
-
-    #[test]
-    fn quick_test() {
-        let v = vec!["foo".to_string(), "bar".to_string(), "baz".to_string()];
-        let s = "bar".to_string();
-        let r = &s;
-        let i = v.iter().position(|x| *x == *r).unwrap();
-        assert_eq!(i, 1 as usize);
-    }
 }

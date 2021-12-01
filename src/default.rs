@@ -56,6 +56,10 @@ lazy_static! {
     /// can be generated
     pub static ref UNKNOWN_PROTEIN_DESCRIPTION: &'static str = "unknown protein";
 
+    /// The default short description to be used for sequence families for which no reasonable
+    /// description can be generated
+    pub static ref UNKNOWN_FAMILY_DESCRIPTION: &'static str = "unknown sequence family";
+
     /// The default string is used to collapse (join) consensus descriptions of disjoint
     /// hit-clusters:
     pub static ref CLUSTER_CONSENSUS_DESCRIPTIONS_JOIN: &'static str = "; ";

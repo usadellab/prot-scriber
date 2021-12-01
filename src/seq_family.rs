@@ -56,4 +56,19 @@ mod tests {
         sf1.query_ids_with_complete_data.push(2);
         assert!(sf1.all_query_data_complete());
     }
+
+    #[test]
+    fn mark_query_id_with_complete_data_works() {
+        let mut sf1 = SeqFamily::new();
+        assert!(sf1.all_query_data_complete());
+        sf1.query_ids.push("Query1".to_string());
+        sf1.query_ids.push("Query2".to_string());
+        sf1.query_ids.push("Query3".to_string());
+        assert!(!sf1.all_query_data_complete());
+        sf1.mark_query_id_with_complete_data(&"Query1".to_string());
+        sf1.mark_query_id_with_complete_data(&"Query2".to_string());
+        assert!(!sf1.all_query_data_complete());
+        sf1.mark_query_id_with_complete_data(&"Query3".to_string());
+        assert!(sf1.all_query_data_complete());
+    }
 }

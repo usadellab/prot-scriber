@@ -98,7 +98,11 @@ impl AnnotationProcess {
     /// * `query: &mut Query` - A reference to the query to be inserted into the in memory
     ///                         database.
     pub fn insert_query(&mut self, query: &mut Query) {
-        // To Do: panic! if query.id already in results, i.e. self.human_readable_descriptions
+        // panic! if query.id already in results, this means the input SSSR files were not sorted
+        // by query identifiers (`qacc` in Blast terminology):
+        if self.human_readable_descriptions.contains_key(&query.id) {
+            panic!( "Found an unexpected occurrence of query '{:?}' while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &query.id);
+        }
         let stored_query: &mut Query;
         if self.queries.contains_key(&query.id) {
             // Insert sequence similarity search results (SSSR) in the format of a Query, where this
@@ -160,23 +164,28 @@ impl AnnotationProcess {
         }
     }
 
+    pub fn annotate_query(&mut self, query_id: String) {
+        // Generate the desired result, i.e. a human readable description for the Query:
+        let hrd = self.queries.get(&query_id).unwrap().annotate();
+        // Add the new result to the in memory database, i.e.
+        // `self.human_readable_descriptions`:
+        self.human_readable_descriptions
+            .insert(query_id.clone(), hrd);
+        // Free memory by removing the parsed input data, no longer required:
+        self.queries.remove(&query_id);
+    }
+
     pub fn process_query_data_complete(&mut self, query_id: String) {
         let mode = self.mode();
         match mode {
             // Handle annotation of single biological sequences:
             AnnotationProcessMode::SequenceAnnotation => {
-                // Generate the desired result, i.e. a human readable description for the Query:
-                let hrd = self.queries.get(&query_id).unwrap().annotate();
-                // Add the new result to the in memory database, i.e.
-                // `self.human_readable_descriptions`:
-                self.human_readable_descriptions
-                    .insert(query_id.clone(), hrd);
-                // Free memory by removing the parsed input data, no longer required:
-                self.queries.remove(&query_id);
+                self.annotate_query(query_id);
             }
             // Handle annotation of sets of biological sequences, so called "Gene Families":
             AnnotationProcessMode::FamilyAnnotation => {
                 // Get SeqFamily for query sequence identifier (qs_id)
+
                 // - if no family for qs_id can be found, annotate query as in SequenceAnnotation
                 // mode
                 // Tell SeqFamily about the completed data
@@ -192,6 +201,7 @@ impl AnnotationProcess {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hit::Hit;
 
     #[test]
     fn new_annotation_process_initializes_fields() {
@@ -215,10 +225,58 @@ mod tests {
 
     #[test]
     fn insert_query_works() {
-        // To Do
-        assert!(false);
+        let mut ap = AnnotationProcess::new();
+        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        let h1 = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h2 = Hit::new(
+            "Hit_Two", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        nq1.add_hit(&h1);
+        nq1.add_hit(&h2);
+        // Test insert_query
+        ap.insert_query(&mut nq1);
+        assert!(ap.queries.contains_key(&nq1.id));
+        assert_eq!(ap.queries.get(&nq1.id).unwrap().hits.len(), 2);
+        // New query, but for the same `qacc`, supposedly parsed from another Blast result table:
+        let mut nq2 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        let h3 = Hit::new(
+            "Hit_Three", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        let h4 = Hit::new(
+            "Hit_Four", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            );
+        nq2.add_hit(&h3);
+        nq2.add_hit(&h4);
+        // Test inserting the same `qacc` parsed from another input Blast result:
+        ap.insert_query(&mut nq2);
+        assert!(ap.queries.contains_key(&nq2.id));
+        assert_eq!(ap.queries.len(), 1);
+        // Assert that the hits from nq1 and nq2 were in fact joined in the stored query:
+        assert_eq!(ap.queries.get(&nq2.id).unwrap().hits.len(), 4);
+        let sq = ap.queries.get(&nq2.id).unwrap();
+        assert!(sq.hits.contains_key(&h1.id));
+        assert!(sq.hits.contains_key(&h2.id));
+        assert!(sq.hits.contains_key(&h3.id));
+        assert!(sq.hits.contains_key(&h4.id));
     }
 
+    #[test]
+    #[should_panic]
+    fn insert_query_panics_in_case_of_unsorted_blast_table() {
+        let mut ap = AnnotationProcess::new();
+        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        // Mark nq1 as already processed:
+        ap.human_readable_descriptions
+            .insert(nq1.id.clone(), "Unknown protein".to_string());
+        // Should panic:
+        ap.insert_query(&mut nq1);
+    }
     #[test]
     fn insert_family_works() {
         let mut ap = AnnotationProcess::new();

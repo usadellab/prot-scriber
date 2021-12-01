@@ -286,6 +286,17 @@ impl AnnotationProcess {
         {
             self.process_query_data_complete(query_id.to_string());
         }
+        // Process seq families that might have queries that got no blast hits in any input blast
+        // table.
+        for seq_family_id in self
+            .seq_families
+            .iter()
+            .map(|(k, _v)| k.clone())
+            .collect::<Vec<String>>()
+            .iter()
+        {
+            self.annotate_seq_family(seq_family_id);
+        }
     }
 }
 
@@ -493,12 +504,17 @@ mod tests {
         ap.insert_seq_family(sf_id1.clone(), sf1);
         nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         ap.insert_query(&mut nq1);
+        let mut sf2 = SeqFamily::new();
+        sf2.query_ids = vec!["The protein without known relatives".to_string()];
+        let sf_id2 = "SeqFamily2".to_string();
+        ap.insert_seq_family(sf_id2.clone(), sf2);
         ap.process_rest_data();
-        // Family should have been annotated:
-        println!("{:?}", ap);
+        // Families should have been annotated:
         assert!(ap.human_readable_descriptions.contains_key(&sf_id1));
         assert!(!ap.queries.contains_key(&nq1.id));
         assert!(!ap.seq_families.contains_key(&sf_id1));
         assert!(!ap.query_id_to_seq_family_id_index.contains_key(&nq1.id));
+        assert!(ap.human_readable_descriptions.contains_key(&sf_id2));
+        assert!(!ap.seq_families.contains_key(&sf_id2));
     }
 }

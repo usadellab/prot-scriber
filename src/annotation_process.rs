@@ -247,13 +247,12 @@ impl AnnotationProcess {
                         .unwrap()
                         .clone();
                     if self.seq_families.contains_key(&seq_fam_id) {
+                        // Tell Family that parsing of Blast results for argument `query_id` has
+                        // been completed:
+                        let seq_fam = self.seq_families.get_mut(&seq_fam_id).unwrap();
+                        seq_fam.mark_query_id_with_complete_data(&query_id);
                         // Ask SeqFamily if all queries have complete data:
-                        if self
-                            .seq_families
-                            .get(&seq_fam_id)
-                            .unwrap()
-                            .all_query_data_complete()
-                        {
+                        if seq_fam.all_query_data_complete() {
                             self.annotate_seq_family(&seq_fam_id);
                         }
                     }
@@ -433,5 +432,73 @@ mod tests {
         sf2.query_ids = vec!["Query1".to_string(), "Query4".to_string()];
         let sf_id2 = "SeqFamily2".to_string();
         ap.insert_seq_family(sf_id2.clone(), sf2);
+    }
+
+    // This test also tests the functions
+    // * annotate_query
+    // * annotate_seq_family
+    // implicitly
+    #[test]
+    fn process_query_data_complete_works() {
+        // Test queries:
+        let mut ap = AnnotationProcess::new();
+        ap.seq_sim_search_tables = vec!["blast_out_table.txt".to_string()];
+        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        ap.insert_query(&mut nq1);
+        // Query should have been annotated:
+        assert!(ap.human_readable_descriptions.contains_key(&nq1.id));
+        assert!(!ap.queries.contains_key(&nq1.id));
+        // Test families:
+        ap = AnnotationProcess::new();
+        ap.seq_sim_search_tables = vec!["blast_out_table.txt".to_string()];
+        let mut sf1 = SeqFamily::new();
+        sf1.query_ids = vec!["Soltu.DM.02G015700.1".to_string()];
+        let sf_id1 = "SeqFamily1".to_string();
+        ap.insert_seq_family(sf_id1.clone(), sf1);
+        nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        ap.insert_query(&mut nq1);
+        // Family should have been annotated:
+        println!("{:?}", ap);
+        assert!(ap.human_readable_descriptions.contains_key(&sf_id1));
+        assert!(!ap.queries.contains_key(&nq1.id));
+        assert!(!ap.seq_families.contains_key(&sf_id1));
+        assert!(!ap.query_id_to_seq_family_id_index.contains_key(&nq1.id));
+    }
+
+    #[test]
+    fn process_rest_data_works() {
+        // Test Queries:
+        let mut ap = AnnotationProcess::new();
+        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        let h1 = Hit::new(
+            "Hit_One", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+        );
+        let h2 = Hit::new(
+            "Hit_Two", "100", "1", "50", "200", "51", "110", "123.4",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+        );
+        nq1.add_hit(&h1);
+        nq1.add_hit(&h2);
+        ap.insert_query(&mut nq1);
+        ap.process_rest_data();
+        // Query should have been annotated:
+        assert!(ap.human_readable_descriptions.contains_key(&nq1.id));
+        assert!(!ap.queries.contains_key(&nq1.id));
+        // Test Families:
+        ap = AnnotationProcess::new();
+        let mut sf1 = SeqFamily::new();
+        sf1.query_ids = vec!["Soltu.DM.02G015700.1".to_string()];
+        let sf_id1 = "SeqFamily1".to_string();
+        ap.insert_seq_family(sf_id1.clone(), sf1);
+        nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        ap.insert_query(&mut nq1);
+        ap.process_rest_data();
+        // Family should have been annotated:
+        println!("{:?}", ap);
+        assert!(ap.human_readable_descriptions.contains_key(&sf_id1));
+        assert!(!ap.queries.contains_key(&nq1.id));
+        assert!(!ap.seq_families.contains_key(&sf_id1));
+        assert!(!ap.query_id_to_seq_family_id_index.contains_key(&nq1.id));
     }
 }

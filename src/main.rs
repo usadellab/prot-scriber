@@ -10,7 +10,8 @@ mod model_funcs;
 mod playground;
 mod query;
 mod seq_family;
-mod seq_sim_table_reader;
+mod seq_sim_table_reader; 
+mod generate_HRD_associated_funcs;
 
 fn main() {
     let matches = App::new("Prot-Scriber")

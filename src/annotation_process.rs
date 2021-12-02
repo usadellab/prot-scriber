@@ -39,28 +39,42 @@ pub enum AnnotationProcessMode {
     FamilyAnnotation,
 }
 
+/// The central function that runs an annotation process. Note that this is implemented as a
+/// "static" function (in Java terminology - apologies offered), because using a reference to an
+/// instance of `AnnotationProcess` would cause lifetime issues. This is, because a
+/// Arc<Mutex<AnnotationProcess>> is constructed and shared between threads. Thus this function
+/// that actually executes an instance of `AnnotationProcess` takes ownership of an argument
+/// `annotation_process`.
+///
+/// # Arguments
+///
+/// * `annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
+pub fn run(annotation_process: AnnotationProcess) {
+    let sssr_tables : Vec<String> = annotation_process.seq_sim_search_tables.map( x => x.clone() ).collect();
+    let ap_arc_mutex: Arc<Mutex<AnnotationProcess>> = Arc::new(Mutex::new(annotation_process));
+
+    // Parse and process each sequence similarity search result table in a dedicated
+    // thread:
+    for sss_tbl in sssr_tables {
+        let ap_i = ap_arc_mutex.clone();
+
+        // Start this sss_tbl's dedicated threat:
+        thread::spawn(move || {
+            let mut x = ap_i.lock().unwrap();
+            parse_table(
+                sss_tbl,
+                SSSR_TABLE_FIELD_SEPARATOR,
+                SEQ_SIM_TABLE_COLUMNS,
+                ap_i,
+            );
+        });
+    }
+}
+
 impl AnnotationProcess {
-    /// Creates and empty (`Default`) instance of struct AnnotationProcess.
+    /// Creates an empty (`Default`) instance of struct AnnotationProcess.
     pub fn new() -> AnnotationProcess {
         Default::default()
-    }
-
-    /// The central function that runs an annotation process.
-    pub fn run(sssr_tables: Vec<String>) {
-        let ap_arc_mutex: Arc<Mutex<HashMap<String, String>>> =
-            Arc::new(Mutex::new(HashMap::new()));
-
-        // Parse and process each sequence similarity search result table in a dedicated
-        // thread:
-        for sss_tbl in sssr_tables {
-            let ap_i = ap_arc_mutex.clone();
-
-            // Start this sss_tbl's dedicated threat:
-            thread::spawn(move || {
-                let mut x = ap_i.lock().unwrap();
-                x.insert("Hello".to_string(), sss_tbl);
-            });
-        }
     }
 
     /// Processes the sequence similarity search result (SSSR) data parsed for the argument

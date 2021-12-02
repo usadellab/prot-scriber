@@ -17,16 +17,15 @@ use std::sync::{Arc, Mutex};
 /// * `path: &str` - The path to the tabular sequence similarity search result file to parse
 /// * `separator: char` - The separator to use to split a line into an array of columns
 /// * `table_cols: &HashMap<String, usize>` - The header information, i.e. the column names and
-///                                           their respective position in the table (`path`).
-/// * `annotation_process: AnnotationProcess` - A mutable reference to an instance of
-///                                                  AnnotationProcess in which to gather the
-///                                                  parsed sequence similarity search results,
-///                                                  i.e. the Queries and the Hits.
+/// their respective position in the table (`path`).
+/// * `annotation_process: Arc<Mutex<AnnotationProcess>>` - A mutable reference to an instance of
+/// AnnotationProcess in which to gather the parsed sequence similarity search results, i.e. the
+/// Queries and the Hits.
 pub fn parse_table(
     path: &str,
     separator: char,
     table_cols: &HashMap<String, usize>,
-    annotation_process: Arc<Mutex<&mut AnnotationProcess>>,
+    annotation_process: Arc<Mutex<AnnotationProcess>>,
 ) {
     // Open stream to the sequence similarity search result table:
     let file = File::open(path).unwrap();

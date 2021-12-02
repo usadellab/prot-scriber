@@ -1,7 +1,8 @@
+use super::default::{SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
 use super::query::Query;
 use super::seq_family::SeqFamily;
+use super::seq_sim_table_reader::parse_table;
 use std::collections::HashMap;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -45,46 +46,21 @@ impl AnnotationProcess {
     }
 
     /// The central function that runs an annotation process.
-    ///
-    /// # Arguments
-    ///
-    /// * `&self` - A reference to an instance of AnnotationProcess
-    pub fn run(&mut self) {
-        // let (tx, rx) = mpsc::channel();
-        // let qhd_arc: Arc<Mutex<HashMap<String, Vec<String>>>> =
-        //     Arc::new(Mutex::new((*self).queries));
+    pub fn run(sssr_tables: Vec<String>) {
+        let ap_arc_mutex: Arc<Mutex<HashMap<String, String>>> =
+            Arc::new(Mutex::new(HashMap::new()));
 
-        // // Parse and process each sequence similarity search result table in a dedicated
-        // // thread:
-        // for sss_tbl in (*self).seq_sim_search_tables {
-        //     let tx_i = tx.clone();
-        //     let qhd_arc_i = qhd_arc.clone();
+        // Parse and process each sequence similarity search result table in a dedicated
+        // thread:
+        for sss_tbl in sssr_tables {
+            let ap_i = ap_arc_mutex.clone();
 
-        //     // Start this sss_tbl's dedicated threat:
-        //     thread::spawn(move || {
-        //         let vals = vec![
-        //             format!("({}) hello", i),
-        //             env!("CARGO_MANIFEST_DIR").to_string(),
-        //             String::from("from"),
-        //             String::from("the"),
-        //             String::from("thread"),
-        //         ];
-
-        //         for val in vals {
-        //             let mut vec_i = qhd_arc_i.lock().unwrap();
-        //             vec_i.push(val);
-        //         }
-        //         tx_i.send(format!("thread {}'s message", i)).unwrap();
-        //     });
-        // }
-
-        // // Receiver thread will wait eternally, as long as tx has not been dropped:
-        // drop(tx);
-
-        // // Listen to messages coming from any thread:
-        // for received in rx {
-        //     println!("Got: {}", received);
-        // }
+            // Start this sss_tbl's dedicated threat:
+            thread::spawn(move || {
+                let mut x = ap_i.lock().unwrap();
+                x.insert("Hello".to_string(), sss_tbl);
+            });
+        }
     }
 
     /// Processes the sequence similarity search result (SSSR) data parsed for the argument

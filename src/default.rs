@@ -40,6 +40,9 @@ lazy_static! {
     /// A Hit's description is split into words using this default regular expression.
     pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"\s+").unwrap();
 
+    /// Default sequence similarity search result table field separator:
+    pub static ref SSSR_TABLE_FIELD_SEPARATOR: char = '\t';
+
     /// The default inflation parameter (I) for Markov Clustering
     pub static ref MCL_INFLATION: f64 = 5.0;
 

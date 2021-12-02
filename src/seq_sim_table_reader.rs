@@ -6,9 +6,11 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::sync::{Arc, Mutex};
 
 /// Finds a tabuar file (`path`) and parses it in a stream approach, i.e. line by line. Returns a
-/// in memory database of the respective parsed queries and their hits.
+/// in memory database of the respective parsed queries and their hits. Note that this function is
+/// making use of a thread safe reference to the argument `annotation_process`.
 ///
 /// # Arguments
 ///
@@ -16,7 +18,7 @@ use std::io::BufReader;
 /// * `separator: char` - The separator to use to split a line into an array of columns
 /// * `table_cols: &HashMap<String, usize>` - The header information, i.e. the column names and
 ///                                           their respective position in the table (`path`).
-/// * `annotation_process: &mut AnnotationProcess` - A mutable reference to an instance of
+/// * `annotation_process: AnnotationProcess` - A mutable reference to an instance of
 ///                                                  AnnotationProcess in which to gather the
 ///                                                  parsed sequence similarity search results,
 ///                                                  i.e. the Queries and the Hits.
@@ -24,7 +26,7 @@ pub fn parse_table(
     path: &str,
     separator: char,
     table_cols: &HashMap<String, usize>,
-    annotation_process: &mut AnnotationProcess,
+    annotation_process: Arc<Mutex<&mut AnnotationProcess>>,
 ) {
     // Open stream to the sequence similarity search result table:
     let file = File::open(path).unwrap();
@@ -43,7 +45,10 @@ pub fn parse_table(
             // Is it the very first line?:
             if curr_query.id != String::new() {
                 // Insert the results collected for the last query:
-                annotation_process.insert_query(&mut curr_query);
+                let mut ap = annotation_process.lock().unwrap();
+                ap.insert_query(&mut curr_query);
+                // release lock:
+                drop(ap);
             }
             // Prepare gathering of results for the next query:
             curr_query = Query::from_qacc(qacc_i.to_string());
@@ -53,7 +58,10 @@ pub fn parse_table(
         curr_query.add_hit(&hit_i);
     }
     // Insert the last query, because we reached the end of the file:
-    annotation_process.insert_query(&mut curr_query);
+    let mut ap = annotation_process.lock().unwrap();
+    ap.insert_query(&mut curr_query);
+    // release lock:
+    drop(ap);
 }
 
 /// Parses a line in the respective sequence similarity search result table. The line is already

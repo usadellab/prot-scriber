@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// # Arguments
 ///
-/// * `path: &str` - The path to the tabular sequence similarity search result file to parse
+/// * `path: String` - The path to the tabular sequence similarity search result file to parse
 /// * `separator: char` - The separator to use to split a line into an array of columns
 /// * `table_cols: &HashMap<String, usize>` - The header information, i.e. the column names and
 /// their respective position in the table (`path`).
@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex};
 /// AnnotationProcess in which to gather the parsed sequence similarity search results, i.e. the
 /// Queries and the Hits.
 pub fn parse_table(
-    path: &str,
+    path: String,
     separator: char,
     table_cols: &HashMap<String, usize>,
     annotation_process: Arc<Mutex<AnnotationProcess>>,
@@ -107,15 +107,14 @@ mod tests {
 
     #[test]
     fn parses_seq_sim_result_table() {
-        let p = Path::new("misc").join("Two_Potato_Proteins_vs_trEMBL_blastpout.txt");
-        let mut ap = AnnotationProcess::new();
-        parse_table(
-            p.to_str().unwrap(),
-            '\t',
-            &(*SEQ_SIM_TABLE_COLUMNS),
-            &mut ap,
-        );
-        let h = ap.queries;
+        let p = Path::new("misc")
+            .join("Two_Potato_Proteins_vs_trEMBL_blastpout.txt")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let ap: Arc<Mutex<AnnotationProcess>> = Arc::new(Mutex::new(AnnotationProcess::new()));
+        parse_table(p, '\t', &(*SEQ_SIM_TABLE_COLUMNS), ap.clone());
+        let h = &ap.lock().unwrap().queries;
         assert_eq!(h.len(), 2);
         assert!(h.contains_key("Soltu.DM.10G003150.1"));
         assert_eq!(h.get("Soltu.DM.10G003150.1").unwrap().hits.len(), 4);

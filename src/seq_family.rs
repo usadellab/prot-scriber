@@ -71,8 +71,15 @@ impl SeqFamily {
                 }
             }
         }
-        // TODO: Invoke `generate_human_readable_description(candidate_descriptions, ...)`
-        (*UNKNOWN_FAMILY_DESCRIPTION).to_string()
+        // Generate a human readable description, if any source candidate descriptions are
+        // available, return the default "unkown family" otherwise:
+        if candidate_descriptions.len() > 0 {
+            // TODO: Invoke `generate_human_readable_description(candidate_descriptions, ...)`
+            // instead of returning the following:
+            (*UNKNOWN_FAMILY_DESCRIPTION).to_string()
+        } else {
+            (*UNKNOWN_FAMILY_DESCRIPTION).to_string()
+        }
     }
 }
 

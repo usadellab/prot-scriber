@@ -17,7 +17,7 @@ mod seq_sim_table_reader;
 fn main() {
     let matches = App::new("Prot-Scriber")
         .version("0.1.0")
-        .about("Assigns short human readable descriptions to query biological sequences using references. For this, it consumes sequence similarity search (Blast or Diamond) results in tabular format. See below on how to run your favorite sequence similarity search tool.")
+        .about("Assigns short human readable descriptions (HRD) to query biological sequences using reference canditate descriptions. In this, prot-scriber consumes sequence similarity search (Blast or Diamond or similar) results in tabular format. A customized lexical analysis is carried out on the descriptions of these Blast Hits and a resulting HRD is assigned to the query sequences.\nprot-scriber can also apply the same methodology to produce HRDs for sets of biological sequences, i.e. gene families.\nSee below on how to run your favorite sequence similarity search tool, so that it produces tabular results in the format prot-scriber needs them.")
         .arg(
             Arg::new("output")
             .required(true)

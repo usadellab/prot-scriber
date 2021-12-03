@@ -4,7 +4,7 @@ use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{mem, thread};
 
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
 /// human readable descriptions, i.e. the annotation of queries or sets of these (biological
@@ -50,7 +50,7 @@ pub enum AnnotationProcessMode {
 /// # Arguments
 ///
 /// * `annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
-pub fn run(annotation_process: AnnotationProcess) -> HashMap<String, String> {
+pub fn run(annotation_process: AnnotationProcess) -> AnnotationProcess {
     // Prepare:
     let sssr_tables: Vec<String> = annotation_process
         .seq_sim_search_tables
@@ -82,13 +82,16 @@ pub fn run(annotation_process: AnnotationProcess) -> HashMap<String, String> {
         handle.join().unwrap();
     }
 
+    // How to take ownership of argument `annotation_process` back from having it moved into an
+    // Arc<Mutex<AnnotationProcess>>; see:
+    // https://stackoverflow.com/questions/29177449/how-to-take-ownership-of-t-from-arcmutext
+    let mut ap = Arc::try_unwrap(ap_arc_mutex).unwrap().into_inner().unwrap();
+
     // Make sure all queries or sequence families are annotated:
-    let mut ap = ap_arc_mutex.lock().unwrap();
     ap.process_rest_data();
 
-    // Prepare result:
-    let result = ap.human_readable_descriptions.clone();
-    result
+    // Return modified version of input argument `annotation_process`:
+    ap
 }
 
 impl AnnotationProcess {
@@ -548,7 +551,8 @@ mod tests {
                 .unwrap()
                 .to_string(),
         );
-        let hrds = run(ap);
+        ap = run(ap);
+        let hrds = ap.human_readable_descriptions;
         assert!(hrds.len() > 0);
         let queries_with_expected_result = vec![
             "Soltu.DM.01G022510.1".to_string(),
@@ -610,7 +614,8 @@ mod tests {
         ];
         ap.insert_seq_family(sf1_id.clone(), sf1);
         ap.insert_seq_family(sf2_id.clone(), sf2);
-        let hrds = run(ap);
+        ap = run(ap);
+        let hrds = ap.human_readable_descriptions;
         assert_eq!(hrds.len(), 2);
         let queries_with_expected_result = vec![sf1_id, sf2_id];
         for qid in queries_with_expected_result {

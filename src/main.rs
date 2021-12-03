@@ -76,10 +76,10 @@ fn main() {
         .collect();
 
     // Execute the Annotation-Process:
-    let human_readable_descriptions: HashMap<String, String> = run(annotation_process);
+    annotation_process = run(annotation_process);
 
     // Save output:
     if let Some(o) = matches.value_of("output") {
-        // write_output_table(o, human_readable_descriptions);
+        // write_output_table(o, annotation_process.human_readable_descriptions);
     }
 }

@@ -606,6 +606,7 @@ mod tests {
             "Soltu.DM.09G022410.3".to_string(),
             "Soltu.DM.10G003150.1".to_string(),
             "Soltu.DM.S001650.1".to_string(),
+            "The_Protein_Without_Blast_Hits".to_string(),
         ];
         ap.insert_seq_family(sf1_id.clone(), sf1);
         ap.insert_seq_family(sf2_id.clone(), sf2);

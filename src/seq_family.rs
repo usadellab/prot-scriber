@@ -64,8 +64,11 @@ impl SeqFamily {
         // Gather all candidate descriptions of all queries belonging to this sequence family. This
         // means collecting all queries' hit-descriptions:
         for qid in self.query_ids.iter() {
-            for (_, hit) in &queries.get(qid).unwrap().hits {
-                candidate_descriptions.push(hit.description.clone());
+            // If the searches found hits of significant similarity for the query sequence:
+            if queries.contains_key(qid) {
+                for (_, hit) in &queries.get(qid).unwrap().hits {
+                    candidate_descriptions.push(hit.description.clone());
+                }
             }
         }
         // TODO: Invoke `generate_human_readable_description(candidate_descriptions, ...)`

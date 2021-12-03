@@ -212,7 +212,7 @@ impl AnnotationProcess {
     pub fn annotate_seq_family(&mut self, seq_family_id: &String) {
         // Generate the desired result, i.e. a human readable description for the SeqFamily:
         let seq_family = self.seq_families.get(seq_family_id).unwrap();
-        let hrd = seq_family.annotate();
+        let hrd = seq_family.annotate(&self.queries);
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
         self.human_readable_descriptions

@@ -46,9 +46,9 @@ pub fn matches_uninformative_list(word: &str, regex: &Vec<Regex>) -> bool {
 // }
 
 // impl PhrasesInfo {
-//     pub fn new(hdr : Vec<String>, input_word_classification : HashMap<String,bool>) -> PhraseInfo {
+//     pub fn new(candidate_hdr : Vec<String>, input_word_classification : HashMap<String,bool>) -> PhraseInfo {
 //         PhraseInfo {
-//             phrases : hdr,
+//             phrases : candidate_hdr,
 //             word_classification : input_word_classification,
 //         }
 //     }
@@ -101,8 +101,6 @@ pub fn get_possible_hrd_phrases(candidate_vector_description: Vec<&str>)-> Vec<S
     return_vec.retain(|x| *x != ""); // remove any empty strings 
     return_vec
 }
-
-// TODO fix borrowing issues
 /// Gets word frequencies of all candidate words
 /// # Arguments 
 /// * `Vector<String>` - vector of strings containing all candidate HRDS.
@@ -110,30 +108,19 @@ pub fn get_candidate_word_frequency(vec : Vec<String>) -> HashMap<String, f32> {
     let mut freq_map: HashMap<String, f32> = HashMap::new();
     let mut map: HashMap<String, i32> = HashMap::new();
     for i in &vec {
-        *freq_map.entry(i.to_string()).or_default() += 1 as f32;
+        *freq_map.entry(i.to_string().to_lowercase()).or_default() += 1 as f32;
     }
     for i in &vec {
         *map.entry(i.to_string()).or_default() += 1 as i32;
     }
     let max_value = map.values().max().unwrap().clone();
     
-    for key in freq_map.keys() {
+    for key in freq_map.to_owned().keys() {
         *freq_map.get_mut(key).unwrap() /= max_value as f32; //normalize
     };
 
 freq_map
 }
-
-
-// fn get_possiable_hrd_phrases(candidate_vector_descriptions){
-//     let  p = powerset(candidate_vector_descriptions);
-
-//     for i in p {
-//         let vector_String: Vec<String> = i.iter().map(|s| s.to_string()).collect();
-//         println!("{:?}\n{:?}", &i, hashset(&vector_String));
-// }  
-// }
-
 
 
 
@@ -163,24 +150,23 @@ mod tests {
         assert_eq!(result, word_classification_map(split_candidates_descripts(candidate_words),re))
 
     }
-    // #[test]
-    // fn test_vec_to_hashset(){
-    //     let test_vec = vec!["alcohol", "c", "alcohol dehydrogenase c terminal"];
-    //     let v4: Vec<String> = test_vec.iter().map(|s| s.to_string()).collect();
-    //     let result = {"dehydrogenase", "c", "terminal", "alcohol dehydrogenase c terminal", "alcohol"};
-    //     assert_eq!(result, hashset(&v4));
-    // }
+    
     #[test]
     fn test_get_possible_hdr_phrases(){
         let candidate_descript_vec = vec!["alcohol", "dehydrogenase", "c", "terminal"];
         let result = vec!["alcohol", "dehydrogenase", "alcohol dehydrogenase", "c", "alcohol c", "dehydrogenase c", "alcohol dehydrogenase c", "terminal", "alcohol terminal", "dehydrogenase terminal", "alcohol dehydrogenase terminal", "c terminal", "alcohol c terminal", "dehydrogenase c terminal", "alcohol dehydrogenase c terminal"];
         assert_eq!(get_possible_hrd_phrases(candidate_descript_vec), result);
     }
-//TODO:
-//     #[test]
-//     fn get_vector_word_frequency(){
-//         let vec = vec!["alcohol".to_string(),"dehydrogenase".to_string(), "c".to_string(), "terminal".to_string()];
-//         let result = {"alcohol": 1 , "dehydrogenase":1 , "c" : 1, "terminal":1};
-//         assert_eq!(result, get_candidate_word_frequency(&vec));
-//     }
+
+    #[test]
+    fn get_vector_word_frequency(){
+        let vec = vec!["Alcohol".to_string(),"dehydrogenase".to_string(), "c".to_string(), "terminal".to_string()];
+        let mut result = HashMap::new();
+        result.insert("terminal".to_string(),1.0);
+        result.insert("dehydrogenase".to_string(),1.0);
+        result.insert("alcohol".to_string(),1.0);
+        result.insert("c".to_string(),1.0);
+
+        assert_eq!(result, get_candidate_word_frequency(vec));
+    }
 }

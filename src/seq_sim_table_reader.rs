@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 /// Finds a tabuar file (`path`) and parses it in a stream approach, i.e. line by line. Returns a
@@ -21,11 +22,14 @@ use std::sync::{Arc, Mutex};
 /// * `annotation_process: Arc<Mutex<AnnotationProcess>>` - A mutable reference to an instance of
 /// AnnotationProcess in which to gather the parsed sequence similarity search results, i.e. the
 /// Queries and the Hits.
+/// * `transmitter: std::sync::mpsc::Sender<String>` - An instance of transmitter to tell the
+/// parent thread when a query has been completely parsed.
 pub fn parse_table(
     path: String,
     separator: char,
     table_cols: &HashMap<String, usize>,
     annotation_process: Arc<Mutex<AnnotationProcess>>,
+    transmitter: Sender<String>,
 ) {
     // Open stream to the sequence similarity search result table:
     let file = File::open(path).unwrap();
@@ -45,7 +49,7 @@ pub fn parse_table(
             if curr_query.id != String::new() {
                 // Insert the results collected for the last query:
                 let mut ap = annotation_process.lock().unwrap();
-                ap.insert_query(&mut curr_query);
+                ap.insert_query(&mut curr_query, transmitter.clone());
                 // release lock:
                 drop(ap);
             }
@@ -58,7 +62,7 @@ pub fn parse_table(
     }
     // Insert the last query, because we reached the end of the file:
     let mut ap = annotation_process.lock().unwrap();
-    ap.insert_query(&mut curr_query);
+    ap.insert_query(&mut curr_query, transmitter);
     // release lock:
     drop(ap);
 }
@@ -90,6 +94,7 @@ mod tests {
     use super::*;
     use crate::default::SEQ_SIM_TABLE_COLUMNS;
     use std::path::Path;
+    use std::sync::mpsc;
 
     #[test]
     fn parses_hit_from_record_line() {
@@ -113,7 +118,12 @@ mod tests {
             .unwrap()
             .to_string();
         let ap: Arc<Mutex<AnnotationProcess>> = Arc::new(Mutex::new(AnnotationProcess::new()));
-        parse_table(p, '\t', &(*SEQ_SIM_TABLE_COLUMNS), ap.clone());
+        let (tx, rx) = mpsc::channel();
+        parse_table(p, '\t', &(*SEQ_SIM_TABLE_COLUMNS), ap.clone(), tx);
+        for received in rx {
+            let mut ap_rx = ap.lock().unwrap();
+            ap_rx.process_query_data_complete(received);
+        }
         let h = &ap.lock().unwrap().queries;
         assert_eq!(h.len(), 2);
         assert!(h.contains_key("Soltu.DM.10G003150.1"));

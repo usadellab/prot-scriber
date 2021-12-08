@@ -3,7 +3,8 @@ use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
+use std::sync::{mpsc, Arc, Mutex};
 use std::{mem, thread};
 
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
@@ -57,29 +58,38 @@ pub fn run(annotation_process: AnnotationProcess) -> AnnotationProcess {
         .iter()
         .map(|x| x.clone())
         .collect();
+    let (tx, rx) = mpsc::channel();
     let ap_arc_mutex: Arc<Mutex<AnnotationProcess>> = Arc::new(Mutex::new(annotation_process));
-    let mut handles = vec![];
 
     // Parse and process each sequence similarity search result table in a dedicated
     // thread:
     for sss_tbl in sssr_tables {
+        let tx_i = tx.clone();
         let ap_i = ap_arc_mutex.clone();
 
         // Start this sss_tbl's dedicated threat:
-        let handle = thread::spawn(move || {
+        thread::spawn(move || {
             parse_table(
                 sss_tbl,
                 *SSSR_TABLE_FIELD_SEPARATOR,
                 &(*SEQ_SIM_TABLE_COLUMNS),
                 ap_i,
+                tx_i,
             );
         });
-        handles.push(handle);
     }
+    // In the unlikely case not a single messages is send through any tx_i, send one, so this does
+    // not become an endless loop:
+    let final_message = "PROT-SCRIBER THREADS HAVE FINISHED".to_string();
+    tx.send(final_message.clone()).unwrap();
+    drop(tx);
 
-    // Wait for the threads to finish:
-    for handle in handles {
-        handle.join().unwrap();
+    // Process queries whose Blast result data has been parsed from all input tables:
+    for received in rx {
+        if received != final_message {
+            let ap_i = ap_arc_mutex.clone();
+            ap_i.lock().unwrap().process_query_data_complete(received);
+        }
     }
 
     // How to take ownership of argument `annotation_process` back from having it moved into an
@@ -113,7 +123,9 @@ impl AnnotationProcess {
     ///                 serves as an in memory database into which to insert the parsed query.
     /// * `query: &mut Query` - A reference to the query to be inserted into the in memory
     ///                         database.
-    pub fn insert_query(&mut self, query: &mut Query) {
+    /// * `transmitter: std::sync::mpsc::Sender<String>` - An instance of transmitter to tell the
+    /// parent thread when a query has been completely parsed.
+    pub fn insert_query(&mut self, query: &mut Query, transmitter: Sender<String>) {
         // panic! if query.id already in results, this means the input SSSR files were not sorted
         // by query identifiers (`qacc` in Blast terminology):
         if self.human_readable_descriptions.contains_key(&query.id) {
@@ -135,8 +147,9 @@ impl AnnotationProcess {
         // Have all input SSSR files provided data for the argument `query`?
         if stored_query.n_parsed_from_sssr_tables == self.seq_sim_search_tables.len() as u16 {
             let sqi = stored_query.id.clone();
-            // If yes, then process the parsed data:
-            self.process_query_data_complete(sqi);
+            // If yes, then tell the parent thread that all Blast result data for query `sqi` has
+            // been completely parsed:
+            transmitter.send(sqi).unwrap();
         }
     }
 
@@ -344,6 +357,7 @@ mod tests {
 
     #[test]
     fn insert_query_works() {
+        let (tx, rx) = mpsc::channel();
         let mut ap = AnnotationProcess::new();
         let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         let h1 = Hit::new(
@@ -357,7 +371,7 @@ mod tests {
         nq1.add_hit(&h1);
         nq1.add_hit(&h2);
         // Test insert_query
-        ap.insert_query(&mut nq1);
+        ap.insert_query(&mut nq1, tx.clone());
         assert!(ap.queries.contains_key(&nq1.id));
         assert_eq!(ap.queries.get(&nq1.id).unwrap().hits.len(), 2);
         // New query, but for the same `qacc`, supposedly parsed from another Blast result table:
@@ -373,7 +387,10 @@ mod tests {
         nq2.add_hit(&h3);
         nq2.add_hit(&h4);
         // Test inserting the same `qacc` parsed from another input Blast result:
-        ap.insert_query(&mut nq2);
+        ap.insert_query(&mut nq2, tx);
+        for received in rx {
+            ap.process_query_data_complete(received);
+        }
         assert!(ap.queries.contains_key(&nq2.id));
         assert_eq!(ap.queries.len(), 1);
         // Assert that the hits from nq1 and nq2 were in fact joined in the stored query:
@@ -388,13 +405,14 @@ mod tests {
     #[test]
     #[should_panic]
     fn insert_query_panics_in_case_of_unsorted_blast_table() {
+        let (tx, _) = mpsc::channel();
         let mut ap = AnnotationProcess::new();
         let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         // Mark nq1 as already processed:
         ap.human_readable_descriptions
             .insert(nq1.id.clone(), "Unknown protein".to_string());
         // Should panic:
-        ap.insert_query(&mut nq1);
+        ap.insert_query(&mut nq1, tx);
     }
 
     #[test]
@@ -469,14 +487,19 @@ mod tests {
     #[test]
     fn process_query_data_complete_works() {
         // Test queries:
+        let (tx, rx) = mpsc::channel();
         let mut ap = AnnotationProcess::new();
         ap.seq_sim_search_tables = vec!["blast_out_table.txt".to_string()];
         let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        ap.insert_query(&mut nq1);
+        ap.insert_query(&mut nq1, tx);
+        for received in rx {
+            ap.process_query_data_complete(received);
+        }
         // Query should have been annotated:
         assert!(ap.human_readable_descriptions.contains_key(&nq1.id));
         assert!(!ap.queries.contains_key(&nq1.id));
         // Test families:
+        let (tx1, rx1) = mpsc::channel();
         ap = AnnotationProcess::new();
         ap.seq_sim_search_tables = vec!["blast_out_table.txt".to_string()];
         let mut sf1 = SeqFamily::new();
@@ -484,7 +507,10 @@ mod tests {
         let sf_id1 = "SeqFamily1".to_string();
         ap.insert_seq_family(sf_id1.clone(), sf1);
         nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        ap.insert_query(&mut nq1);
+        ap.insert_query(&mut nq1, tx1);
+        for received in rx1 {
+            ap.process_query_data_complete(received);
+        }
         // Family should have been annotated:
         assert!(ap.human_readable_descriptions.contains_key(&sf_id1));
         assert!(!ap.queries.contains_key(&nq1.id));
@@ -495,6 +521,7 @@ mod tests {
     #[test]
     fn process_rest_data_works() {
         // Test Queries:
+        let (tx, _) = mpsc::channel();
         let mut ap = AnnotationProcess::new();
         let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         let h1 = Hit::new(
@@ -507,7 +534,7 @@ mod tests {
         );
         nq1.add_hit(&h1);
         nq1.add_hit(&h2);
-        ap.insert_query(&mut nq1);
+        ap.insert_query(&mut nq1, tx.clone());
         ap.process_rest_data();
         // Query should have been annotated:
         assert!(ap.human_readable_descriptions.contains_key(&nq1.id));
@@ -519,7 +546,7 @@ mod tests {
         let sf_id1 = "SeqFamily1".to_string();
         ap.insert_seq_family(sf_id1.clone(), sf1);
         nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        ap.insert_query(&mut nq1);
+        ap.insert_query(&mut nq1, tx);
         let mut sf2 = SeqFamily::new();
         sf2.query_ids = vec!["The protein without known relatives".to_string()];
         let sf_id2 = "SeqFamily2".to_string();

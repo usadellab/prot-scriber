@@ -1,12 +1,32 @@
 use regex::Regex;
 use std::collections::HashMap;
+use super::default::SPLIT_DESCRIPTION_REGEX;
 // use std::collections::HashSet;
 
 
-/// Given filtered candidate descriptions it splits each word and returns a vector.
+/// Given filtered candidate descriptions it splits each word and returns a universe of all descriptions.
+/// 
 /// # Arguments
+/// 
+/// * `Vec<&str>` vector of all candidate descriptions
+pub  fn candidate_hdrs_word_universe(vec : Vec<&str>) -> Vec<&str> {
+    let mut splitted_candidates_universe = vec![];
+    for candidate in vec.into_iter(){
+        let mut split_candidate : Vec<&str> = (*SPLIT_DESCRIPTION_REGEX).split(&candidate).into_iter().collect();
+        splitted_candidates_universe.append(& mut split_candidate);
+    }
+    splitted_candidates_universe.retain(|x | *x != "");
+    splitted_candidates_universe
+}
+
+
+
+/// Given filtered candidate descriptions it splits each word and returns a vector.
+/// 
+/// # Arguments
+/// 
 /// * `String of a candidate HRD description` & `Vector containing Regex strings`
-// More robust function exist in the hit.rs file `description_words`
+
 pub fn split_candidates_descripts(candidate_words:&str)-> Vec<&str> {    
     let mut word_vec : Vec<&str> = candidate_words.split(|c : char| c.is_whitespace()).collect();
     word_vec.push(candidate_words); // add the original candidate word
@@ -16,11 +36,13 @@ pub fn split_candidates_descripts(candidate_words:&str)-> Vec<&str> {
 
 /// Creates a HashMap containing individual candidate descriptions(keys) and if its informative (value : bool).
 /// The matches are converted by the if condition to match the logic. bool (True) is assigned to an informative word.
+/// 
 /// # Arguments
+/// 
 /// * `Vector of strings` & `Vector of Regex` 
-pub fn word_classification_map(candidate_word_vec:Vec<&str>,re:Vec<Regex>) -> HashMap<&str,bool> {
+pub fn word_classification_map(universe_hrd_words:Vec<&str>,re:Vec<Regex>) -> HashMap<&str,bool> {
     let mut word_classif = HashMap::new();
-    for w in candidate_word_vec{
+    for w in universe_hrd_words{
         if matches_uninformative_list(&w, &re) == true {
             let tag = false;
             word_classif.insert(w,  tag);
@@ -32,7 +54,9 @@ pub fn word_classification_map(candidate_word_vec:Vec<&str>,re:Vec<Regex>) -> Ha
     word_classif
 }
 /// When parsed a set of regex strings in a vector it matches and returns true if match.
+/// 
 /// # Arguments
+/// 
 /// *`String` - word & `Vec<Regex>` - Vector of Regex strings
 pub fn matches_uninformative_list(word: &str, regex: &Vec<Regex>) -> bool {
     regex.iter().any(|x| x.is_match(&word.to_string()))
@@ -66,7 +90,9 @@ pub fn matches_uninformative_list(word: &str, regex: &Vec<Regex>) -> bool {
 
 
 /// Powersets any slice
+/// 
 /// # Arguments
+/// 
 /// * `slice`- Given a slice vector get all possible powersets of the items.
 pub fn powerset<T: Clone>(slice: &[T]) -> Vec<Vec<T>> {
     let mut v: Vec<Vec<T>> = Vec::new();
@@ -89,9 +115,11 @@ pub fn powerset<T: Clone>(slice: &[T]) -> Vec<Vec<T>> {
 
 /// Given candidate descriptions gets all phrases from the candidate descriptions
 /// Gets all phrases using the powerset function`powerset`
+/// 
 ///  # Arguments
+/// 
 /// * `Vec<&str>`- Vector containing candidate descriptions as strings.
-pub fn get_possible_hrd_phrases(candidate_vector_description: Vec<&str>)-> Vec<String> {
+pub fn phrases(candidate_vector_description: Vec<&str>)-> Vec<String> {
     let all_phrases = powerset(&candidate_vector_description);
     let mut return_vec = vec![];
     for vec in all_phrases {
@@ -102,9 +130,11 @@ pub fn get_possible_hrd_phrases(candidate_vector_description: Vec<&str>)-> Vec<S
     return_vec
 }
 /// Gets word frequencies of all candidate words
-/// # Arguments 
+/// 
+/// # Arguments
+///  
 /// * `Vector<String>` - vector of strings containing all candidate HRDS.
-pub fn get_candidate_word_frequency(vec : Vec<String>) -> HashMap<String, f32> {
+pub fn frequencies(vec : Vec<String>) -> HashMap<String, f32> {
     let mut freq_map: HashMap<String, f32> = HashMap::new();
     let mut map: HashMap<String, i32> = HashMap::new();
     for i in &vec {
@@ -127,7 +157,18 @@ freq_map
 #[cfg(test)]
 mod tests {
     use super::*;
+    // use crate::default::SPLIT_DESCRIPTION_REGEX;
     // use crate::default::*;
+    // use super::default::SPLIT_DESCRIPTION_REGEX;
+    #[test]
+    fn candidate_word_universe() {
+        let candidates_vector = vec!["Alcohol dehydrogenase", "manitol dehydrogenase", "Cinnamyl alcohol-dehydrogenase", 
+                                                "Geraniol dehydrogenase", "Geraniol|terminal dehydrogenase", "alcohol dehydrogenase c terminal"];
+        let result = vec!["Alcohol", "dehydrogenase", "manitol", "dehydrogenase", "Cinnamyl", "alcohol", "dehydrogenase", "Geraniol",
+                                    "dehydrogenase", "Geraniol", "terminal", "dehydrogenase", "alcohol", "dehydrogenase", "c", "terminal"];
+        assert_eq!(result, candidate_hdrs_word_universe(candidates_vector));
+
+    }
     #[test]
     fn test_match_uninformative_regex_list(){
         let re = vec![Regex::new(r"(?i)\bterminal\b").unwrap()];
@@ -146,27 +187,31 @@ mod tests {
     fn test_word_classification_map(){
         let candidate_words = "alcohol dehydrogenase c terminal";
         let re = vec![Regex::new(r"(?i)\bterminal\b").unwrap(),Regex::new(r"(?i)\bc\b").unwrap() ];
-        let result = HashMap::from([("alcohol", true),("c", false), ("dehydrogenase", true), ("terminal", false), ("alcohol dehydrogenase c terminal", false)]);
+        let result = HashMap::from([("alcohol", true),("c", false), ("dehydrogenase", true), 
+                                                        ("terminal", false), ("alcohol dehydrogenase c terminal", false)]);
         assert_eq!(result, word_classification_map(split_candidates_descripts(candidate_words),re))
 
     }
     
     #[test]
-    fn test_get_possible_hdr_phrases(){
+    fn test_phrases(){
         let candidate_descript_vec = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-        let result = vec!["alcohol", "dehydrogenase", "alcohol dehydrogenase", "c", "alcohol c", "dehydrogenase c", "alcohol dehydrogenase c", "terminal", "alcohol terminal", "dehydrogenase terminal", "alcohol dehydrogenase terminal", "c terminal", "alcohol c terminal", "dehydrogenase c terminal", "alcohol dehydrogenase c terminal"];
-        assert_eq!(get_possible_hrd_phrases(candidate_descript_vec), result);
+        let result = vec!["alcohol", "dehydrogenase", "alcohol dehydrogenase", "c", "alcohol c", "dehydrogenase c",
+                                     "alcohol dehydrogenase c", "terminal", "alcohol terminal", "dehydrogenase terminal",  
+                                     "alcohol dehydrogenase terminal", "c terminal", "alcohol c terminal", 
+                                     "dehydrogenase c terminal", "alcohol dehydrogenase c terminal"];
+        assert_eq!(phrases(candidate_descript_vec), result);
     }
 
     #[test]
-    fn get_vector_word_frequency(){
-        let vec = vec!["Alcohol".to_string(),"dehydrogenase".to_string(), "c".to_string(), "terminal".to_string()];
+    fn test_frequencies(){
+        let vec = vec!["Alcohol".to_string(),"dehydrogenase".to_string(), "c".to_string(), "terminal".to_string(),];
         let mut result = HashMap::new();
         result.insert("terminal".to_string(),1.0);
         result.insert("dehydrogenase".to_string(),1.0);
         result.insert("alcohol".to_string(),1.0);
         result.insert("c".to_string(),1.0);
 
-        assert_eq!(result, get_candidate_word_frequency(vec));
+        assert_eq!(result, frequencies(vec));
     }
 }

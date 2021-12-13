@@ -21,18 +21,18 @@ pub  fn candidate_hdrs_word_universe(vec : Vec<&str>) -> Vec<&str> {
 
 
 
-/// Given filtered candidate descriptions it splits each word and returns a vector.
-/// 
-/// # Arguments
-/// 
-/// * `String of a candidate HRD description` & `Vector containing Regex strings`
+// /// Given filtered candidate descriptions it splits each word and returns a vector.
+// /// 
+// /// # Arguments
+// /// 
+// /// * `String of a candidate HRD description` & `Vector containing Regex strings`
 
-pub fn split_candidates_descripts(candidate_words:&str)-> Vec<&str> {    
-    let mut word_vec : Vec<&str> = candidate_words.split(|c : char| c.is_whitespace()).collect();
-    word_vec.push(candidate_words); // add the original candidate word
-    word_vec
+// pub fn split_candidates_descripts(candidate_words:&str)-> Vec<&str> {    
+//     let mut word_vec : Vec<&str> = candidate_words.split(|c : char| c.is_whitespace()).collect();
+//     word_vec.push(candidate_words); // add the original candidate word
+//     word_vec
 
-}
+// }
 
 /// Creates a HashMap containing individual candidate descriptions(keys) and if its informative (value : bool).
 /// The matches are converted by the if condition to match the logic. bool (True) is assigned to an informative word.
@@ -151,7 +151,56 @@ pub fn frequencies(vec : Vec<String>) -> HashMap<String, f32> {
 
 freq_map
 }
+   /// Computes the score of a word using 'inverse information content' calculated
+    /// as -log( (1-p.word) ). In order to avoid infinite values for a word that is
+    /// the single element of the word-set, i.e. it has a frequency of one, the
+    /// score of one is returned.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `word` - A string representing the word
+    /// * `wrd.frequencies` - An instance of base::table holding the frequencies
+    ///                             of the dictionary (all words).
 
+    fn inverse_information_content(word : &str, wrd_frequencies : HashMap<&str,f64>) -> f64{
+        let sum_wrd_frequencies : f64 = wrd_frequencies.values().into_iter().sum(); 
+        
+        if wrd_frequencies.values().len() as f64 > 1. {
+            let pw = wrd_frequencies[word]/sum_wrd_frequencies;
+            let iic = f64::log10(1. - (1. / (1. -  pw)));
+            iic
+        } else if wrd_frequencies.values().len() as f64 == 1. && wrd_frequencies.contains_key(word) {
+                1.
+            } else {
+                panic!("Invalid or no word frequency parsed");
+            }
+    }
+
+
+    fn mean(list: &Vec<f64>) -> f64 {
+        let sum: f64 = Iterator::sum(list.iter());
+        f64::from(sum) / (list.len() as f64)
+    }
+
+
+    /// Computes the score of a word using 'inverse information content' and centering
+    /// 
+    /// # Arguments
+    /// 
+    /// *`word_frequencies`  An instance of base::table holding the frequencies
+
+    fn centered_word_scores(wrd_frequencies: HashMap<&str, f64>) -> f64 /*HashMap<&str, f64>*/ {
+        let mut all_iic = vec![];
+        for word in wrd_frequencies.keys() {
+            let mut iic = inverse_information_content(word, wrd_frequencies);
+            all_iic.append(iic);
+        }
+        
+        let ave = mean(all_iic);
+        ave
+
+        // println!("{:?}", all_iic);
+    }
 
 
 #[cfg(test)]
@@ -177,21 +226,21 @@ mod tests {
 
     }
     #[test]
-    fn test_split_candidates_words(){
-        let candidate_words = "alcohol dehydrogenase c terminal";
-        let result = vec!["alcohol", "dehydrogenase", "c", "terminal", "alcohol dehydrogenase c terminal"];
-        assert_eq!(result, split_candidates_descripts(candidate_words));
+    // fn test_split_candidates_words(){
+    //     let candidate_words = "alcohol dehydrogenase c terminal";
+    //     let result = vec!["alcohol", "dehydrogenase", "c", "terminal", "alcohol dehydrogenase c terminal"];
+    //     assert_eq!(result, split_candidates_descripts(candidate_words));
          
-    }
+    // }
     #[test]
-    fn test_word_classification_map(){
-        let candidate_words = "alcohol dehydrogenase c terminal";
-        let re = vec![Regex::new(r"(?i)\bterminal\b").unwrap(),Regex::new(r"(?i)\bc\b").unwrap() ];
-        let result = HashMap::from([("alcohol", true),("c", false), ("dehydrogenase", true), 
-                                                        ("terminal", false), ("alcohol dehydrogenase c terminal", false)]);
-        assert_eq!(result, word_classification_map(split_candidates_descripts(candidate_words),re))
+    // fn test_word_classification_map(){
+    //     let candidate_words = "alcohol dehydrogenase c terminal";
+    //     let re = vec![Regex::new(r"(?i)\bterminal\b").unwrap(),Regex::new(r"(?i)\bc\b").unwrap() ];
+    //     let result = HashMap::from([("alcohol", true),("c", false), ("dehydrogenase", true), 
+    //                                                     ("terminal", false), ("alcohol dehydrogenase c terminal", false)]);
+    //     assert_eq!(result, word_classification_map(split_candidates_descripts(candidate_words),re))
 
-    }
+    // }
     
     #[test]
     fn test_phrases(){

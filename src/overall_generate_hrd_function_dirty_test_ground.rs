@@ -75,10 +75,10 @@ pub fn hrds(){
     println!("{:?}", word_frequencies_map);
     // Retain only the informative words and their frequencies
     for key in classified_universe.keys(){
-        println!("{:?}", key);
+        // println!("{:?}", key);
         word_frequencies_map.retain(|k,_| *k != key);
     }
-    println!("{:?}", word_frequencies_map);
+    println!("## Frequency map of only true values \n {:?}", word_frequencies_map);
 
     // Powersets
     pub fn powerset<T: Clone>(slice: &[T]) -> Vec<Vec<T>> {
@@ -98,7 +98,8 @@ pub fn hrds(){
         }
         v
     }
-
+    
+            // This should return a vector of vector of vectors (each phrase should be a vector)
     pub fn phrases(candidate_vector_description: Vec<&str>)-> Vec<String> {
         let all_phrases = powerset(&candidate_vector_description);
         let mut return_vec = vec![];
@@ -123,15 +124,35 @@ pub fn hrds(){
         let phrase = phrases(word_candidate_vec);
         phrases_universe.push(phrase);
     }
-    // Hash set if phrases
-    let mut phrases_set: HashSet<&Vec<String>> = HashSet::new();
+    // Hash set of phrases from each candidate
+    // let mut phrases_set: HashSet<&Vec<String>> = HashSet::new();
 
-    for ph  in phrases_universe.iter() {
-        println!("{:?}",ph);
-        phrases_set.insert(ph);
+    // for ph  in phrases_universe.iter() {
+    //     // println!("{:?}",ph);
+    //     phrases_set.insert(ph);
+    // }
+
+    // println!("{:?}",phrases_set);
+    // // for i in phrases_set.iter() {
+    // // println!("{:?}", i );
+    // // }
+
+    // Hashset of phrases from all the candidates, a universe of all phrases
+    let mut phrases_universe_set: HashSet<Vec<&str>> = HashSet::new();
+    for vec_ph in phrases_universe.iter(){
+        for ph in vec_ph.iter() {
+            // convert the phrases to a vector
+            phrases_universe_set.insert(split_candidates_descripts(ph));
+            // println!("{:?}", split_candidates_descripts(ph));
+        }
     }
 
-    for i in phrases_set.iter() {
-    println!("{:?}", i );
-    }
+    // for i in phrases_universe_set.iter() {
+    //     println!("{:?}", i );
+    //     }
+    println!("## Phrases to be scored \n {:?}", phrases_universe_set);
+
+
+
+
 }

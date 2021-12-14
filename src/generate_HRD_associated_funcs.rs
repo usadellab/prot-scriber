@@ -162,14 +162,13 @@ freq_map
     /// * `wrd.frequencies` - An instance of base::table holding the frequencies
     ///                             of the dictionary (all words).
 
-    fn inverse_information_content(word : &str, wrd_frequencies : HashMap<&str,f64>) -> f64{
-        let sum_wrd_frequencies : f64 = wrd_frequencies.values().into_iter().sum(); 
-        
-        if wrd_frequencies.values().len() as f64 > 1. {
+    fn inverse_information_content(word : &str, wrd_frequencies : HashMap<&str,f32>) -> f32{
+        let sum_wrd_frequencies : f32 = wrd_frequencies.values().into_iter().sum(); 
+        if wrd_frequencies.values().len() as f32 > 1. {
             let pw = wrd_frequencies[word]/sum_wrd_frequencies;
-            let iic = f64::log10(1. - (1. / (1. -  pw)));
+            let iic = f32::log10(1. / (1. -  pw));
             iic
-        } else if wrd_frequencies.values().len() as f64 == 1. && wrd_frequencies.contains_key(word) {
+        } else if wrd_frequencies.values().len() as f32 == 1. && wrd_frequencies.contains_key(word) {
                 1.
             } else {
                 panic!("Invalid or no word frequency parsed");

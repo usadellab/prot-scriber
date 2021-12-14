@@ -152,7 +152,24 @@ pub fn hrds(){
     //     }
     println!("## Phrases to be scored \n {:?}", phrases_universe_set);
 
+    fn inverse_information_content(word : &str, wrd_frequencies : HashMap<&str,f32>) -> f32{
+        let sum_wrd_frequencies : f32 = wrd_frequencies.values().into_iter().sum(); 
+        println!("sum of word frequencies --> {:?}", &sum_wrd_frequencies);
+        if wrd_frequencies.values().len() as f32 > 1. {
+            let pw = wrd_frequencies[word]/sum_wrd_frequencies;
+            let iic = f32::log10(1. / (1. -  pw));
+            iic
+        } else if wrd_frequencies.values().len() as f32 == 1. && wrd_frequencies.contains_key(word) {
+                1.
+            } else {
+                panic!("Invalid or no word frequency parsed");
+            }
+    }
 
-
-
+    for phrase in phrases_universe_set.iter()  {
+        for word in phrase{
+            let iic = inverse_information_content(&word, word_frequencies_map.to_owned());
+            println!("IIC --> {:?} {:?}", &word, &iic);
+        }
+    }
 }

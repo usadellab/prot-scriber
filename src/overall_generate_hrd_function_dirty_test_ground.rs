@@ -168,8 +168,10 @@ pub fn hrds(){
 
     for phrase in phrases_universe_set.iter()  {
         for word in phrase{
-            let iic = inverse_information_content(&word, word_frequencies_map.to_owned());
-            println!("IIC --> {:?} {:?}", &word, &iic);
+            if word_frequencies_map.contains_key(word) {
+                let iic = inverse_information_content(&word, word_frequencies_map.to_owned());
+                println!("IIC --> {:?} {:?}", &word, &iic);
+            }
         }
     }
 }

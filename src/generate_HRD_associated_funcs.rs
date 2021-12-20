@@ -200,7 +200,12 @@ freq_map
     //     // println!("{:?}", all_iic);
 
     // }
-    // highest scoring phrases // input map of scored phrases, output the vector of the highest scoring phrases.
+/// Selects the highest scoring phrase from a map of phrases (keys) and overall scores (values) 
+/// outputs vector of the highest scoring phrases and length.
+/// 
+/// # Arguments
+/// 
+/// * `HashMap<Vec<&str>, f32> `, map of scored phrases 
 pub fn predicted_hrd(phrases_score_map : HashMap<Vec<&str>, f32>) -> Vec<&str>{
     let phrases_score_values = phrases_score_map.values();
     let mut phrases_score_vec = vec![];

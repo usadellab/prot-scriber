@@ -3,6 +3,7 @@ extern crate lazy_static;
 
 use annotation_process::{run, AnnotationProcess};
 use clap::{App, Arg};
+use seq_family_reader::parse_seq_families_file;
 use std::collections::HashMap;
 
 mod annotation_process;
@@ -12,6 +13,7 @@ mod model_funcs;
 mod playground;
 mod query;
 mod seq_family;
+mod seq_family_reader;
 mod seq_sim_table_reader;
 
 fn main() {
@@ -65,8 +67,7 @@ fn main() {
 
     // Add biological sequence families information, if provided as input by the user:
     if let Some(seq_families) = matches.value_of("seq-families") {
-        // TODO: Parse gene families
-        // parse_seq_families_file( seq_families, &mut annotation_process );
+        parse_seq_families_file(seq_families, &mut annotation_process);
     }
 
     // Set the input sequence similarity search result (SSSR) tables (Blast or Diamond):

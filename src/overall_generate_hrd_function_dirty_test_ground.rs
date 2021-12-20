@@ -6,9 +6,9 @@ use std::collections::HashSet;
 pub fn hrds(){
 
     // input vector of candidate hrds
-    let candidates_vector = vec!["alcohol dehydrogenase", "manitol dehydrogenase", "cinnamyl alcohol-dehydrogenase", 
-                                "geraniol dehydrogenase", "geraniol|terminal dehydrogenase", 
-                                "alcohol dehydrogenase c terminal"];
+    let candidates_vector = vec!["alcohol dehydrogenase", "alcohol dehydrogenase", "alcohol dehydrogenase", "alcohol dehydrogenase", "manitol dehydrogenase", "cinnamyl alcohol-dehydrogenase", 
+                                "geraniol dehydrogenase", "geraniol|dehydrogenase terminal","manitol dehydrogenase", 
+                                "alcohol dehydrogenase c-terminal"];
 
     // chop into words 
     pub  fn candidate_hdrs_word_universe(vec : Vec<&str>) -> Vec<&str> {
@@ -75,10 +75,10 @@ pub fn hrds(){
     println!("{:?}", word_frequencies_map);
     // Retain only the informative words and their frequencies
     for key in classified_universe.keys(){
-        println!("{:?}", key);
+        // println!("{:?}", key);
         word_frequencies_map.retain(|k,_| *k != key);
     }
-    println!("{:?}", word_frequencies_map);
+    println!("## Frequency map of only true values \n {:?}", word_frequencies_map);
 
     // Powersets
     pub fn powerset<T: Clone>(slice: &[T]) -> Vec<Vec<T>> {
@@ -98,7 +98,8 @@ pub fn hrds(){
         }
         v
     }
-
+    
+            // This should return a vector of vector of vectors (each phrase should be a vector)
     pub fn phrases(candidate_vector_description: Vec<&str>)-> Vec<String> {
         let all_phrases = powerset(&candidate_vector_description);
         let mut return_vec = vec![];
@@ -123,15 +124,135 @@ pub fn hrds(){
         let phrase = phrases(word_candidate_vec);
         phrases_universe.push(phrase);
     }
-    // Hash set if phrases
-    let mut phrases_set: HashSet<&Vec<String>> = HashSet::new();
+    // Hash set of phrases from each candidate
+    // let mut phrases_set: HashSet<&Vec<String>> = HashSet::new();
 
-    for ph  in phrases_universe.iter() {
-        println!("{:?}",ph);
-        phrases_set.insert(ph);
+    // for ph  in phrases_universe.iter() {
+    //     // println!("{:?}",ph);
+    //     phrases_set.insert(ph);
+    // }
+
+    // println!("{:?}",phrases_set);
+    // // for i in phrases_set.iter() {
+    // // println!("{:?}", i );
+    // // }
+
+    // Hashset of phrases from all the candidates, a universe of all phrases
+    let mut phrases_universe_set: HashSet<Vec<&str>> = HashSet::new();
+    for vec_ph in phrases_universe.iter(){
+        for ph in vec_ph.iter() {
+            // convert the phrases to a vector
+            phrases_universe_set.insert(split_candidates_descripts(ph));
+            // println!("{:?}", split_candidates_descripts(ph));
+        }
     }
 
-    for i in phrases_set.iter() {
-    println!("{:?}", i );
+    // for i in phrases_universe_set.iter() {
+    //     println!("{:?}", i );
+    //     }
+    println!("## Phrases to be scored \n {:?}", phrases_universe_set);
+
+    fn inverse_information_content(word : &str, wrd_frequencies : HashMap<&str,f32>) -> f32{
+        let sum_wrd_frequencies : f32 = wrd_frequencies.values().into_iter().sum(); 
+        println!("sum of word frequencies --> {:?}", &sum_wrd_frequencies);
+        if wrd_frequencies.values().len() as f32 > 1. {
+            let pw = wrd_frequencies[word]/sum_wrd_frequencies;
+            // let pw = wrd_frequencies[word];
+            println!("{:?} --- {:?} -- pw is {:?}",wrd_frequencies[word],word, pw);
+            let iic = f32::log10(1. / (1. -  pw));
+            iic
+        } else if wrd_frequencies.values().len() as f32 == 1. && wrd_frequencies.contains_key(word) {
+                1.
+            } else {
+                panic!("Invalid or no word frequency parsed");
+            }
     }
+
+    fn mean(list: Vec<f32>) -> f32 {
+        let sum: f32 = Iterator::sum(list.iter());
+        f32::from(sum) / (list.len() as f32)
+    }
+
+
+    // /// Computes the score of a word using 'inverse information content' and centering
+    // /// 
+    // /// # Arguments
+    // /// 
+    // /// *`word_frequencies`  An instance of dictionary of all words with their frequencies.
+
+    // fn centered_word_scores(wrd_frequencies: HashMap<&str, f32>) -> f32 {
+    //     let mut all_iic = vec![];
+    //     for word in wrd_frequencies.keys() {
+    //         let mut iic = inverse_information_content(word, wrd_frequencies);
+    //         all_iic.append(iic);
+    //     }
+        
+    //     let ave = mean(all_iic);
+    //     ave
+
+    //     // println!("{:?}", all_iic);
+    // }
+
+    
+    let mut all_iic = vec![];
+    for phrase in phrases_universe_set.iter()  {
+        for word in phrase{
+            if word_frequencies_map.contains_key(word) {
+                let iic = inverse_information_content(&word, word_frequencies_map.to_owned());
+                // println!("IIC --> {:?} {:?}", &word, &iic);
+                all_iic.push(iic.clone());
+            }
+        }
+    }
+    
+    let p_w_i = mean(all_iic.clone());
+    println!("p_w_i{:?} ----------------{:?}", all_iic, p_w_i);
+    // fn centered_word_scores(wrd_frequencies: HashMap<&str, f32>,word_frequencies_map, phrases_universe_set: HashSet<Vec<&str>>, p_w_i:f32) -> HashMap<&str,f32> {
+        let mut phrases_score_map = HashMap::new();
+        for phrase in phrases_universe_set.iter()  {
+            let mut phrase_word_scores = vec![];
+            for word in phrase{
+                if word_frequencies_map.contains_key(word) {
+                    let iic = inverse_information_content(&word, word_frequencies_map.to_owned());
+                    let word_score = iic - p_w_i;
+                    phrase_word_scores.push(word_score);
+                    // phrases_score_map.insert(phrase, word_score);
+                    // println!("IIC --> {:?} {:?} {:?}", &word, &iic, &word_score);
+                }
+            }
+            println!("{:?} => {:?}", phrase, phrase_word_scores);
+            let sum_phrase : f32 = phrase_word_scores.iter().sum();
+            phrases_score_map.insert(phrase,sum_phrase);
+        }
+        for i in phrases_score_map.iter(){
+          println!("{:?}", i)
+        }
+        // phrases_score_map
+    // }
+
+    // let mut phrases_score_vec: Vec<(&Vec<&str>, &f32)> = phrases_score_map.iter().collect();
+    // println!("{:?}", phrases_score_vec);
+    // phrases_score_vec.sort_by(|a, b| b.1.partial_cmp(a.1));
+    //                 map.sort_by(|a,b| a.1[lineage_count].partial_cmp(&b.1[lineage_count]).unwrap());
+
+    
+    // let max_phrase_score = phrases_score_map.values().max().unwrap().clone();
+    // println!("{:?}", max_phrase_score);
+    
+    // highest scoring phrases // input map of scored phrases, output the vector of the highest scoring phrases.
+    let phrases_score_values = phrases_score_map.values();
+    let mut phrases_score_vec = vec![];
+    for i in phrases_score_values{
+        phrases_score_vec.push(i)
+    }
+    phrases_score_vec.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    // println!("{:?}", phrases_score_vec[0]);
+    let phrases_high_score = phrases_score_vec[0].to_owned();
+    for (key, value ) in phrases_score_map {
+        if value == phrases_high_score { 
+            println!("{:?} {:?}",&value, &key);}
+    }
+
+
+
 }

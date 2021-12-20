@@ -35,10 +35,13 @@ fn parse_seq_family(family: String) -> Result<(String, SeqFamily), Box<dyn Error
     let mut seq_fam_instance = SeqFamily::new(); // the genes contained in that family
 
     // split the gene column using the default separator.
+    // In case genes were separated by a <TAB> character
+    // we need to re-join the remaining elements.
     let gene_cols: Vec<String> = SPLIT_GENE_FAMILY_GENES_REGEX
-        .split(family_cols[1])
+        .split(&family_cols[1..].join("\t"))
         .map(String::from)
         .collect();
+
     // set family genes
     seq_fam_instance.query_ids = gene_cols;
     // return OK
@@ -65,8 +68,8 @@ mod tests {
     #[test]
     fn parses_correct_lines_ok() {
         let line_1: String = "OG0023617	VFABAHed036352,VFABAHed036353".to_string();
-        let line_2: String = "OG0023617	VFABAHed036352 VFABAHed036353".to_string();
-        let line_3: String = "OG0023617	VFABAHed036352   VFABAHed036353, VFABAHed036354".to_string();
+        let line_2: String = "OG0023617	VFABAHed036490 ,	 VFABAHed036491  VFABAHed036353".to_string();
+        let line_3: String = "OG0023617	VFABAHed036352	VFABAHed036353, VFABAHed036354".to_string();
 
         match parse_seq_family(line_1) {
             Ok((seq_fam_name, seq_fam_instance)) => {
@@ -79,7 +82,7 @@ mod tests {
         match parse_seq_family(line_2) {
             Ok((seq_fam_name, seq_fam_instance)) => {
                 assert_eq!(seq_fam_name, "OG0023617");
-                assert_eq!(seq_fam_instance.query_ids.len(), 2);
+                assert_eq!(seq_fam_instance.query_ids.len(), 3);
             }
             Err(e) => println!("{}", e),
         }

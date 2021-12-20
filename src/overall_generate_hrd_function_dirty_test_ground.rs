@@ -136,7 +136,6 @@ pub fn hrds(){
     // // for i in phrases_set.iter() {
     // // println!("{:?}", i );
     // // }
-<<<<<<< HEAD
 
     // Hashset of phrases from all the candidates, a universe of all phrases
     let mut phrases_universe_set: HashSet<Vec<&str>> = HashSet::new();
@@ -257,89 +256,3 @@ pub fn hrds(){
 
 
 }
-=======
-
-    // Hashset of phrases from all the candidates, a universe of all phrases
-    let mut phrases_universe_set: HashSet<Vec<&str>> = HashSet::new();
-    for vec_ph in phrases_universe.iter(){
-        for ph in vec_ph.iter() {
-            // convert the phrases to a vector
-            phrases_universe_set.insert(split_candidates_descripts(ph));
-            // println!("{:?}", split_candidates_descripts(ph));
-        }
-    }
-
-    // for i in phrases_universe_set.iter() {
-    //     println!("{:?}", i );
-    //     }
-    println!("## Phrases to be scored \n {:?}", phrases_universe_set);
-
-    fn inverse_information_content(word : &str, wrd_frequencies : HashMap<&str,f32>) -> f32{
-        let sum_wrd_frequencies : f32 = wrd_frequencies.values().into_iter().sum(); 
-        println!("sum of word frequencies --> {:?}", &sum_wrd_frequencies);
-        if wrd_frequencies.values().len() as f32 > 1. {
-            let pw = wrd_frequencies[word]/sum_wrd_frequencies;
-            let iic = f32::log10(1. / (1. -  pw));
-            iic
-        } else if wrd_frequencies.values().len() as f32 == 1. && wrd_frequencies.contains_key(word) {
-                1.
-            } else {
-                panic!("Invalid or no word frequency parsed");
-            }
-    }
-
-    fn mean(list: Vec<f32>) -> f32 {
-        let sum: f32 = Iterator::sum(list.iter());
-        f32::from(sum) / (list.len() as f32)
-    }
-
-
-    // /// Computes the score of a word using 'inverse information content' and centering
-    // /// 
-    // /// # Arguments
-    // /// 
-    // /// *`word_frequencies`  An instance of dictionary of all words with their frequencies.
-
-    // fn centered_word_scores(wrd_frequencies: HashMap<&str, f32>) -> f32 {
-    //     let mut all_iic = vec![];
-    //     for word in wrd_frequencies.keys() {
-    //         let mut iic = inverse_information_content(word, wrd_frequencies);
-    //         all_iic.append(iic);
-    //     }
-
-    //     let ave = mean(all_iic);
-    //     ave
-
-    //     // println!("{:?}", all_iic);
-    // }
-
-
-    let mut all_iic = vec![];
-    for phrase in phrases_universe_set.iter()  {
-        for word in phrase{
-            let iic = inverse_information_content(&word, word_frequencies_map.to_owned());
-            println!("IIC --> {:?} {:?}", &word, &iic);
-            if word_frequencies_map.contains_key(word) {
-                let iic = inverse_information_content(&word, word_frequencies_map.to_owned());
-                // println!("IIC --> {:?} {:?}", &word, &iic);
-                all_iic.push(iic.clone());
-            }
-        }
-    }
-
-    let p_w_i = mean(all_iic);
-    println!("{:?}", p_w_i);
-
-    for phrase in phrases_universe_set.iter()  {
-        for word in phrase{
-            if word_frequencies_map.contains_key(word) {
-                let iic = inverse_information_content(&word, word_frequencies_map.to_owned());
-                let word_score = iic - p_w_i;
-                println!("IIC --> {:?} {:?} {:?}", &word, &iic, &word_score);
-            }
-        }
-    }
-
-   
-}
->>>>>>> 9eb7d3770793fb3ea0a8fc28d04069c30af1af3f

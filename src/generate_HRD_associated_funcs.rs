@@ -181,24 +181,56 @@ freq_map
     }
 
 
-    /// Computes the score of a word using 'inverse information content' and centering
-    /// 
-    /// # Arguments
-    /// 
-    /// *`word_frequencies`  An instance of dictionary of all words with their frequencies.
+    // /// Computes the score of a word using 'inverse information content' and centering
+    // /// 
+    // /// # Arguments
+    // /// 
+    // /// *`word_frequencies`  An instance of dictionary of all words with their frequencies.
 
-    fn centered_word_scores(wrd_frequencies: HashMap<&str, f64>) -> f64 /*HashMap<&str, f64>*/ {
-        let mut all_iic = vec![];
-        for word in wrd_frequencies.keys() {
-            let mut iic = inverse_information_content(word, wrd_frequencies);
-            all_iic.append(iic);
-        }
+    // fn centered_word_scores(wrd_frequencies: HashMap<&str, f64>) -> f64 /*HashMap<&str, f64>*/ {
+    //     let mut all_iic = vec![];
+    //     for word in wrd_frequencies.keys() {
+    //         let mut iic = inverse_information_content(word, wrd_frequencies);
+    //         all_iic.append(iic);
+    //     }
         
-        let ave = mean(all_iic);
-        ave
+    //     let ave = mean(all_iic);
+    //     ave
 
-        // println!("{:?}", all_iic);
+    //     // println!("{:?}", all_iic);
+
+    // }
+    // highest scoring phrases // input map of scored phrases, output the vector of the highest scoring phrases.
+pub fn predicted_hrd(phrases_score_map : HashMap<Vec<&str>, f32>) -> Vec<&str>{
+    let phrases_score_values = phrases_score_map.values();
+    let mut phrases_score_vec = vec![];
+    for i in phrases_score_values{
+        phrases_score_vec.push(i)
     }
+
+    phrases_score_vec.sort_by(|a, b| b.partial_cmp(a).unwrap());
+
+    let phrases_high_score = phrases_score_vec[0].to_owned();
+    let mut highest_scored_phrases = vec![];
+    for (key, value ) in phrases_score_map {
+        if value == phrases_high_score {
+            highest_scored_phrases.push(key); 
+        }
+    }
+    let mut length_of_h_s_p = vec![];
+    for phrase in highest_scored_phrases.clone(){
+        length_of_h_s_p.push(phrase.len())
+    }
+
+    let mut hrd = vec![];
+    let largest_phrase = length_of_h_s_p.iter().max().unwrap();
+    for mut phrase in highest_scored_phrases.clone(){
+        if phrase.len() == largest_phrase.to_owned() {
+            hrd.append(& mut phrase);
+        }
+    }
+    hrd
+}
 
 
 #[cfg(test)]
@@ -260,5 +292,17 @@ mod tests {
         result.insert("c".to_string(),1.0);
 
         assert_eq!(result, frequencies(vec));
+    }
+
+    #[test]
+    fn test_predicted_hrd(){
+        let result = vec!["dehydrogenase", "c", "terminal"];
+        let mut scored_phrases = HashMap::new();
+        scored_phrases.insert(vec!["dehydrogenase", "c"],0.265823);
+        scored_phrases.insert(vec!["dehydrogenase", "c", "terminal"],0.265823);
+        scored_phrases.insert(vec!["alcohol", "dehydrogenase"],0.22149113);
+        scored_phrases.insert(vec!["cinnamyl", "alcohol", "dehydrogenase"], -0.110522866);
+
+        assert_eq!(result, predicted_hrd(scored_phrases));
     }
 }

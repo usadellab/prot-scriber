@@ -206,6 +206,32 @@ freq_map
         p_w_i
     }
 
+    /// Computes the score of each word in a phrase using 'inverse information content' and centering.
+    /// Outputs a HashMap of phrases and the sum of centered iic scores.
+    ///
+    /// # Arguments
+    ///
+    /// *`word_frequencies`  An instance of dictionary of all words with their frequencies.
+    /// 
+    /// *`phrases_universe_set` HashSet of Vectors containing all possible phrases (universe phrases)
+
+    fn centered_word_scores_phrases <'a>(word_frequencies_map: HashMap<&str,f32> , phrases_universe_set: HashSet<Vec<&'a str>>) -> HashMap<Vec<&'a str>, f32> {
+        let p_w_i = mean_inv_inf_cntn(word_frequencies_map.clone(), phrases_universe_set.clone());
+        let mut phrases_score_map = HashMap::new();
+        for phrase in phrases_universe_set.iter().cloned() {
+            let mut phrase_word_scores = vec![];
+            for word in phrase.clone(){
+                if word_frequencies_map.contains_key(word) {
+                    let iic = inverse_information_content(word, word_frequencies_map.to_owned());
+                    let word_score = iic - p_w_i;
+                    phrase_word_scores.push(word_score);
+                }
+            }
+            let sum_phrase : f32 = phrase_word_scores.iter().sum();
+            phrases_score_map.insert(phrase.clone(), sum_phrase);
+        }
+        phrases_score_map
+        }
 
 
 /// Selects the highest scoring phrase from a map of phrases (keys) and overall scores (values)

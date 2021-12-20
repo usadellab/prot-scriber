@@ -2,7 +2,52 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use super::default::SPLIT_DESCRIPTION_REGEX;
-// use std::collections::HashSet;
+
+
+pub fn generateHumanReadableDescription( candidateHRDs: Vec<&str> ) -> String {
+    // Build universe word-set
+    let universe = candidate_hdrs_word_universe(candidateHRDs.clone());
+
+    // Filter words and create a map of informative and non-informative words
+    let mut classified_universe = word_classification_map(universe.clone());
+    classified_universe.retain(|_, v| *v != true);
+
+    // Normalized word frequencies
+    let mut word_frequencies_map = frequencies(universe.clone());
+
+    // Retain only the informative words and their frequencies
+    for key in classified_universe.keys(){
+        // println!("{:?}", key);
+        word_frequencies_map.retain(|k,_| *k != key);
+    }
+
+    // All possible phrases using the powerset function
+    let mut phrases_universe = vec![];
+    for candidate in candidateHRDs.clone().iter(){
+        let word_candidate_vec = split_candidates_descripts(candidate);
+        let phrase = phrases(word_candidate_vec);
+        phrases_universe.push(phrase);
+    }
+
+    // Hashset of phrases from all the candidates, a universe of all phrases
+    let mut phrases_universe_set: HashSet<Vec<&str>> = HashSet::new();
+    for vec_ph in phrases_universe.iter(){
+        for ph in vec_ph.iter() {
+            // convert the phrases to a vector
+            phrases_universe_set.insert(split_candidates_descripts(ph));
+        }
+    }
+
+    // Score phrases using centered inverse information content
+    let phrases_score_map = centered_word_scores_phrases(word_frequencies_map, phrases_universe_set);
+
+    // Hrd description
+    let hrd_vec = predicted_hrd(phrases_score_map);
+    let hrd_str = hrd_vec.join(" ");
+    hrd_str
+}
+
+
 
 
 /// Given filtered candidate descriptions it splits each word and returns a universe of all descriptions.
@@ -22,18 +67,16 @@ pub  fn candidate_hdrs_word_universe(vec : Vec<&str>) -> Vec<&str> {
 
 
 
-// /// Given filtered candidate descriptions it splits each word and returns a vector.
-// ///
-// /// # Arguments
-// ///
-// /// * `String of a candidate HRD description` & `Vector containing Regex strings`
+/// Given filtered candidate descriptions it splits each word and returns a vector.
+///
+/// # Arguments
+///
+/// * `String of a candidate HRD description` & `Vector containing Regex strings`
+pub fn split_candidates_descripts(candidate_words:&str)-> Vec<&str> {
+    let mut word_vec : Vec<&str> = (*SPLIT_DESCRIPTION_REGEX).split(candidate_words).into_iter().collect();
+    word_vec
+}
 
-// pub fn split_candidates_descripts(candidate_words:&str)-> Vec<&str> {
-//     let mut word_vec : Vec<&str> = candidate_words.split(|c : char| c.is_whitespace()).collect();
-//     word_vec.push(candidate_words); // add the original candidate word
-//     word_vec
-
-// }
 
 /// Creates a HashMap containing individual candidate descriptions(keys) and if its informative (value : bool).
 /// The matches are converted by the if condition to match the logic. bool (True) is assigned to an informative word.
@@ -41,10 +84,10 @@ pub  fn candidate_hdrs_word_universe(vec : Vec<&str>) -> Vec<&str> {
 /// # Arguments
 ///
 /// * `Vector of strings` & `Vector of Regex`
-pub fn word_classification_map(universe_hrd_words:Vec<&str>,re:Vec<Regex>) -> HashMap<&str,bool> {
+pub fn word_classification_map(universe_hrd_words:Vec<&str>) -> HashMap<&str,bool> {
     let mut word_classif = HashMap::new();
     for w in universe_hrd_words{
-        if matches_uninformative_list(&w, &re) == true {
+        if matches_uninformative_list(&w, re) == true {                     //TODO: parse informative words
             let tag = false;
             word_classif.insert(w,  tag);
         }else{
@@ -59,7 +102,7 @@ pub fn word_classification_map(universe_hrd_words:Vec<&str>,re:Vec<Regex>) -> Ha
 /// # Arguments
 ///
 /// *`String` - word & `Vec<Regex>` - Vector of Regex strings
-pub fn matches_uninformative_list(word: &str, regex: &Vec<Regex>) -> bool {
+pub fn matches_uninformative_list(word: &str, regex: Vec<Regex>) -> bool {
     regex.iter().any(|x| x.is_match(&word.to_string()))
 }
 
@@ -135,17 +178,16 @@ pub fn phrases(candidate_vector_description: Vec<&str>)-> Vec<String> {
 /// # Arguments
 ///
 /// * `Vector<String>` - vector of strings containing all candidate HRDS.
-pub fn frequencies(vec : Vec<String>) -> HashMap<String, f32> {
-    let mut freq_map: HashMap<String, f32> = HashMap::new();
+pub fn frequencies(vec : Vec<&str>) -> HashMap<&str, f32> {
+    let mut freq_map: HashMap<&str, f32> = HashMap::new();
     let mut map: HashMap<String, i32> = HashMap::new();
     for i in &vec {
-        *freq_map.entry(i.to_string().to_lowercase()).or_default() += 1 as f32;
+        *freq_map.entry(i).or_default() += 1 as f32;
     }
     for i in &vec {
         *map.entry(i.to_string()).or_default() += 1 as i32;
     }
     let max_value = map.values().max().unwrap().clone();
-
     for key in freq_map.to_owned().keys() {
         *freq_map.get_mut(key).unwrap() /= max_value as f32; //normalize
     };
@@ -212,7 +254,7 @@ freq_map
     /// # Arguments
     ///
     /// *`word_frequencies`  An instance of dictionary of all words with their frequencies.
-    /// 
+    ///
     /// *`phrases_universe_set` HashSet of Vectors containing all possible phrases (universe phrases)
 
     fn centered_word_scores_phrases <'a>(word_frequencies_map: HashMap<&str,f32> , phrases_universe_set: HashSet<Vec<&'a str>>) -> HashMap<Vec<&'a str>, f32> {

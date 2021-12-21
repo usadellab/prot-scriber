@@ -13,6 +13,7 @@ mod playground;
 mod query;
 mod seq_family;
 mod seq_sim_table_reader;
+mod output_writer;
 
 fn main() {
     let matches = App::new("Prot-Scriber")
@@ -80,6 +81,9 @@ fn main() {
 
     // Save output:
     if let Some(o) = matches.value_of("output") {
-        // write_output_table(o, annotation_process.human_readable_descriptions);
+        match output_writer::write_output_table(o.to_string(), annotation_process.human_readable_descriptions){
+            Ok(()) => println!("successfully write to the file!"),
+            Err(e) => eprintln!("encounter an error! :( \n  {}", e),
+        };
     }
 }

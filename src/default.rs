@@ -66,4 +66,7 @@ lazy_static! {
     /// The default string is used to collapse (join) consensus descriptions of disjoint
     /// hit-clusters:
     pub static ref CLUSTER_CONSENSUS_DESCRIPTIONS_JOIN: &'static str = "; ";
+
+    /// The default regular expression to split gene family genes
+    pub static ref SPLIT_GENE_FAMILY_GENES_REGEX: Regex = Regex::new(r"(\s*,\s*|\s+)").unwrap();
 }

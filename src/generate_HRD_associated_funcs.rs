@@ -10,7 +10,7 @@ use std::collections::HashSet;
 ///
 /// * `Vec<String>` A vector of strings containing all candidate descriptions.
 pub fn generate_human_readable_description(candidate_hrds: Vec<String>) -> String {
-    // Covert Vec<String> input into Vec<&str> 
+    // Covert Vec<String> input into Vec<&str>
     let candidate_hdr: Vec<&str> = candidate_hrds.iter().map(AsRef::as_ref).collect();
     // Build universe word-set
     let universe = candidate_hdrs_word_universe(candidate_hdr.clone());
@@ -107,22 +107,21 @@ pub fn word_classification_map(universe_hrd_words: Vec<&str>) -> HashMap<String,
     word_classif
 }
 
-/// Generates a vector of uninformative words from the universe of candidate hrd words 
-/// 
+/// Generates a vector of uninformative words from the universe of candidate hrd words
+///
 /// Arguments
-/// 
+///
 /// * `Vector of strings`
-/// 
+///
 pub fn uninformative_words_vec(universe_hrd_words: Vec<&str>) -> Vec<String> {
     let mut uninformative_words = vec![];
     for w in universe_hrd_words {
         if matches_uninformative_list(&w) == true {
             uninformative_words.push(w.to_lowercase());
-        }    
+        }
     }
     uninformative_words
 }
-
 
 /// When parsed a set of regex strings in a vector it matches and returns true if match.
 ///
@@ -175,6 +174,7 @@ pub fn phrases(candidate_vector_description: Vec<&str>) -> Vec<String> {
     return_vec.retain(|x| *x != ""); // remove any empty strings
     return_vec
 }
+
 /// Gets word frequencies of all candidate words
 ///
 /// # Arguments
@@ -206,7 +206,6 @@ pub fn frequencies(vec: Vec<&str>) -> HashMap<&str, f32> {
 ///
 /// * `word` - A string representing the word
 /// * `wrd.frequencies` - An instance of dictionary of all words with their frequencies.
-
 pub fn inverse_information_content(word: &str, wrd_frequencies: HashMap<&str, f32>) -> f32 {
     let sum_wrd_frequencies: f32 = wrd_frequencies.values().into_iter().sum();
     if wrd_frequencies.values().len() as f32 > 1. {
@@ -265,7 +264,6 @@ pub fn mean_inv_inf_cntn(
 /// * `word_frequencies`  An instance of dictionary of all words with their frequencies.
 ///
 /// * `phrases_universe_set` HashSet of Vectors containing all possible phrases (universe phrases)
-
 pub fn centered_word_scores_phrases<'a>(
     word_frequencies_map: HashMap<&str, f32>,
     phrases_universe_set: HashSet<Vec<&'a str>>,
@@ -324,38 +322,11 @@ pub fn predicted_hrd(phrases_score_map: HashMap<Vec<&str>, f32>) -> Vec<&str> {
     hrd
 }
 
-// pub struct PhrasesInfo {
-//     phrases : HashSet<Vec<String>>,
-//     word_classification: HashMap<String,bool>,
-//     word_frequencies: HashMap<String,f32>
-// }
-
-// impl PhrasesInfo {
-//     pub fn new(candidate_hdr : Vec<String>, input_word_classification : HashMap<String,bool>) -> PhraseInfo {
-//         PhraseInfo {
-//             phrases : candidate_hdr,
-//             word_classification : input_word_classification,
-//         }
-//     }
-//     pub fn get_word_universe(&self) {
-//         let universe = (*self).word_classification.keys();
-
-//     }
-// }
-
-// pub fn phrasesFromCandidateDescription( word_vec : Vec<String>, word_classif : HashMap<String,bool>) -> PhraseInfo{
-//     let mut Phrase_info = PhraseInfo::new(word_vec, word_classif);
-//     let universe = Phrase_info.get_word_universe();
-//     Phrase_info
-// }
-
 #[cfg(test)]
 mod tests {
     use std::vec;
 
     use super::*;
-    // use crate::default::SPLIT_DESCRIPTION_REGEX;
-    // use crate::default::*;
     #[test]
     fn candidate_word_universe() {
         let candidates_vector = vec![
@@ -389,18 +360,6 @@ mod tests {
 
     #[test]
     fn test_candidate_hdrs_word_universe() {
-        // Vec<String>
-        // let candidate_hrds = vec![
-        //     "alcohol dehydrogenase".to_string(),
-        //     "manitol dehydrogenase".to_string(),
-        //     "cinnamyl alcohol-dehydrogenase".to_string(),
-        //     "geraniol dehydrogenase".to_string(),
-        //     "geraniol|dehydrogenase terminal".to_string(),
-        //     "manitol dehydrogenase".to_string(),
-        //     "alcohol dehydrogenase c-terminal".to_string(),
-        // ];
-
-        // Vec<&str>
         let candidate_hrds = vec![
             "alcohol dehydrogenase",
             "manitol dehydrogenase",
@@ -464,7 +423,7 @@ mod tests {
     #[test]
     fn test_uninformative_words_vector() {
         let candidate_words = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-        let result = vec!["c".to_string(),"terminal".to_string() ];
+        let result = vec!["c".to_string(), "terminal".to_string()];
         assert_eq!(result, uninformative_words_vec(candidate_words));
     }
 
@@ -571,14 +530,14 @@ mod tests {
         freq_map.insert("f", 1. as f32);
 
         let mut iic_vec = vec![];
-        for phrase in &word_set{
-            for word in phrase{
-                let iic = inverse_information_content(word,freq_map.clone());
+        for phrase in &word_set {
+            for word in phrase {
+                let iic = inverse_information_content(word, freq_map.clone());
                 iic_vec.push(iic);
             }
         }
         let result = mean(iic_vec);
-        
+
         assert_eq!(result, mean_inv_inf_cntn(freq_map, word_set))
     }
 

@@ -9,28 +9,23 @@ use std::collections::HashSet;
 /// # Arguments
 ///
 /// * `Vec<String>` A vector of strings containing all candidate descriptions.
-pub fn generateHumanReadableDescription(candidateHRDs: Vec<String>) -> String {
-    // Covert Vec<String> input into Vec<&str> // TODO works but to be refactored
-    let candidate_hdr: Vec<&str> = candidateHRDs.iter().map(AsRef::as_ref).collect();
+pub fn generate_human_readable_description(candidate_hrds: Vec<String>) -> String {
+    // Covert Vec<String> input into Vec<&str> 
+    let candidate_hdr: Vec<&str> = candidate_hrds.iter().map(AsRef::as_ref).collect();
     // Build universe word-set
     let universe = candidate_hdrs_word_universe(candidate_hdr.clone());
 
-    // Filter words and create a map  non-informative words
-    let mut classified_universe = word_classification_map(universe.clone());
-    // An instance of un_informative words
-    classified_universe.retain(|_, v| *v != true);
-
-    // // retain only the informative words in the universe
-    // for un_inf_wrd in classified_universe.keys() {
-    //     universe.retain(|x| x != un_inf_wrd);
-    // }
+    // Filter words and create a vector non-informative words
+    let uninformative_words = uninformative_words_vec(universe.clone());
 
     // Normalized word frequencies
     let mut word_frequencies_map = frequencies(universe.clone());
 
     // Retain only the informative words and their frequencies
-    for key in classified_universe.keys() {
-        word_frequencies_map.retain(|k, _| *k != key);
+    if uninformative_words.len() > 0 {
+        for word in uninformative_words.iter() {
+            word_frequencies_map.retain(|key, _| *key != word);
+        }
     }
 
     // All possible phrases using the powerset function
@@ -84,7 +79,7 @@ pub fn candidate_hdrs_word_universe(vec: Vec<&str>) -> Vec<&str> {
 ///
 /// * `String of a candidate HRD description` & `Vector containing Regex strings`
 pub fn split_candidates_descripts(candidate_words: &str) -> Vec<&str> {
-    let mut word_vec: Vec<&str> = (*SPLIT_DESCRIPTION_REGEX)
+    let word_vec: Vec<&str> = (*SPLIT_DESCRIPTION_REGEX)
         .split(candidate_words)
         .into_iter()
         .collect();
@@ -111,6 +106,24 @@ pub fn word_classification_map(universe_hrd_words: Vec<&str>) -> HashMap<String,
     }
     word_classif
 }
+
+/// Generates a vector of uninformative words from the universe of candidate hrd words 
+/// 
+/// Arguments
+/// 
+/// * `Vector of strings`
+/// 
+pub fn uninformative_words_vec(universe_hrd_words: Vec<&str>) -> Vec<String> {
+    let mut uninformative_words = vec![];
+    for w in universe_hrd_words {
+        if matches_uninformative_list(&w) == true {
+            uninformative_words.push(w.to_lowercase());
+        }    
+    }
+    uninformative_words
+}
+
+
 /// When parsed a set of regex strings in a vector it matches and returns true if match.
 ///
 /// # Arguments
@@ -377,7 +390,7 @@ mod tests {
     #[test]
     fn test_candidate_hdrs_word_universe() {
         // Vec<String>
-        // let candidateHRDs = vec![
+        // let candidate_hrds = vec![
         //     "alcohol dehydrogenase".to_string(),
         //     "manitol dehydrogenase".to_string(),
         //     "cinnamyl alcohol-dehydrogenase".to_string(),
@@ -388,7 +401,7 @@ mod tests {
         // ];
 
         // Vec<&str>
-        let candidateHRDs = vec![
+        let candidate_hrds = vec![
             "alcohol dehydrogenase",
             "manitol dehydrogenase",
             "cinnamyl alcohol-dehydrogenase",
@@ -418,7 +431,7 @@ mod tests {
             "c",
             "terminal",
         ];
-        assert_eq!(result, candidate_hdrs_word_universe(candidateHRDs));
+        assert_eq!(result, candidate_hdrs_word_universe(candidate_hrds));
     }
 
     #[test]
@@ -446,6 +459,13 @@ mod tests {
             ("terminal".to_string(), false),
         ]);
         assert_eq!(result, word_classification_map(candidate_words));
+    }
+
+    #[test]
+    fn test_uninformative_words_vector() {
+        let candidate_words = vec!["alcohol", "dehydrogenase", "c", "terminal"];
+        let result = vec!["c".to_string(),"terminal".to_string() ];
+        assert_eq!(result, uninformative_words_vec(candidate_words));
     }
 
     #[test]
@@ -604,7 +624,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generateHumanReadableDescription() {
+    fn test_generate_human_readable_description() {
         let candidate_hrds = vec![
             "manitol dehydrogenase".to_string(),
             "cinnamyl alcohol-dehydrogenase".to_string(),
@@ -615,6 +635,6 @@ mod tests {
         ];
         let result = "dehydrogenase c terminal".to_string();
 
-        assert_eq!(result, generateHumanReadableDescription(candidate_hrds));
+        assert_eq!(result, generate_human_readable_description(candidate_hrds));
     }
 }

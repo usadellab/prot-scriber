@@ -5,13 +5,13 @@ use clap::{App, Arg};
 
 mod annotation_process;
 mod default;
+mod generate_HRD_associated_funcs;
 mod hit;
 mod model_funcs;
 mod playground;
 mod query;
 mod seq_family;
-mod seq_sim_table_reader; 
-mod generate_HRD_associated_funcs;
+mod seq_sim_table_reader;
 
 fn main() {
     let matches = App::new("Prot-Scriber")

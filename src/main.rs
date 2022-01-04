@@ -1,7 +1,10 @@
 #[macro_use]
 extern crate lazy_static;
 
+use annotation_process::{run, AnnotationProcess};
 use clap::{App, Arg};
+use seq_family_reader::parse_seq_families_file;
+use std::collections::HashMap;
 
 mod annotation_process;
 mod default;
@@ -11,12 +14,13 @@ mod model_funcs;
 mod playground;
 mod query;
 mod seq_family;
+mod seq_family_reader;
 mod seq_sim_table_reader;
 
 fn main() {
     let matches = App::new("Prot-Scriber")
         .version("0.1.0")
-        .about("Assigns short human readable descriptions to query biological sequences using references. For this, it consumes sequence similarity search (Blast or Diamond) results in tabular format. See below on how to run your favorite sequence similarity search tool.")
+        .about("Assigns short human readable descriptions (HRD) to query biological sequences using reference canditate descriptions. In this, prot-scriber consumes sequence similarity search (Blast or Diamond or similar) results in tabular format. A customized lexical analysis is carried out on the descriptions of these Blast Hits and a resulting HRD is assigned to the query sequences.\nprot-scriber can also apply the same methodology to produce HRDs for sets of biological sequences, i.e. gene families.\nSee below on how to run your favorite sequence similarity search tool, so that it produces tabular results in the format prot-scriber needs them.")
         .arg(
             Arg::new("output")
             .required(true)
@@ -43,6 +47,13 @@ fn main() {
             .about("Header of the --seq-sim-table (-s) arg. Separated by space (' ') the names of the columns as they appear in the respective table. Required and default columns are 'qacc sacc qlen qstart qend slen sstart send bitscore stitle'. You can have additional columns that will be ignored. If multiple --seq-sim-table (-s) args are provided make sure the --header (-h) args appear in the correct order, e.g. the first -h arg will be used for the first -s arg, the second -h will be used for the second -s and so on."),
         )
         .arg(
+            Arg::new("biological sequence families")
+            .short('f')
+            .takes_value(true)
+            .long("seq-families")
+            .about("A file in which families of biological sequences are stored, one family per line. Each line must have format 'fam-name TAB gene1,gene2,gene3'. Make sure no gene appears in more than one family."),
+        )
+        .arg(
             Arg::new("debug")
             .short('d')
             .long("debug")
@@ -50,12 +61,27 @@ fn main() {
         )
         .get_matches();
 
-    let seq_sim_tables: Vec<_> = matches.values_of("seq-sim-table").unwrap().collect();
-    println!("Input seq-sim-tables are: {:?}", seq_sim_tables);
+    let seq_sim_search_tables: Vec<_> = matches.values_of("seq-sim-table").unwrap().collect();
 
-    if let Some(o) = matches.value_of("output") {
-        println!("Value for output: {}", o);
+    // Create a new AnnotationProcess instance and provide it with the necessary input data:
+    let mut annotation_process = AnnotationProcess::new();
+
+    // Add biological sequence families information, if provided as input by the user:
+    if let Some(seq_families) = matches.value_of("seq-families") {
+        parse_seq_families_file(seq_families, &mut annotation_process);
     }
 
-    println!("Welcome!");
+    // Set the input sequence similarity search result (SSSR) tables (Blast or Diamond):
+    annotation_process.seq_sim_search_tables = seq_sim_search_tables
+        .iter()
+        .map(|x| x.to_string())
+        .collect();
+
+    // Execute the Annotation-Process:
+    annotation_process = run(annotation_process);
+
+    // Save output:
+    if let Some(o) = matches.value_of("output") {
+        // write_output_table(o, annotation_process.human_readable_descriptions);
+    }
 }

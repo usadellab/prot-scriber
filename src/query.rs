@@ -106,6 +106,8 @@ impl Query {
     ///
     /// * `&self` - A mutable reference to self, this instance of Query
     pub fn annotate(&self) -> String {
+        // TODO: Gather all self.hits description fields and pass them to
+        // `generate_human_readable_description`.
         (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
     }
 }

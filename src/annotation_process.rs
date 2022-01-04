@@ -1,9 +1,10 @@
+use super::default::{SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
 use super::query::Query;
 use super::seq_family::SeqFamily;
+use super::seq_sim_table_reader::parse_table;
 use std::collections::HashMap;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{mem, thread};
 
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
 /// human readable descriptions, i.e. the annotation of queries or sets of these (biological
@@ -38,53 +39,65 @@ pub enum AnnotationProcessMode {
     FamilyAnnotation,
 }
 
-impl AnnotationProcess {
-    /// Creates and empty (`Default`) instance of struct AnnotationProcess.
-    pub fn new() -> AnnotationProcess {
-        Default::default()
+/// The central function that runs an annotation process. Note that this is implemented as a
+/// "static" function (in Java terminology - apologies offered), because using a reference to an
+/// instance of `AnnotationProcess` would cause lifetime issues. This is, because a
+/// Arc<Mutex<AnnotationProcess>> is constructed and shared between threads. Thus this function
+/// that actually executes an instance of `AnnotationProcess` takes ownership of an argument
+/// `annotation_process`. Returns the results of running the Annotation-Process in the form of a
+/// `HashMap<String, String>`.
+///
+/// # Arguments
+///
+/// * `annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
+pub fn run(annotation_process: AnnotationProcess) -> AnnotationProcess {
+    // Prepare:
+    let sssr_tables: Vec<String> = annotation_process
+        .seq_sim_search_tables
+        .iter()
+        .map(|x| x.clone())
+        .collect();
+    let ap_arc_mutex: Arc<Mutex<AnnotationProcess>> = Arc::new(Mutex::new(annotation_process));
+    let mut handles = vec![];
+
+    // Parse and process each sequence similarity search result table in a dedicated
+    // thread:
+    for sss_tbl in sssr_tables {
+        let ap_i = ap_arc_mutex.clone();
+
+        // Start this sss_tbl's dedicated threat:
+        let handle = thread::spawn(move || {
+            parse_table(
+                sss_tbl,
+                *SSSR_TABLE_FIELD_SEPARATOR,
+                &(*SEQ_SIM_TABLE_COLUMNS),
+                ap_i,
+            );
+        });
+        handles.push(handle);
     }
 
-    /// The central function that runs an annotation process.
-    ///
-    /// # Arguments
-    ///
-    /// * `&self` - A reference to an instance of AnnotationProcess
-    pub fn run(&mut self) {
-        // let (tx, rx) = mpsc::channel();
-        // let qhd_arc: Arc<Mutex<HashMap<String, Vec<String>>>> =
-        //     Arc::new(Mutex::new((*self).queries));
+    // Wait for the threads to finish:
+    for handle in handles {
+        handle.join().unwrap();
+    }
 
-        // // Parse and process each sequence similarity search result table in a dedicated
-        // // thread:
-        // for sss_tbl in (*self).seq_sim_search_tables {
-        //     let tx_i = tx.clone();
-        //     let qhd_arc_i = qhd_arc.clone();
+    // How to take ownership of argument `annotation_process` back from having it moved into an
+    // Arc<Mutex<AnnotationProcess>>; see:
+    // https://stackoverflow.com/questions/29177449/how-to-take-ownership-of-t-from-arcmutext
+    let mut ap = Arc::try_unwrap(ap_arc_mutex).unwrap().into_inner().unwrap();
 
-        //     // Start this sss_tbl's dedicated threat:
-        //     thread::spawn(move || {
-        //         let vals = vec![
-        //             format!("({}) hello", i),
-        //             env!("CARGO_MANIFEST_DIR").to_string(),
-        //             String::from("from"),
-        //             String::from("the"),
-        //             String::from("thread"),
-        //         ];
+    // Make sure all queries or sequence families are annotated:
+    ap.process_rest_data();
 
-        //         for val in vals {
-        //             let mut vec_i = qhd_arc_i.lock().unwrap();
-        //             vec_i.push(val);
-        //         }
-        //         tx_i.send(format!("thread {}'s message", i)).unwrap();
-        //     });
-        // }
+    // Return modified version of input argument `annotation_process`:
+    ap
+}
 
-        // // Receiver thread will wait eternally, as long as tx has not been dropped:
-        // drop(tx);
-
-        // // Listen to messages coming from any thread:
-        // for received in rx {
-        //     println!("Got: {}", received);
-        // }
+impl AnnotationProcess {
+    /// Creates an empty (`Default`) instance of struct AnnotationProcess.
+    pub fn new() -> AnnotationProcess {
+        Default::default()
     }
 
     /// Processes the sequence similarity search result (SSSR) data parsed for the argument
@@ -202,7 +215,7 @@ impl AnnotationProcess {
     pub fn annotate_seq_family(&mut self, seq_family_id: &String) {
         // Generate the desired result, i.e. a human readable description for the SeqFamily:
         let seq_family = self.seq_families.get(seq_family_id).unwrap();
-        let hrd = seq_family.annotate();
+        let hrd = seq_family.annotate(&self.queries);
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
         self.human_readable_descriptions
@@ -276,18 +289,10 @@ impl AnnotationProcess {
     pub fn process_rest_data(&mut self) {
         // Cannot get away without cloning the keys. Rust compiler complains about an immutable
         // borrow and at the same time a mutable borrow of `self` in the call of
-        // process_query_data_complete.
-        for query_id in self
-            .queries
-            .iter()
-            .map(|(k, _v)| k.clone())
-            .collect::<Vec<String>>()
-            .iter()
-        {
-            self.process_query_data_complete(query_id.to_string());
-        }
+        // process_rest_data or annotate_seq_family, respectively.
+
         // Process seq families that might have queries that got no blast hits in any input blast
-        // table.
+        // table:
         for seq_family_id in self
             .seq_families
             .iter()
@@ -297,6 +302,17 @@ impl AnnotationProcess {
         {
             self.annotate_seq_family(seq_family_id);
         }
+        // Process queries that might have gotten parsed results only from a subset of the input
+        // sequence similarity search result (SSSR) files:
+        for query_id in self
+            .queries
+            .iter()
+            .map(|(k, _v)| k.clone())
+            .collect::<Vec<String>>()
+            .iter()
+        {
+            self.process_query_data_complete(query_id.to_string());
+        }
     }
 }
 
@@ -304,6 +320,7 @@ impl AnnotationProcess {
 mod tests {
     use super::*;
     use crate::hit::Hit;
+    use std::path::Path;
 
     #[test]
     fn new_annotation_process_initializes_fields() {
@@ -469,7 +486,6 @@ mod tests {
         nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         ap.insert_query(&mut nq1);
         // Family should have been annotated:
-        println!("{:?}", ap);
         assert!(ap.human_readable_descriptions.contains_key(&sf_id1));
         assert!(!ap.queries.contains_key(&nq1.id));
         assert!(!ap.seq_families.contains_key(&sf_id1));
@@ -516,5 +532,97 @@ mod tests {
         assert!(!ap.query_id_to_seq_family_id_index.contains_key(&nq1.id));
         assert!(ap.human_readable_descriptions.contains_key(&sf_id2));
         assert!(!ap.seq_families.contains_key(&sf_id2));
+    }
+
+    #[test]
+    fn run_annotates_queries() {
+        let mut ap = AnnotationProcess::new();
+        ap.seq_sim_search_tables.push(
+            Path::new("misc")
+                .join("Twelve_Proteins_vs_Swissprot_blastp.txt")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
+        ap.seq_sim_search_tables.push(
+            Path::new("misc")
+                .join("Twelve_Proteins_vs_trembl_blastp.txt")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
+        ap = run(ap);
+        let hrds = ap.human_readable_descriptions;
+        assert!(hrds.len() > 0);
+        let queries_with_expected_result = vec![
+            "Soltu.DM.01G022510.1".to_string(),
+            "Soltu.DM.01G045390.1".to_string(),
+            "Soltu.DM.02G015700.1".to_string(),
+            "Soltu.DM.02G020600.1".to_string(),
+            "Soltu.DM.03G011280.1".to_string(),
+            "Soltu.DM.03G026010.1".to_string(),
+            "Soltu.DM.04G035790.1".to_string(),
+            "Soltu.DM.07G016620.1".to_string(),
+            "Soltu.DM.09G022410.3".to_string(),
+            "Soltu.DM.10G003150.1".to_string(),
+            "Soltu.DM.S001650.1".to_string(),
+        ];
+        for qid in queries_with_expected_result {
+            assert!(hrds.contains_key(&qid))
+        }
+        for (_, v) in hrds {
+            assert!(!v.is_empty());
+        }
+    }
+
+    #[test]
+    fn run_annotates_families() {
+        let mut ap = AnnotationProcess::new();
+        ap.seq_sim_search_tables.push(
+            Path::new("misc")
+                .join("Twelve_Proteins_vs_Swissprot_blastp.txt")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
+        ap.seq_sim_search_tables.push(
+            Path::new("misc")
+                .join("Twelve_Proteins_vs_trembl_blastp.txt")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
+        let mut sf1 = SeqFamily::new();
+        let sf1_id = "SeqFamily1".to_string();
+        sf1.query_ids = vec![
+            "Soltu.DM.01G022510.1".to_string(),
+            "Soltu.DM.01G045390.1".to_string(),
+            "Soltu.DM.02G015700.1".to_string(),
+            "Soltu.DM.02G020600.1".to_string(),
+            "Soltu.DM.03G011280.1".to_string(),
+            "Soltu.DM.03G026010.1".to_string(),
+            "Soltu.DM.04G035790.1".to_string(),
+        ];
+        let mut sf2 = SeqFamily::new();
+        let sf2_id = "SeqFamily2".to_string();
+        sf2.query_ids = vec![
+            "Soltu.DM.07G016620.1".to_string(),
+            "Soltu.DM.09G022410.3".to_string(),
+            "Soltu.DM.10G003150.1".to_string(),
+            "Soltu.DM.S001650.1".to_string(),
+            "The_Protein_Without_Blast_Hits".to_string(),
+        ];
+        ap.insert_seq_family(sf1_id.clone(), sf1);
+        ap.insert_seq_family(sf2_id.clone(), sf2);
+        ap = run(ap);
+        let hrds = ap.human_readable_descriptions;
+        assert_eq!(hrds.len(), 2);
+        let queries_with_expected_result = vec![sf1_id, sf2_id];
+        for qid in queries_with_expected_result {
+            assert!(hrds.contains_key(&qid))
+        }
+        for (_, v) in hrds {
+            assert!(!v.is_empty());
+        }
     }
 }

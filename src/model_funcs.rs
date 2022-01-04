@@ -1,6 +1,21 @@
 use eq_float::F64;
 use regex::Regex;
 
+/// Applies a list of regular expressions to a string. If any of them match returns true,
+/// otherwise returns false.
+/// This function is used to exclude non-informative descriptions from a human readable
+/// sequence title and to check for non-informative words to be excluded from scoring
+/// 
+/// # Arguments
+/// 
+/// * stitle - The sequence title string
+/// * regexs - A vector of regular expression to be applied to the stitle argument.
+pub fn matches_blacklist(stitle: &str, regexs: &Vec<Regex>) -> bool {
+    regexs
+        .iter()
+        .any(|x| x.is_match(&stitle.to_string()))
+}
+
 /// Fasta entries have a long title in which the sequence identifier and often taxonomic
 /// information is given along with a short human readable protein description. We are only
 /// interested in the latter. This function extracts the short description using regular
@@ -59,5 +74,27 @@ mod tests {
             filter_stitle(t1, &(*FILTER_REGEXS)),
             "Probable LRR receptor-like serine/threonine-protein kinase At3g47570"
         );
+    }
+
+    #[test]
+    fn default_matches_blacklist_regexs(){
+        let t1 = "LRR receptor-like serine/threonine-protein kinase EFR";
+        assert_eq!(false,matches_blacklist(t1, &(*BLACKLIST_STITLE_REGEXS)));
+
+        let t2 = "Probable LRR receptor-like serine/threonine-protein kinase At3g47570";
+        assert_eq!(true,matches_blacklist(t2, &(*BLACKLIST_STITLE_REGEXS)));
+        
+        let t3 = "Putative receptor-like protein kinase At3g47110";
+        assert_eq!(true,matches_blacklist(t3, &(*BLACKLIST_STITLE_REGEXS)));
+
+        let t4 = "hypothetical receptor-like protein kinase At3g47110";
+        assert_eq!(true,matches_blacklist(t4, &(*BLACKLIST_STITLE_REGEXS)));
+
+        let t5 = "whole Genome shotgun Sequence";
+        assert_eq!(true,matches_blacklist(t5, &(*BLACKLIST_STITLE_REGEXS)));
+
+        let t6 = "predicted Receptor-like protein kinase";
+        assert_eq!(true,matches_blacklist(t6, &(*BLACKLIST_STITLE_REGEXS)));
+
     }
 }

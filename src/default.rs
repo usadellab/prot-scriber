@@ -4,6 +4,53 @@ use std::collections::HashMap;
 
 lazy_static! {
 
+    /// The default Blacklist of regular expressions used to check for non-informative words
+    /// in the description to be excluded from scoring. If ANY of these expression matches
+    /// the word is considered as non-informative
+    pub static ref BLACKLIST_DESCRIPTION_WORDS_REGEXS: Vec<Regex> = vec![
+        Regex::new(r"(?i)\bunknown\b").unwrap(),
+        Regex::new(r"(?i)\bmember\b").unwrap(),
+        Regex::new(r"(?i)\blike\b").unwrap(),
+        Regex::new(r"(?i)\bassociated\b").unwrap(),
+        Regex::new(r"(?i)\bcontaining\b").unwrap(),
+        Regex::new(r"(?i)\bactivated\b").unwrap(),
+        Regex::new(r"(?i)\bfamily\b").unwrap(),
+        Regex::new(r"(?i)\bsubfamily\b").unwrap(),
+        Regex::new(r"(?i)\binteracting\b").unwrap(),
+        Regex::new(r"(?i)\bactivity\b").unwrap(),
+        Regex::new(r"(?i)\bsimilar\b").unwrap(),
+        Regex::new(r"(?i)\bproduct\b").unwrap(),
+        Regex::new(r"(?i)\bexpressed\b").unwrap(),
+        Regex::new(r"(?i)\bpredicted\b").unwrap(),
+        Regex::new(r"(?i)\bputative\b").unwrap(),
+        Regex::new(r"(?i)\buncharacterized\b").unwrap(),
+        Regex::new(r"(?i)\bprobable\b").unwrap(),
+        Regex::new(r"(?i)\bprotein\b").unwrap(),
+        Regex::new(r"(?i)\bgene\b").unwrap(),
+        Regex::new(r"(?i)\btair\b").unwrap(),
+        Regex::new(r"(?i)\bfragment\b").unwrap(),
+        Regex::new(r"(?i)\bhomolog\b").unwrap(),
+        Regex::new(r"(?i)\bcontig\b").unwrap(),
+        Regex::new(r"(?i)\brelated\b").unwrap(),
+        Regex::new(r"(?i)\bremark\b").unwrap(),
+        Regex::new(r"(?i)\b\w?orf(\w?|\d+)\b").unwrap(),
+    ];
+
+    /// The default Blacklist of regular expressions used to filter out Hit title (`stitle`) fields
+    /// if they match ANY of these expressions.
+    pub static ref BLACKLIST_STITLE_REGEXS: Vec<Regex> = vec![
+        Regex::new(r"(?i)^similar\s+to").unwrap(),
+        Regex::new(r"(?i)^probable ").unwrap(),
+        Regex::new(r"(?i)^putative ").unwrap(),
+        Regex::new(r"(?i)^predicted ").unwrap(),
+        Regex::new(r"(?i)^uncharacterized").unwrap(),
+        Regex::new(r"(?i)^unknown").unwrap(),
+        Regex::new(r"(?i)^hypothetical").unwrap(),
+        Regex::new(r"(?i)^unnamed").unwrap(),
+        Regex::new(r"(?i)^whole\s+genome\s+shotgun\s+sequence").unwrap(),
+        Regex::new(r"(?i)^clone").unwrap(),
+    ];
+
     /// The default regular expressions used to filter a Hit title (`stitle`) and retain the short
     /// human readable description.
     pub static ref FILTER_REGEXS: Vec<Regex> = vec![
@@ -40,6 +87,9 @@ lazy_static! {
     /// A Hit's description is split into words using this default regular expression.
     pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([-/|/\\;,':().\s+]+)").unwrap();
 
+    /// Default sequence similarity search result table field separator:
+    pub static ref SSSR_TABLE_FIELD_SEPARATOR: char = '\t';
+
     /// The default inflation parameter (I) for Markov Clustering
     pub static ref MCL_INFLATION: f64 = 5.0;
 
@@ -70,4 +120,6 @@ lazy_static! {
         Regex::new(r"(?i)\bc\b").unwrap(),
     ];
 
+    /// The default regular expression to split gene family genes
+    pub static ref SPLIT_GENE_FAMILY_GENES_REGEX: Regex = Regex::new(r"(\s*,\s*|\s+)").unwrap();
 }

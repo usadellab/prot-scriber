@@ -10,12 +10,12 @@ mod annotation_process;
 mod default;
 mod hit;
 mod model_funcs;
+mod output_writer;
 mod playground;
 mod query;
 mod seq_family;
 mod seq_family_reader;
 mod seq_sim_table_reader;
-mod output_writer;
 
 fn main() {
     let matches = App::new("Prot-Scriber")
@@ -82,9 +82,15 @@ fn main() {
 
     // Save output:
     if let Some(o) = matches.value_of("output") {
-        match output_writer::write_output_table(o.to_string(), annotation_process.human_readable_descriptions){
-            Ok(()) => println!("successfully write to the file!"),
-            Err(e) => eprintln!("encounter an error! :( \n  {}", e),
+        match output_writer::write_output_table(
+            o.to_string(),
+            annotation_process.human_readable_descriptions,
+        ) {
+            Ok(()) => println!("output written to file {}!", o),
+            Err(e) => eprintln!(
+                "We are sorry, an error occurred when attempting to write output to file {} \n{}",
+                o, e
+            ),
         };
     }
 }

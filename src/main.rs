@@ -3,6 +3,7 @@ extern crate lazy_static;
 
 use annotation_process::{run, AnnotationProcess};
 use clap::{App, Arg};
+use load_optional_default_vals::OptionalsUserRegexLists;
 use seq_family_reader::parse_seq_families_file;
 use std::collections::HashMap;
 
@@ -10,6 +11,7 @@ mod annotation_process;
 mod default;
 mod generate_hrd_associated_funcs;
 mod hit;
+mod load_optional_default_vals;
 mod model_funcs;
 mod playground;
 mod query;
@@ -59,9 +61,22 @@ fn main() {
             .long("debug")
             .about("Turn debugging information on."),
         )
+        .arg(Arg::new("family gene separator regex")
+        .short('p')
+        .long("family-gene-separator-regex")
+        .about("regex to split genes in gene families"),
+        )
         .get_matches();
 
     let seq_sim_search_tables: Vec<_> = matches.values_of("seq-sim-table").unwrap().collect();
+
+    // New instance to hold users regex files in memory
+    let optional_users_regex_list = OptionalsUserRegexLists::new();
+
+    // Overwrite default value for regex to split genes in gene families, if provided as input by user:
+    if let Some(regex) = matches.value_of("family-gene-separator-regex") {
+        OptionalsUserRegexLists::parse_family_gene_separator_regex(regex);
+    }
 
     // Create a new AnnotationProcess instance and provide it with the necessary input data:
     let mut annotation_process = AnnotationProcess::new();

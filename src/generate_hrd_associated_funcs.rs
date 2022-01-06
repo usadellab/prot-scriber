@@ -542,34 +542,33 @@ mod tests {
     }
 
     #[test]
-    // fn test_centered_word_scores_phrases() {
-    //     let mut word_set = HashSet::new();
-    //     word_set.insert(vec!["a"]);
-    //     word_set.insert(vec!["b"]);
-    //     word_set.insert(vec!["c"]);
-    //     word_set.insert(vec!["d"]);
-    //     word_set.insert(vec!["e"]);
-    //     word_set.insert(vec!["f"]);
+    fn test_centered_word_scores_phrases() {
+        let mut word_set = HashSet::new();
+        word_set.insert(vec!["a"]);
+        word_set.insert(vec!["b"]);
+        word_set.insert(vec!["c"]);
+        word_set.insert(vec!["d"]);
+        word_set.insert(vec!["e"]);
+        word_set.insert(vec!["f"]);
 
-    //     let mut freq_map = HashMap::new();
-    //     freq_map.insert(["a"], 3. as f32);
-    //     freq_map.insert(["b"], 2. as f32);
-    //     freq_map.insert(["c"], 2. as f32);
-    //     freq_map.insert(["d"], 1. as f32);
-    //     freq_map.insert(["e"], 1. as f32);
-    //     freq_map.insert(["f"], 1. as f32);
+        let mut freq_map = HashMap::new();
+        freq_map.insert("a", 3. as f32);
+        freq_map.insert("b", 2. as f32);
+        freq_map.insert("c", 2. as f32);
+        freq_map.insert("d", 1. as f32);
+        freq_map.insert("e", 1. as f32);
+        freq_map.insert("f", 1. as f32);
 
-    //     let mut result = HashMap::new();
-    //     result.insert(["a"], 0.17016765);
-    //     result.insert(["d"], -0.08114678);
-    //     result.insert(["f"], -0.08114678);
-    //     result.insert(["c"], 0.036636323);
-    //     result.insert(["b"], 0.036636323);
-    //     result.insert(["e"], -0.08114678);
+        let mut result = HashMap::new();
+        result.insert(vec!["a"], 0.1701677 as f32);
+        result.insert(vec!["d"], -0.08114673 as f32);
+        result.insert(vec!["f"], -0.08114673 as f32);
+        result.insert(vec!["c"], 0.036636263 as f32);
+        result.insert(vec!["b"], 0.036636263 as f32);
+        result.insert(vec!["e"], -0.08114673 as f32);
+        assert_eq!(result, centered_word_scores_phrases(freq_map, word_set));
+    }
 
-    //     assert_eq!(result, centered_word_scores_phrases(freq_map, word_set));
-
-    // } // TODO
     #[test]
     fn test_predicted_hrd() {
         let result = vec!["dehydrogenase", "c", "terminal"];

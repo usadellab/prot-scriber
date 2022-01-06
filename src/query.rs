@@ -1,6 +1,7 @@
 use super::annotation_process::AnnotationProcess;
 use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
 use super::hit::*;
+use crate::generate_hrd_associated_funcs::generate_human_readable_description;
 use std::collections::HashMap;
 
 // NOTE that unit tests for struct Query are located in `./src/query_tests.rs`.
@@ -106,9 +107,17 @@ impl Query {
     ///
     /// * `&self` - A mutable reference to self, this instance of Query
     pub fn annotate(&self) -> String {
-        // TODO: Gather all self.hits description fields and pass them to
-        // `generate_human_readable_description`.
-        (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
+        let mut candidate_descriptions = vec![];
+        let query_hit_map = &self.hits;
+        for hit in query_hit_map.values() {
+            candidate_descriptions.push(hit.description.to_owned());
+        }
+        if candidate_descriptions.len() > 0 {
+            let hrd = generate_human_readable_description(candidate_descriptions);
+            hrd
+        } else {
+            (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
+        }
     }
 }
 

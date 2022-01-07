@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 mod annotation_process;
 mod default;
+mod generate_hrd_associated_funcs;
 mod hit;
 mod model_funcs;
 mod output_writer;

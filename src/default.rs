@@ -37,7 +37,7 @@ lazy_static! {
     ];
 
     /// The default Blacklist of regular expressions used to filter out Hit title (`stitle`) fields
-    /// if they match ANY of these expressions. 
+    /// if they match ANY of these expressions.
     pub static ref BLACKLIST_STITLE_REGEXS: Vec<Regex> = vec![
         Regex::new(r"(?i)^similar\s+to").unwrap(),
         Regex::new(r"(?i)^probable ").unwrap(),
@@ -85,7 +85,7 @@ lazy_static! {
     };
 
     /// A Hit's description is split into words using this default regular expression.
-    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"\s+").unwrap();
+    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([-/|/\\;,':().\s+]+)").unwrap();
 
     /// Default sequence similarity search result table field separator:
     pub static ref SSSR_TABLE_FIELD_SEPARATOR: char = '\t';
@@ -113,6 +113,12 @@ lazy_static! {
     /// The default string is used to collapse (join) consensus descriptions of disjoint
     /// hit-clusters:
     pub static ref CLUSTER_CONSENSUS_DESCRIPTIONS_JOIN: &'static str = "; ";
+
+    /// The default regular expressions used to label /filter uninformative words.
+    pub static ref UNINFORMATIVE_REGEXS: Vec<Regex> = vec![
+        Regex::new(r"(?i)\bterminal\b").unwrap(),
+        Regex::new(r"(?i)\bc\b").unwrap(),
+    ];
 
     /// The default regular expression to split gene family genes
     pub static ref SPLIT_GENE_FAMILY_GENES_REGEX: Regex = Regex::new(r"(\s*,\s*|\s+)").unwrap();

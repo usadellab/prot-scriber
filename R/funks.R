@@ -244,7 +244,7 @@ referenceWordListFromMercator4Annos <- function(mm4.anno.tbl,
         curateMercator4Annos)) {
     mm4.curated.tbl <- curate.annos.funk(mm4.anno.tbl)
     filter.i <- mm4.curated.tbl$TYPE & !grepl(paste0("^", paste(exclude.mm4.root.bins, 
-        collapse = "|")), pc.mercator$BINCODE)
+        collapse = "|")), mm4.anno.tbl$BINCODE)
     mm4.fltrd.tbl <- mm4.curated.tbl[filter.i, ]
     uniq.prot.ids <- unique(mm4.fltrd.tbl$IDENTIFIER)
     setNames(mclapply(uniq.prot.ids, function(prot.id) {

@@ -21,7 +21,7 @@ option_list <- list(
     c("-d", "--data-dir"),
     type = "character",
     default = NULL,
-    help = "The directory into which to write the result binary 'p_coccineus_seq_sim_search.RData'",
+    help = "The directory into which to write the result binary 'p_coccineus_reference_words.RData'",
     metavar = "character"
   ),
   make_option(

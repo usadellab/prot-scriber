@@ -117,6 +117,78 @@ and these two HTML documents that show all HRDs that were annotated to the diffe
 * p_coccineus_HRDs.html.bz2
 * p_coccineus_HRDs_multi_region.html.bz2
 
+## Faba annotation
+
+For material files of this genome see folder `/mnt/data/asis/prot-scriber/evaluation`. 
+
+The amino acid sequences, including splice variants, are in fasta file:
+`20210914_Faba_annotations_v1.2_split_chr1_proteins_longest_variants.fa`
+
+### Only use longest splice variants
+
+To only use the longest splice variants for proteins with multiple variants, the following script was applied:
+```sh
+cd /mnt/data/asis/prot-scriber/prot.scriber
+Rscript ./exec/prepareFabaAminoAcidSeqs.R \
+  -a /mnt/data/asis/prot-scriber/evaluation/20210914_Faba_annotations_v1.2_split_chr1_proteins.fa \
+  -o /mnt/data/asis/prot-scriber/evaluation/20210914_Faba_annotations_v1.2_split_chr1_proteins_longest_variants.fa
+```
+
+### Sequence Similarity Searches
+
+The above "longest splice variants" of the Faba proteome were used as query in
+Diamond searches against UniProt's SwissProt and trEMBL.
+
+See the following job-scripts in dir `/mnt/data/asis/prot-scriber/evaluation` for the above searches:
+* `Faba_vs_swissprot_oge_job.sh`
+* `Faba_vs_trembl_oge_job.sh`
+
+### Reference annotations
+
+Pfam-A domains were identified using HMMER3 and Mercator (v4) was used to
+annotate MapMan-Bins to the Faba query proteins.
+
+See the following script in dir `/mnt/data/asis/prot-scriber/evaluation` for
+details:
+* `Faba_vs_PfamA_oge_job.sh`
+
+The file
+`20210914_Faba_annotations_v1.2_split_chr1_proteins_longest_variants_mercatorv4.txt`
+contains the results of Mercator, invoked online using the browser interface.
+
+### Load Seq-Sim-Search-Results into Prot-Scriber
+
+The sequence similaroty search results are parsed and preparred for the
+prot-scriber annotation method using the following script:
+```sh
+# Executed on "kildare" node
+cd /mnt/data/asis/prot-scriber/prot.scriber/
+Rscript ./exec/loadFabaSeqSimSearchResults.R \
+  -t /mnt/data/asis/prot-scriber/evaluation/Faba_vs_trembl_blastp.txt \
+  -s /mnt/data/asis/prot-scriber/evaluation/Faba_vs_swisprot_blastp.txt \
+  -d /mnt/data/asis/prot-scriber/prot.scriber/data -n 55
+```
+
+### Load reference Pfam-A and Mercator (MapMan-Bin) reference annotations
+
+Prot-Scriber uses Pfam-A and MapMan-Bin annotations as references (gold standard) to evaluate its predictions (HRDs) performance calculating F-Scores and the MCC. These references were generated above (see respective section). To load and parse this data for subsequent analyses, the following command was issued:
+```sh
+# Executed on "kildare" node
+cd /mnt/data/asis/prot-scriber/prot.scriber
+Rscript ./exec/loadFaba_PfamA_Mercator4_results.R \
+  -m ../evaluation/20210914_Faba_annotations_v1.2_split_chr1_proteins_longest_variants_mercatorv4.txt \
+  -p ../evaluation/Faba_vs_PfamA_hmmscan_out.tsv -n 55 -d ./data/
+```
+
+### Generate Human Readable Descriptions (HRDs) for the Faba query proteins
+
+This step has been done using the following script:
+```sh
+# Executed on "kildare" node
+cd /mnt/data/asis/prot-scriber/prot.scriber
+Rscript ./exec/annotateAndEvaluateFaba.R -n 55 -d ./data/
+```
+
 ## References
 
 1. Levy Karin, E., Mirdita, M. & Söding, J. MetaEuk—sensitive, high-throughput gene discovery, and annotation for large-scale eukaryotic metagenomics. Microbiome 8, 48 (2020).

@@ -1,5 +1,6 @@
 use super::default::SPLIT_DESCRIPTION_REGEX;
 use super::default::UNINFORMATIVE_REGEXS;
+use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
 use regex::Regex;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -50,9 +51,11 @@ pub fn generate_human_readable_description(candidate_hrds: Vec<String>) -> Strin
         centered_word_scores_phrases(word_frequencies_map, phrases_universe_set);
 
     // Hrd description
-    let hrd_vec = predicted_hrd(phrases_score_map);
-    let hrd_str = hrd_vec.join(" ");
-    hrd_str
+    let hrd_res = predicted_hrd(phrases_score_map);
+    match hrd_res {
+        Ok(hrd_vec) => hrd_vec.join(" "),
+        Err(()) => (*UNKNOWN_PROTEIN_DESCRIPTION).to_string(),
+    }
 }
 
 /// Given filtered candidate descriptions it splits each word and returns a universe of all descriptions.
@@ -291,35 +294,39 @@ pub fn centered_word_scores_phrases<'a>(
 /// # Arguments
 ///
 /// * `HashMap<Vec<&str>, f32> `, map of scored phrases
-pub fn predicted_hrd(phrases_score_map: HashMap<Vec<&str>, f32>) -> Vec<&str> {
-    let phrases_score_values = phrases_score_map.values();
-    let mut phrases_score_vec = vec![];
-    for i in phrases_score_values {
-        phrases_score_vec.push(i)
-    }
-
-    phrases_score_vec.sort_by(|a, b| b.partial_cmp(a).unwrap());
-
-    let phrases_high_score = phrases_score_vec[0].to_owned();
-    let mut highest_scored_phrases = vec![];
-    for (key, value) in phrases_score_map {
-        if value == phrases_high_score {
-            highest_scored_phrases.push(key);
+pub fn predicted_hrd(phrases_score_map: HashMap<Vec<&str>, f32>) -> Result<Vec<String>, ()> {
+    if phrases_score_map.len() > 0 {
+        let phrases_score_values = phrases_score_map.values();
+        let mut phrases_score_vec = vec![];
+        for i in phrases_score_values {
+            phrases_score_vec.push(i)
         }
-    }
-    let mut length_of_h_s_p = vec![];
-    for phrase in highest_scored_phrases.clone() {
-        length_of_h_s_p.push(phrase.len())
-    }
 
-    let mut hrd = vec![];
-    let largest_phrase = length_of_h_s_p.iter().max().unwrap();
-    for mut phrase in highest_scored_phrases.clone() {
-        if phrase.len() == largest_phrase.to_owned() {
-            hrd.append(&mut phrase);
+        phrases_score_vec.sort_by(|a, b| b.partial_cmp(a).unwrap());
+
+        let phrases_high_score = phrases_score_vec[0].to_owned();
+        let mut highest_scored_phrases = vec![];
+        for (key, value) in phrases_score_map {
+            if value == phrases_high_score {
+                highest_scored_phrases.push(key);
+            }
         }
+        let mut length_of_h_s_p = vec![];
+        for phrase in highest_scored_phrases.clone() {
+            length_of_h_s_p.push(phrase.len())
+        }
+
+        let mut hrd: Vec<String> = vec![];
+        let largest_phrase = length_of_h_s_p.iter().max().unwrap();
+        for phrase in highest_scored_phrases.clone() {
+            if phrase.len() == largest_phrase.to_owned() {
+                hrd = phrase.iter().map(|x| (*x).to_string()).collect();
+            }
+        }
+        Ok(hrd)
+    } else {
+        Err(())
     }
-    hrd
 }
 
 #[cfg(test)]
@@ -578,7 +585,7 @@ mod tests {
         scored_phrases.insert(vec!["alcohol", "dehydrogenase"], 0.22149113);
         scored_phrases.insert(vec!["cinnamyl", "alcohol", "dehydrogenase"], -0.110522866);
 
-        assert_eq!(result, predicted_hrd(scored_phrases));
+        assert_eq!(result, predicted_hrd(scored_phrases).unwrap());
     }
 
     #[test]

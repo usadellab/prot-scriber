@@ -2,9 +2,10 @@ use super::default::{SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
 use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
+use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::{mem, thread};
+use std::sync::mpsc;
+use std::thread;
 
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
 /// human readable descriptions, i.e. the annotation of queries or sets of these (biological
@@ -49,49 +50,46 @@ pub enum AnnotationProcessMode {
 ///
 /// # Arguments
 ///
-/// * `annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
-pub fn run(annotation_process: AnnotationProcess) -> AnnotationProcess {
+/// * `mut annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
+pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
     // Prepare:
     let sssr_tables: Vec<String> = annotation_process
         .seq_sim_search_tables
         .iter()
         .map(|x| x.clone())
         .collect();
-    let ap_arc_mutex: Arc<Mutex<AnnotationProcess>> = Arc::new(Mutex::new(annotation_process));
-    let mut handles = vec![];
+    let (tx, rx) = mpsc::channel();
 
     // Parse and process each sequence similarity search result table in a dedicated
     // thread:
     for sss_tbl in sssr_tables {
-        let ap_i = ap_arc_mutex.clone();
+        let tx_i = tx.clone();
 
         // Start this sss_tbl's dedicated threat:
-        let handle = thread::spawn(move || {
+        thread::spawn(move || {
             parse_table(
                 sss_tbl,
                 *SSSR_TABLE_FIELD_SEPARATOR,
                 &(*SEQ_SIM_TABLE_COLUMNS),
-                ap_i,
+                tx_i,
             );
         });
-        handles.push(handle);
     }
+    // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
+    // otherwise the below receiver loop will wait forever for tx to send some messages.
+    drop(tx);
 
-    // Wait for the threads to finish:
-    for handle in handles {
-        handle.join().unwrap();
+    // Process messages sent by the above threads. Note that this might trigger the annotation of
+    // some queries or sequence families, if their data has been parsed completely:
+    for mut received_query in rx {
+        annotation_process.insert_query(&mut received_query);
     }
-
-    // How to take ownership of argument `annotation_process` back from having it moved into an
-    // Arc<Mutex<AnnotationProcess>>; see:
-    // https://stackoverflow.com/questions/29177449/how-to-take-ownership-of-t-from-arcmutext
-    let mut ap = Arc::try_unwrap(ap_arc_mutex).unwrap().into_inner().unwrap();
 
     // Make sure all queries or sequence families are annotated:
-    ap.process_rest_data();
+    annotation_process.process_rest_data();
 
     // Return modified version of input argument `annotation_process`:
-    ap
+    annotation_process
 }
 
 impl AnnotationProcess {
@@ -287,31 +285,58 @@ impl AnnotationProcess {
     /// * `&mut self` - A mutable reference to the current instance of AnnotationProcess, which
     ///                 serves as an in memory database into which to insert the parsed query.
     pub fn process_rest_data(&mut self) {
-        // Cannot get away without cloning the keys. Rust compiler complains about an immutable
-        // borrow and at the same time a mutable borrow of `self` in the call of
-        // process_rest_data or annotate_seq_family, respectively.
-
-        // Process seq families that might have queries that got no blast hits in any input blast
-        // table:
-        for seq_family_id in self
-            .seq_families
-            .iter()
-            .map(|(k, _v)| k.clone())
-            .collect::<Vec<String>>()
-            .iter()
-        {
-            self.annotate_seq_family(seq_family_id);
+        // Note that below `par_iter` is used to process the data _in parallel_. To make this work
+        // the parallel processes need to be independent and cannot write results of annotations
+        // (HRDs) into the current instance of AnnotationProcess without using something like an
+        // Mutex. Thus results are collected in terms of tuples containing the annotee identifier
+        // and the generated human readable description.
+        let mode = self.mode();
+        let mut hrd_tuples: Vec<(String, String)> = vec![];
+        match mode {
+            // Handle annotation of single biological sequences:
+            AnnotationProcessMode::SequenceAnnotation => {
+                // Process queries that might have gotten parsed results only from a subset of the input
+                // sequence similarity search result (SSSR) files:
+                hrd_tuples = self
+                    .queries
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<String>>()
+                    .par_iter()
+                    .map(|query_id| {
+                        let query = self.queries.get(query_id).unwrap();
+                        let hrd = query.annotate();
+                        ((*query_id).to_string(), hrd)
+                    })
+                    .collect();
+            }
+            // Handle annotation of sets of biological sequences, so called "Gene Families":
+            AnnotationProcessMode::FamilyAnnotation => {
+                // Process seq families that might have queries that got no blast hits in any input blast
+                // table:
+                hrd_tuples = self
+                    .seq_families
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<String>>()
+                    .par_iter()
+                    .map(|seq_fam_id| {
+                        let seq_fam = self.seq_families.get(seq_fam_id).unwrap();
+                        let hrd = seq_fam.annotate(&self.queries);
+                        ((*seq_fam_id).to_string(), hrd)
+                    })
+                    .collect();
+            }
         }
-        // Process queries that might have gotten parsed results only from a subset of the input
-        // sequence similarity search result (SSSR) files:
-        for query_id in self
-            .queries
-            .iter()
-            .map(|(k, _v)| k.clone())
-            .collect::<Vec<String>>()
-            .iter()
-        {
-            self.process_query_data_complete(query_id.to_string());
+
+        // Free memory:
+        self.queries = Default::default();
+        self.seq_families = Default::default();
+        self.query_id_to_seq_family_id_index = Default::default();
+
+        // Set the human readable descriptions generated in parallel:
+        for i_tpl in hrd_tuples {
+            self.human_readable_descriptions.insert(i_tpl.0, i_tpl.1);
         }
     }
 }

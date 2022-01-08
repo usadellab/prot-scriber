@@ -41,7 +41,7 @@ pub fn parse_table(
             // Is it the very first line?:
             if curr_query.id != String::new() {
                 // Inform about an instance of `Query` being successfully and completely parsed:
-                transmitter.send(curr_query);
+                transmitter.send(curr_query).unwrap();
             }
             // Prepare gathering of results for the next query:
             curr_query = Query::from_qacc(qacc_i.to_string());
@@ -53,7 +53,7 @@ pub fn parse_table(
 
     // Inform about the last instance of `Query` being successfully and completely
     // parsed:
-    transmitter.send(curr_query);
+    transmitter.send(curr_query).unwrap();
 }
 
 /// Parses a line in the respective sequence similarity search result table. The line is already

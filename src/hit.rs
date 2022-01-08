@@ -227,12 +227,15 @@ mod tests {
             "Hit_One", "100", "1", "50", "200", "51", "110", "123.4", "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let expected_words: HashSet<&str> = vec![
-            "Probable",
-            "LRR",
-            "receptor-like",
-            "serine/threonine-protein",
             "kinase",
+            "LRR",
+            "threonine",
+            "like",
+            "serine",
             "At3g47570",
+            "receptor",
+            "Probable",
+            "protein",
         ]
         .into_iter()
         .collect();

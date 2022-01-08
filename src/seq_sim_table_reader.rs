@@ -1,12 +1,11 @@
 //! Code used to parse sequence similarity search result tables is implemented in this module.
-use super::annotation_process::AnnotationProcess;
 use super::hit::*;
 use super::query::*;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 
 /// Finds a tabuar file (`path`) and parses it in a stream approach, i.e. line by line. Returns a
 /// in memory database of the respective parsed queries and their hits. Note that this function is
@@ -18,14 +17,12 @@ use std::sync::{Arc, Mutex};
 /// * `separator: char` - The separator to use to split a line into an array of columns
 /// * `table_cols: &HashMap<String, usize>` - The header information, i.e. the column names and
 /// their respective position in the table (`path`).
-/// * `annotation_process: Arc<Mutex<AnnotationProcess>>` - A mutable reference to an instance of
-/// AnnotationProcess in which to gather the parsed sequence similarity search results, i.e. the
-/// Queries and the Hits.
+/// * `transmitter: Sender<Query>` - Used to send instances of `Query` to any receiver.
 pub fn parse_table(
     path: String,
     separator: char,
     table_cols: &HashMap<String, usize>,
-    annotation_process: Arc<Mutex<AnnotationProcess>>,
+    transmitter: Sender<Query>,
 ) {
     // Open stream to the sequence similarity search result table:
     let file = File::open(path).unwrap();
@@ -43,11 +40,8 @@ pub fn parse_table(
         if qacc_i != curr_query.id {
             // Is it the very first line?:
             if curr_query.id != String::new() {
-                // Insert the results collected for the last query:
-                let mut ap = annotation_process.lock().unwrap();
-                ap.insert_query(&mut curr_query);
-                // release lock:
-                drop(ap);
+                // Inform about an instance of `Query` being successfully and completely parsed:
+                transmitter.send(curr_query).unwrap();
             }
             // Prepare gathering of results for the next query:
             curr_query = Query::from_qacc(qacc_i.to_string());
@@ -56,11 +50,10 @@ pub fn parse_table(
         let hit_i = parse_hit(&record_cols, table_cols);
         curr_query.add_hit(&hit_i);
     }
-    // Insert the last query, because we reached the end of the file:
-    let mut ap = annotation_process.lock().unwrap();
-    ap.insert_query(&mut curr_query);
-    // release lock:
-    drop(ap);
+
+    // Inform about the last instance of `Query` being successfully and completely
+    // parsed:
+    transmitter.send(curr_query).unwrap();
 }
 
 /// Parses a line in the respective sequence similarity search result table. The line is already
@@ -90,6 +83,7 @@ mod tests {
     use super::*;
     use crate::default::SEQ_SIM_TABLE_COLUMNS;
     use std::path::Path;
+    use std::sync::mpsc;
 
     #[test]
     fn parses_hit_from_record_line() {
@@ -112,9 +106,12 @@ mod tests {
             .to_str()
             .unwrap()
             .to_string();
-        let ap: Arc<Mutex<AnnotationProcess>> = Arc::new(Mutex::new(AnnotationProcess::new()));
-        parse_table(p, '\t', &(*SEQ_SIM_TABLE_COLUMNS), ap.clone());
-        let h = &ap.lock().unwrap().queries;
+        let (tx, rx) = mpsc::channel();
+        parse_table(p, '\t', &(*SEQ_SIM_TABLE_COLUMNS), tx);
+        let mut h: HashMap<String, Query> = HashMap::new();
+        for received in rx {
+            h.insert(received.id.clone(), received);
+        }
         assert_eq!(h.len(), 2);
         assert!(h.contains_key("Soltu.DM.10G003150.1"));
         assert_eq!(h.get("Soltu.DM.10G003150.1").unwrap().hits.len(), 4);

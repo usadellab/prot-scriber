@@ -114,8 +114,9 @@ lazy_static! {
     /// hit-clusters:
     pub static ref CLUSTER_CONSENSUS_DESCRIPTIONS_JOIN: &'static str = "; ";
 
-    /// The default regular expressions used to label /filter uninformative words.
+    /// The default regular expressions used to label / filter uninformative words.
     pub static ref UNINFORMATIVE_REGEXS: Vec<Regex> = vec![
+        Regex::new(r"(?i)\bprotein\b").unwrap(),
         Regex::new(r"(?i)\bterminal\b").unwrap(),
         Regex::new(r"(?i)\bc\b").unwrap(),
     ];

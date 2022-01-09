@@ -1,5 +1,7 @@
 //! Code used to parse sequence similarity search result tables is implemented in this module.
+use super::default::BLACKLIST_STITLE_REGEXS;
 use super::hit::*;
+use super::model_funcs::matches_blacklist;
 use super::query::*;
 use std::collections::HashMap;
 use std::fs::File;
@@ -26,29 +28,46 @@ pub fn parse_table(
 ) {
     // Open stream to the sequence similarity search result table:
     let file = File::open(path).unwrap();
-    let reader = BufReader::new(file);
+    let mut reader = BufReader::new(file);
 
     // The current query for which to read in hits:
     let mut curr_query = Query::new();
+
+    // The index of the column in which to find the `qacc`:
+    let qacc_col_ind = *table_cols.get("qacc").unwrap();
+    // The index of the column in which to find the `stitle`:
+    let stitle_col_ind = *table_cols.get("stitle").unwrap();
+
     // Process line by line in streamed read from table:
-    for line in reader.lines() {
-        let record_line = line.unwrap();
-        let record_cols: Vec<&str> = record_line.trim().split(separator).collect();
-        // Obtain the current query accession (ID) knowing its column number:
-        let qacc_i = record_cols[*table_cols.get("qacc").unwrap()];
-        // Did we hit a new block, i.e. a new query?:
-        if qacc_i != curr_query.id {
-            // Is it the very first line?:
-            if curr_query.id != String::new() {
-                // Inform about an instance of `Query` being successfully and completely parsed:
-                transmitter.send(curr_query).unwrap();
+    let mut record_line = String::new();
+    loop {
+        match reader.read_line(&mut record_line) {
+            Err(_) | Ok(0) => break,
+            Ok(_) => {
+                // Split current record line into cells:
+                let record_cols: Vec<&str> = record_line.trim().split(separator).collect();
+                // Obtain the current query accession (ID) knowing its column number:
+                let qacc_i = record_cols[qacc_col_ind].to_string();
+                // Did we hit a new block, i.e. a new query?:
+                if qacc_i != curr_query.id {
+                    // Is it the very first line?:
+                    if curr_query.id != String::new() {
+                        // Inform about an instance of `Query` being successfully and completely parsed:
+                        transmitter.send(curr_query).unwrap();
+                    }
+                    // Prepare gathering of results for the next query:
+                    curr_query = Query::from_qacc(qacc_i.to_string());
+                }
+                // Process the current hit:
+                let stitle = record_cols[stitle_col_ind].to_string();
+                if !matches_blacklist(&stitle, &(*BLACKLIST_STITLE_REGEXS)) {
+                    let hit_i = parse_hit(&record_cols, table_cols);
+                    curr_query.add_hit(&hit_i);
+                }
+                // Prepare for holding readout of next line:
+                record_line.clear();
             }
-            // Prepare gathering of results for the next query:
-            curr_query = Query::from_qacc(qacc_i.to_string());
         }
-        // Process the current hit:
-        let hit_i = parse_hit(&record_cols, table_cols);
-        curr_query.add_hit(&hit_i);
     }
 
     // Inform about the last instance of `Query` being successfully and completely

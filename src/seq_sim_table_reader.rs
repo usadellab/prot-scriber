@@ -48,11 +48,12 @@ pub fn parse_table(
                 let record_cols: Vec<&str> = record_line.trim().split(separator).collect();
                 // Obtain the current query accession (ID) knowing its column number:
                 let qacc_i = record_cols[qacc_col_ind].to_string();
-                // Did we hit a new block, i.e. a new query?:
+                // Did we hit a new block, i.e. a new query?
                 if qacc_i != curr_query.id {
-                    // Is it the very first line?:
+                    // Is it the very first line?
                     if curr_query.id != String::new() {
-                        // Inform about an instance of `Query` being successfully and completely parsed:
+                        // Inform about an instance of `Query` being successfully and completely
+                        // parsed:
                         transmitter.send(curr_query).unwrap();
                     }
                     // Prepare gathering of results for the next query:

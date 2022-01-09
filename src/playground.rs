@@ -1,46 +1,36 @@
 #[cfg(test)]
 mod tests {
-    use std::sync::mpsc;
-    use std::sync::{Arc, Mutex};
+    use std::env;
+    use std::fs::File;
+    use std::io::prelude::*;
+    use std::io::BufReader;
     use std::thread;
 
     #[test]
-    fn parse_input_with_events() {
-        let n_blast_tables = 2;
-
-        let (tx, rx) = mpsc::channel();
-        let v: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-
-        for i in 0..n_blast_tables {
-            let tx_i = tx.clone();
-            let v_i = v.clone();
-
-            thread::spawn(move || {
-                let vals = vec![
-                    format!("({}) hello", i),
-                    env!("CARGO_MANIFEST_DIR").to_string(),
-                    String::from("from"),
-                    String::from("the"),
-                    String::from("thread"),
-                ];
-
-                for val in vals {
-                    let mut vec_i = v_i.lock().unwrap();
-                    vec_i.push(val);
+    fn read_lines_test() {
+        let path = env::var("PS_F1").unwrap();
+        let file = File::open(path).unwrap();
+        let mut reader = BufReader::new(file);
+        let mut buf = String::new();
+        loop {
+            match reader.read_line(&mut buf) {
+                Err(_) | Ok(0) => break,
+                Ok(_) => {
+                    print!(".");
+                    buf.clear();
                 }
-                tx_i.send(format!("thread {}'s message", i)).unwrap();
-            });
+            }
         }
-        // Receiver will wait eternally, as long as tx has not moved and finished sending. So
-        // manually drop it.
-        drop(tx);
+    }
 
-        for received in rx {
-            println!("Got: {}", received);
+    #[test]
+    fn lines_test() {
+        let path = env::var("PS_F1").unwrap();
+        let file = File::open(path).unwrap();
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            let _record_line = line.unwrap();
+            print!(",");
         }
-
-        println!("Data vector 'v':\n{:?}", *v.lock().unwrap());
-
-        assert!(true);
     }
 }

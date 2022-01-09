@@ -9,7 +9,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::sync::mpsc::Sender;
 
-/// Finds a tabuar file (`path`) and parses it in a stream approach, i.e. line by line. Returns a
+/// Finds a tabular file (`path`) and parses it in a stream approach, i.e. line by line. Returns a
 /// in memory database of the respective parsed queries and their hits. Note that this function is
 /// making use of a thread safe reference to the argument `annotation_process`.
 ///

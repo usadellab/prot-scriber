@@ -1,4 +1,3 @@
-use super::annotation_process::AnnotationProcess;
 use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
 use super::hit::*;
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
@@ -74,32 +73,6 @@ impl Query {
         }
     }
 
-    /// Increments the counter `n_parsed_from_sssr_tables` of how many times this query was parsed
-    /// from input sequence similarity search result (SSSR) tables. If this number is equal to the
-    /// number of input SSSR tables the respective AnnotationProcess was started with, all possible
-    /// SSSR result data has been read and parsed and thus this function can start the generation
-    /// of a human readable description for this query. Returns the generated human readable
-    /// description (HRD) as `Option<String>`, being `None` if still more SSSR results might be
-    /// there to parse, or `Some` if all input SSSR tables have been parsed for this query and thus
-    /// a HRD could be generated.
-    ///
-    /// # Arguments
-    ///
-    /// * `&mut self` - A mutable reference to self, this instance of Query
-    /// * `n_input_sssr: u16` - The number of SSSR input tables the respective AnnotationProcess
-    ///                         was started with.
-    pub fn increment_times_parsed_and_annotate_if_indicated(
-        &mut self,
-        n_input_sssr: u16,
-    ) -> Option<String> {
-        self.n_parsed_from_sssr_tables += 1;
-        if self.n_parsed_from_sssr_tables == n_input_sssr {
-            Some(self.annotate())
-        } else {
-            None
-        }
-    }
-
     /// Generates and returns a human readable description (`String`) for this biological query
     /// sequence.
     ///
@@ -137,19 +110,19 @@ mod tests {
     #[test]
     fn query_add_hit_only_uses_higest_bitscore() {
         let high = Hit::new(
-            "Hit_One", "100", "1", "50", "200", "51", "110", "123.4",
+            "Hit_One", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let low = Hit::new(
-            "Hit_One", "100", "1", "50", "200", "51", "110", "1.4",
+            "Hit_One", "1.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let highest = Hit::new(
-            "Hit_One", "100", "1", "50", "200", "51", "110", "666.6",
+            "Hit_One", "666.6",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let other = Hit::new(
-            "Hit_Two", "100", "1", "50", "200", "51", "110", "123.4",
+            "Hit_Two", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let mut query = Query::from_qacc("Query_Curious".to_string());

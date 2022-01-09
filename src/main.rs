@@ -4,7 +4,6 @@ extern crate lazy_static;
 use annotation_process::{run, AnnotationProcess};
 use clap::{App, Arg};
 use seq_family_reader::parse_seq_families_file;
-use std::collections::HashMap;
 
 mod annotation_process;
 mod default;

@@ -37,6 +37,10 @@ pub fn parse_table(
     let qacc_col_ind = *table_cols.get("qacc").unwrap();
     // The index of the column in which to find the `stitle`:
     let stitle_col_ind = *table_cols.get("stitle").unwrap();
+    // The index of the column in which to find the `bitscore`:
+    let bitscore_col_ind = *table_cols.get("bitscore").unwrap();
+    // The index of the column in which to find the `sacc`:
+    let sacc_col_ind = *table_cols.get("sacc").unwrap();
 
     // Process line by line in streamed read from table:
     let mut record_line = String::new();
@@ -62,7 +66,12 @@ pub fn parse_table(
                 // Process the current hit:
                 let stitle = record_cols[stitle_col_ind].to_string();
                 if !matches_blacklist(&stitle, &(*BLACKLIST_STITLE_REGEXS)) {
-                    let hit_i = parse_hit(&record_cols, table_cols);
+                    let hit_i = parse_hit(
+                        &record_cols,
+                        &sacc_col_ind,
+                        &bitscore_col_ind,
+                        &stitle_col_ind,
+                    );
                     curr_query.add_hit(&hit_i);
                 }
                 // Prepare for holding readout of next line:
@@ -82,19 +91,20 @@ pub fn parse_table(
 /// # Arguments
 ///
 /// * `record_cols: &Vec<&str>` - The record parsed from splitting the respective line
-/// * `table_cols: &HashMap<String, usize>` - The table header, i.e. the column names and their
-///                                           position in the argument `record_cols`.
-pub fn parse_hit(record_cols: &Vec<&str>, table_cols: &HashMap<String, usize>) -> Hit {
+/// * `sacc_col_ind: &usize` - The index of argument `record_cols` where the `sacc` is stored.
+/// * `bitscore_col_ind: &usize` - The index of argument `record_cols` where the `bitscore` is
+///                               stored.
+/// * `stitle_col_ind: &usize` - The index of argument `record_cols` where the `stitle` is stored.
+pub fn parse_hit(
+    record_cols: &Vec<&str>,
+    sacc_col_ind: &usize,
+    bitscore_col_ind: &usize,
+    stitle_col_ind: &usize,
+) -> Hit {
     Hit::new(
-        record_cols[*table_cols.get("sacc").unwrap()],
-        record_cols[*table_cols.get("qlen").unwrap()],
-        record_cols[*table_cols.get("qstart").unwrap()],
-        record_cols[*table_cols.get("qend").unwrap()],
-        record_cols[*table_cols.get("slen").unwrap()],
-        record_cols[*table_cols.get("sstart").unwrap()],
-        record_cols[*table_cols.get("send").unwrap()],
-        record_cols[*table_cols.get("bitscore").unwrap()],
-        record_cols[*table_cols.get("stitle").unwrap()],
+        record_cols[*sacc_col_ind],
+        record_cols[*bitscore_col_ind],
+        record_cols[*stitle_col_ind],
     )
 }
 
@@ -111,11 +121,9 @@ mod tests {
             "Soltu.DM.02G015700.1", "sp|C0LGP4|Y3475_ARATH", "2209", "1284", "2199", "1010", "64", "998", "580",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         ];
-        let hit = parse_hit(&record_cols, &(*SEQ_SIM_TABLE_COLUMNS));
-        let expected = Hit::new( "sp|C0LGP4|Y3475_ARATH",
-            "2209", "1284", "2199", "1010", "64", "998", "580",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-            );
+        let hit = parse_hit(&record_cols, &1, &8, &9);
+        let expected = Hit::new( "sp|C0LGP4|Y3475_ARATH", "580",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1");
         assert_eq!(hit, expected);
     }
 

@@ -1,7 +1,6 @@
 use super::default::SPLIT_DESCRIPTION_REGEX;
 use super::default::UNINFORMATIVE_REGEXS;
 use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
-use regex::Regex;
 use std::collections::HashMap;
 use std::collections::HashSet;
 

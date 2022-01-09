@@ -312,8 +312,8 @@ impl AnnotationProcess {
             }
             // Handle annotation of sets of biological sequences, so called "Gene Families":
             AnnotationProcessMode::FamilyAnnotation => {
-                // Process seq families that might have queries that got no blast hits in any input blast
-                // table:
+                // Process seq families that might have queries that got no blast hits in some
+                // input blast tables:
                 hrd_tuples = self
                     .seq_families
                     .keys()

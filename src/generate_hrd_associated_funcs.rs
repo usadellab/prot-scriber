@@ -84,7 +84,8 @@ pub fn powerset<T: Clone>(slice: &[T]) -> Vec<Vec<T>> {
 }
 
 /// Calculates the word frequencies for argument `universe_words` and returns a `HashMap<String,
-/// f32>` mapping the words to their respective frequency.
+/// f32>` mapping the words to their respective frequency. Note that this functions returns
+/// absolute frequencies in terms of number of appearances.
 ///
 /// # Arguments
 ///
@@ -93,8 +94,7 @@ pub fn frequencies(universe_words: &Vec<String>) -> HashMap<String, f32> {
     let mut word_freqs: HashMap<String, f32> = HashMap::new();
     for word in universe_words.iter() {
         if !word_freqs.contains_key(word) {
-            let n_appearances = universe_words.iter().filter(|x| (*x) == word).count() as f32
-                / universe_words.len() as f32;
+            let n_appearances = universe_words.iter().filter(|x| (*x) == word).count() as f32;
             word_freqs.insert((*word).clone(), n_appearances);
         }
     }
@@ -113,7 +113,7 @@ pub fn inverse_information_content(word: &String, wrd_frequencies: &HashMap<Stri
     let sum_wrd_frequencies: f32 = wrd_frequencies.values().into_iter().sum();
     if wrd_frequencies.values().len() as f32 > 1. {
         let pw = wrd_frequencies[word] / sum_wrd_frequencies;
-        f32::log(1. / (1. - pw), std::f32::consts::E)
+        -1.0 * f32::log(1. - pw, std::f32::consts::E)
     } else if wrd_frequencies.values().len() as f32 == 1. && wrd_frequencies.contains_key(word) {
         1.0
     } else {

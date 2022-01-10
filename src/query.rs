@@ -82,7 +82,7 @@ impl Query {
     pub fn annotate(&self) -> String {
         if self.hits.len() > 0 {
             let hit_descriptions = self.hits.values().map(|h| h.description.clone()).collect();
-            generate_human_readable_description(hit_descriptions)
+            generate_human_readable_description(&hit_descriptions)
         } else {
             (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
         }

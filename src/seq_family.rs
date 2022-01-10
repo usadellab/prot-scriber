@@ -75,7 +75,7 @@ impl SeqFamily {
         // Generate a human readable description, if any source Hit descriptions are
         // available, return the default "unkown family" otherwise:
         if hit_descriptions.len() > 0 {
-            let hrd = generate_human_readable_description(hit_descriptions);
+            let hrd = generate_human_readable_description(&hit_descriptions);
             hrd
         } else {
             (*UNKNOWN_FAMILY_DESCRIPTION).to_string()

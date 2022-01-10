@@ -8,46 +8,30 @@ use std::collections::HashSet;
 ///
 /// # Arguments
 ///
-/// * `Vec<String>` A vector of strings containing all Hit descriptions.
-pub fn generate_human_readable_description(hit_hrds: Vec<String>) -> String {
-    // Covert Vec<String> input into Vec<&str>
-    let hit_hdr: Vec<&str> = hit_hrds.iter().map(AsRef::as_ref).collect();
-    // Build universe word-set
-    let universe = hit_hdrs_word_universe(hit_hdr.clone());
+/// * `hit_hrds: &Vec<String>` - A vector of strings containing all Hit descriptions.
+pub fn generate_human_readable_description(descriptions: &Vec<String>) -> String {
+    // Split the descriptions into vectors of words:
+    let description_words: Vec<Vec<String>> = descriptions
+        .iter()
+        .map(|dsc| split_descriptions(dsc))
+        .collect();
 
-    // Filter words and create a vector non-informative words
-    let uninformative_words = uninformative_words_vec(universe.clone());
+    // Build universe of words:
+    let word_universe: Vec<String> = description_words.into_iter().flatten().collect();
 
-    // Normalized word frequencies
-    let mut word_frequencies_map = frequencies(universe.clone());
-
-    // Retain only the informative words and their frequencies
-    if uninformative_words.len() > 0 {
-        for word in uninformative_words.iter() {
-            word_frequencies_map.retain(|key, _| *key != word);
-        }
-    }
+    // Calculate the frequency of the universe words:
+    let word_frequencies = frequencies(&word_universe);
 
     // All possible phrases using the powerset function
-    let mut phrases_universe = vec![];
-    for hit in hit_hdr.clone().iter() {
-        let hit_desc_words = split_hits_descripts(hit);
-        let phrase = phrases(hit_desc_words);
-        phrases_universe.push(phrase);
+    let mut phrases_set: HashSet<Vec<String>> = HashSet::new();
+    for desc_words in description_words {
+        phrases_set.insert(desc_words);
     }
-
-    // Hashset of phrases from all the Hits, a universe of all phrases
-    let mut phrases_universe_set: HashSet<Vec<&str>> = HashSet::new();
-    for vec_ph in phrases_universe.iter() {
-        for ph in vec_ph.iter() {
-            // convert the phrases to a vector
-            phrases_universe_set.insert(split_hits_descripts(ph));
-        }
-    }
+    // Convert to vector to ease usage and save memory in scoring:
+    let phrases: Vec<Vec<String>> = phrases_set.into_iter().collect();
 
     // Score phrases using centered inverse information content
-    let phrases_score_map =
-        centered_word_scores_phrases(word_frequencies_map, phrases_universe_set);
+    let phrases_score_map = centered_word_scores_phrases(word_frequencies, phrases);
 
     // Hrd description
     let hrd_res = predicted_hrd(phrases_score_map);
@@ -61,15 +45,23 @@ pub fn generate_human_readable_description(hit_hrds: Vec<String>) -> String {
 ///
 /// # Arguments
 ///
-/// * `Vec<&str>` vector of all Hit descriptions
-pub fn hit_hdrs_word_universe(vec: Vec<&str>) -> Vec<&str> {
-    let mut splitted_hits_universe = vec![];
-    for hit in vec.into_iter() {
-        let mut split_hit: Vec<&str> = (*SPLIT_DESCRIPTION_REGEX).split(&hit).into_iter().collect();
-        splitted_hits_universe.append(&mut split_hit);
+/// * `descriptions: &Vec<String>` vector of all Hit descriptions
+pub fn word_universe(descriptions: &Vec<String>) -> Vec<String> {
+    let mut word_universe = vec![];
+    for hit_description in descriptions.into_iter() {
+        let mut split_hit: Vec<String> = (*SPLIT_DESCRIPTION_REGEX)
+            // Generate a set of words from the hit_description:
+            .split(&hit_description)
+            .collect::<Vec<&str>>()
+            .iter()
+            // Filter out words that are not informative:
+            .filter(|x| !matches_uninformative_list(x))
+            .map(|x| (*x).to_string())
+            .collect();
+        // Add the words to the universe, retaining their frequency - this is a vector, not a set:
+        word_universe.append(&mut split_hit);
     }
-    // splitted_hits_universe.retain(|x| *x != "");
-    splitted_hits_universe
+    word_universe
 }
 
 /// Given filtered Hit descriptions it splits each word and returns a vector.
@@ -77,12 +69,11 @@ pub fn hit_hdrs_word_universe(vec: Vec<&str>) -> Vec<&str> {
 /// # Arguments
 ///
 /// * `String of a Hit HRD description` & `Vector containing Regex strings`
-pub fn split_hits_descripts(hit_words: &str) -> Vec<&str> {
-    let word_vec: Vec<&str> = (*SPLIT_DESCRIPTION_REGEX)
-        .split(hit_words)
-        .into_iter()
-        .collect();
-    word_vec
+pub fn split_descriptions(description: &String) -> Vec<String> {
+    (*SPLIT_DESCRIPTION_REGEX)
+        .split(description)
+        .map(|x| (*x).to_string())
+        .collect()
 }
 
 /// Creates a HashMap containing individual Hit descriptions(keys) and if its informative (value : bool).
@@ -128,7 +119,6 @@ pub fn uninformative_words_vec(universe_hrd_words: Vec<&str>) -> Vec<String> {
 ///
 /// * `String` - word & `Vec<Regex>` - Vector of Regex strings
 pub fn matches_uninformative_list(word: &str) -> bool {
-    //TODO: update unformative words in defaults.rs
     (*BLACKLIST_DESCRIPTION_WORDS_REGEXS)
         .iter()
         .any(|x| x.is_match(&word.to_string()))
@@ -174,26 +164,22 @@ pub fn phrases(hit_vector_description: Vec<&str>) -> Vec<String> {
     return_vec
 }
 
-/// Gets word frequencies of all Hit words
+/// Calculates the word frequencies for argument `universe_words` and returns a `HashMap<String,
+/// f32>` mapping the words to their respective frequency.
 ///
 /// # Arguments
 ///
-/// * `Vector<String>` - vector of strings containing all Hit HRDS.
-pub fn frequencies(vec: Vec<&str>) -> HashMap<&str, f32> {
-    let mut freq_map: HashMap<&str, f32> = HashMap::new();
-    let mut map: HashMap<String, i32> = HashMap::new();
-    for i in &vec {
-        *freq_map.entry(i).or_default() += 1 as f32;
+/// * `universe_words: &Vector<String>` - vector of words
+pub fn frequencies(universe_words: &Vec<String>) -> HashMap<String, f32> {
+    let mut word_freqs: HashMap<String, f32> = HashMap::new();
+    for word in universe_words.iter() {
+        if !word_freqs.contains_key(word) {
+            let n_appearances = universe_words.iter().filter(|x| (*x) == word).count() as f32
+                / universe_words.len() as f32;
+            word_freqs.insert((*word).clone(), n_appearances);
+        }
     }
-    for i in &vec {
-        *map.entry(i.to_string()).or_default() += 1 as i32;
-    }
-    let max_value = map.values().max().unwrap().clone();
-    for key in freq_map.to_owned().keys() {
-        *freq_map.get_mut(key).unwrap() /= max_value as f32; //normalize
-    }
-
-    freq_map
+    word_freqs
 }
 
 /// Computes the score of a word using 'inverse information content' calculated
@@ -261,12 +247,11 @@ pub fn mean_inv_inf_cntn(
 /// # Arguments
 ///
 /// * `word_frequencies`  An instance of dictionary of all words with their frequencies.
-///
 /// * `phrases_universe_set` HashSet of Vectors containing all possible phrases (universe phrases)
-pub fn centered_word_scores_phrases<'a>(
-    word_frequencies_map: HashMap<&str, f32>,
-    phrases_universe_set: HashSet<Vec<&'a str>>,
-) -> HashMap<Vec<&'a str>, f32> {
+pub fn centered_word_scores_phrases(
+    word_frequencies_map: &HashMap<String, f32>,
+    phrases_universe_set: &Vec<Vec<String>>,
+) -> Vec<f32> {
     let p_w_i = mean_inv_inf_cntn(word_frequencies_map.clone(), phrases_universe_set.clone());
     let mut phrases_score_map = HashMap::new();
     for phrase in phrases_universe_set.iter().cloned() {
@@ -358,7 +343,7 @@ mod tests {
             "c",
             "terminal",
         ];
-        assert_eq!(result, hit_hdrs_word_universe(hits_vector));
+        assert_eq!(result, word_universe(hits_vector));
     }
 
     #[test]
@@ -393,14 +378,14 @@ mod tests {
             "c",
             "terminal",
         ];
-        assert_eq!(result, hit_hdrs_word_universe(hit_hrds));
+        assert_eq!(result, word_universe(hit_hrds));
     }
 
     #[test]
     fn test_split_hits_descripts() {
         let hit_words = "alcohol dehydrogenase c terminal";
         let result = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-        assert_eq!(result, split_hits_descripts(hit_words));
+        assert_eq!(result, split_descriptions(hit_words));
     }
     #[test]
     fn test_match_uninformative_list() {
@@ -595,7 +580,7 @@ mod tests {
             "alcohol dehydrogenase c-terminal".to_string(),
         ];
         let expected = "dehydrogenase".to_string();
-        let result = generate_human_readable_description(hit_hrds);
+        let result = generate_human_readable_description(&hit_hrds);
         println!("\n\n{}\n\n", result);
 
         assert_eq!(expected, result);

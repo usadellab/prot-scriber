@@ -80,12 +80,16 @@ impl Query {
     ///
     /// * `&self` - A mutable reference to self, this instance of Query
     pub fn annotate(&self) -> String {
+        let mut hrd: String = (*UNKNOWN_PROTEIN_DESCRIPTION).to_string();
         if self.hits.len() > 0 {
             let hit_descriptions = self.hits.values().map(|h| h.description.clone()).collect();
-            generate_human_readable_description(&hit_descriptions)
-        } else {
-            (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
+            let hrd_option = generate_human_readable_description(&hit_descriptions);
+            match hrd_option {
+                Some(hum_read_desc) => hrd = hum_read_desc,
+                None => {}
+            }
         }
+        hrd
     }
 }
 

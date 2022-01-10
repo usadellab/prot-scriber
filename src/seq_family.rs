@@ -74,12 +74,15 @@ impl SeqFamily {
         }
         // Generate a human readable description, if any source Hit descriptions are
         // available, return the default "unkown family" otherwise:
+        let mut hrd: String = (*UNKNOWN_FAMILY_DESCRIPTION).to_string();
         if hit_descriptions.len() > 0 {
-            let hrd = generate_human_readable_description(hit_descriptions);
-            hrd
-        } else {
-            (*UNKNOWN_FAMILY_DESCRIPTION).to_string()
+            let hrd_option = generate_human_readable_description(&hit_descriptions);
+            match hrd_option {
+                Some(hum_read_desc) => hrd = hum_read_desc,
+                None => {}
+            }
         }
+        hrd
     }
 }
 

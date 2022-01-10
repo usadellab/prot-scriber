@@ -269,9 +269,9 @@ mod tests {
 
         let pw: f32 = freq_map.values().into_iter().sum();
 
-        let result = f32::log(1. / (1. - 3. / pw), 2.71828182846);
+        let expected = f32::log(1. / (1. - 3. / pw), std::f32::consts::E);
 
-        assert_eq!(result, inverse_information_content(&word, &freq_map))
+        assert_eq!(expected, inverse_information_content(&word, &freq_map))
     }
 
     #[test]
@@ -297,23 +297,33 @@ mod tests {
         phrases.push(vec!["e".to_string()]);
         phrases.push(vec!["f".to_string()]);
 
+        // Note that we assume a universe of ten words:
         let mut freq_map: HashMap<String, f32> = HashMap::new();
-        freq_map.insert("a".to_string(), 3. as f32);
-        freq_map.insert("b".to_string(), 2. as f32);
-        freq_map.insert("c".to_string(), 2. as f32);
-        freq_map.insert("d".to_string(), 1. as f32);
-        freq_map.insert("e".to_string(), 1. as f32);
-        freq_map.insert("f".to_string(), 1. as f32);
+        freq_map.insert("a".to_string(), 0.3 as f32);
+        freq_map.insert("b".to_string(), 0.2 as f32);
+        freq_map.insert("c".to_string(), 0.2 as f32);
+        freq_map.insert("d".to_string(), 0.1 as f32);
+        freq_map.insert("e".to_string(), 0.1 as f32);
+        freq_map.insert("f".to_string(), 0.1 as f32);
 
+        // All of the above phrases consist just of a single word, thus their phrase-scores should
+        // be identical to the centered frequency of their word:
         let expected: Vec<f32> = vec![
-            0.1701677 as f32,
-            -0.08114673 as f32,
-            -0.08114673 as f32,
-            0.036636263 as f32,
-            0.036636263 as f32,
-            -0.08114673 as f32,
+            -1.0 * f32::log(1. - 0.3, std::f32::consts::E),
+            -1.0 * f32::log(1. - 0.2, std::f32::consts::E),
+            -1.0 * f32::log(1. - 0.2, std::f32::consts::E),
+            -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
+            -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
+            -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
         ];
-        assert_eq!(expected, score_phrases(&freq_map, &phrases));
+        let mean_inv_inf_cntnt: f32 = expected.iter().sum::<f32>() / expected.len() as f32;
+        assert_eq!(
+            expected
+                .iter()
+                .map(|x| x - mean_inv_inf_cntnt)
+                .collect::<Vec<f32>>(),
+            score_phrases(&freq_map, &phrases)
+        );
     }
 
     #[test]

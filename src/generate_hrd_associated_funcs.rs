@@ -155,7 +155,7 @@ pub fn score_phrases(
         let mut phr_score = 0.0;
         for word in phrase.iter() {
             if word_inv_inf_cntnt.contains_key(word) {
-                phr_score += word_inv_inf_cntnt.get(word).unwrap() / mean_word_inv_inf_cntnt;
+                phr_score += word_inv_inf_cntnt.get(word).unwrap() - mean_word_inv_inf_cntnt;
             }
         }
         phrase_scores.push(phr_score);
@@ -206,6 +206,7 @@ pub fn find_best_scoring_phrase(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_approx_eq::assert_approx_eq;
     use std::vec;
 
     #[test]
@@ -248,10 +249,10 @@ mod tests {
             "terminal".to_string(),
         ];
         let mut result = HashMap::new();
-        result.insert("terminal".to_string(), 0.25);
-        result.insert("dehydrogenase".to_string(), 0.25);
-        result.insert("alcohol".to_string(), 0.25);
-        result.insert("c".to_string(), 0.25);
+        result.insert("terminal".to_string(), 1.0);
+        result.insert("dehydrogenase".to_string(), 1.0);
+        result.insert("alcohol".to_string(), 1.0);
+        result.insert("c".to_string(), 1.0);
 
         assert_eq!(result, frequencies(&vec));
     }
@@ -317,13 +318,17 @@ mod tests {
             -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
         ];
         let mean_inv_inf_cntnt: f32 = expected.iter().sum::<f32>() / expected.len() as f32;
-        assert_eq!(
-            expected
-                .iter()
-                .map(|x| x - mean_inv_inf_cntnt)
-                .collect::<Vec<f32>>(),
-            score_phrases(&freq_map, &phrases)
-        );
+        let expected_centered = expected
+            .iter()
+            .map(|x| x - mean_inv_inf_cntnt)
+            .collect::<Vec<f32>>();
+        let result = score_phrases(&freq_map, &phrases);
+        assert_approx_eq!(expected_centered[0], result[0], 0.00001 as f32);
+        assert_approx_eq!(expected_centered[1], result[1], 1.11111 as f32);
+        assert_approx_eq!(expected_centered[2], result[2], 2.22221 as f32);
+        assert_approx_eq!(expected_centered[3], result[3], 3.33331 as f32);
+        assert_approx_eq!(expected_centered[4], result[4], 4.44441 as f32);
+        assert_approx_eq!(expected_centered[5], result[5], 5.55551 as f32);
     }
 
     #[test]
@@ -360,7 +365,7 @@ mod tests {
             "manitol dehydrogenase".to_string(),
             "alcohol dehydrogenase c-terminal".to_string(),
         ];
-        let expected = "alcohol dehydrogenase c terminal".to_string();
+        let expected = "dehydrogenase".to_string();
         let result = generate_human_readable_description(&hit_hrds).unwrap();
 
         assert_eq!(expected, result);

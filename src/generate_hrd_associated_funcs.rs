@@ -299,12 +299,12 @@ mod tests {
 
         // Note that we assume a universe of ten words:
         let mut freq_map: HashMap<String, f32> = HashMap::new();
-        freq_map.insert("a".to_string(), 0.3 as f32);
-        freq_map.insert("b".to_string(), 0.2 as f32);
-        freq_map.insert("c".to_string(), 0.2 as f32);
-        freq_map.insert("d".to_string(), 0.1 as f32);
-        freq_map.insert("e".to_string(), 0.1 as f32);
-        freq_map.insert("f".to_string(), 0.1 as f32);
+        freq_map.insert("a".to_string(), 3. as f32);
+        freq_map.insert("b".to_string(), 2. as f32);
+        freq_map.insert("c".to_string(), 2. as f32);
+        freq_map.insert("d".to_string(), 1. as f32);
+        freq_map.insert("e".to_string(), 1. as f32);
+        freq_map.insert("f".to_string(), 1. as f32);
 
         // All of the above phrases consist just of a single word, thus their phrase-scores should
         // be identical to the centered frequency of their word:

@@ -61,21 +61,21 @@ impl SeqFamily {
     /// * `queries: &HashMap<String, Query>` - A constant reference to the in memory database of
     /// `Query` instances. This is used to extract the `Hit.description`s from.
     pub fn annotate(&self, queries: &HashMap<String, Query>) -> String {
-        let mut candidate_descriptions: Vec<String> = vec![];
-        // Gather all candidate descriptions of all queries belonging to this sequence family. This
+        let mut hit_descriptions: Vec<String> = vec![];
+        // Gather all Hit descriptions of all queries belonging to this sequence family. This
         // means collecting all queries' hit-descriptions:
         for qid in self.query_ids.iter() {
             // If the searches found hits of significant similarity for the query sequence:
             if queries.contains_key(qid) {
                 for (_, hit) in &queries.get(qid).unwrap().hits {
-                    candidate_descriptions.push(hit.description.clone());
+                    hit_descriptions.push(hit.description.clone());
                 }
             }
         }
-        // Generate a human readable description, if any source candidate descriptions are
+        // Generate a human readable description, if any source Hit descriptions are
         // available, return the default "unkown family" otherwise:
-        if candidate_descriptions.len() > 0 {
-            let hrd = generate_human_readable_description(candidate_descriptions);
+        if hit_descriptions.len() > 0 {
+            let hrd = generate_human_readable_description(hit_descriptions);
             hrd
         } else {
             (*UNKNOWN_FAMILY_DESCRIPTION).to_string()

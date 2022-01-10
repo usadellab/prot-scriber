@@ -80,14 +80,9 @@ impl Query {
     ///
     /// * `&self` - A mutable reference to self, this instance of Query
     pub fn annotate(&self) -> String {
-        let mut candidate_descriptions = vec![];
-        let query_hit_map = &self.hits;
-        for hit in query_hit_map.values() {
-            candidate_descriptions.push(hit.description.to_owned());
-        }
-        if candidate_descriptions.len() > 0 {
-            let hrd = generate_human_readable_description(candidate_descriptions);
-            hrd
+        if self.hits.len() > 0 {
+            let hit_descriptions = self.hits.values().map(|h| h.description.clone()).collect();
+            generate_human_readable_description(hit_descriptions)
         } else {
             (*UNKNOWN_PROTEIN_DESCRIPTION).to_string()
         }
@@ -110,19 +105,19 @@ mod tests {
     #[test]
     fn query_add_hit_only_uses_higest_bitscore() {
         let high = Hit::new(
-            "Hit_One", "123.4",
+            "hit_One", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let low = Hit::new(
-            "Hit_One", "1.4",
+            "hit_One", "1.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let highest = Hit::new(
-            "Hit_One", "666.6",
+            "hit_One", "666.6",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let other = Hit::new(
-            "Hit_Two", "123.4",
+            "hit_Two", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
         let mut query = Query::from_qacc("Query_Curious".to_string());
@@ -130,14 +125,14 @@ mod tests {
         assert_eq!(query.hits.len(), 1);
         query.add_hit(&low);
         assert_eq!(query.hits.len(), 1);
-        assert_eq!(*query.hits.get("Hit_One").unwrap(), high);
+        assert_eq!(*query.hits.get("hit_One").unwrap(), high);
         query.add_hit(&other);
         assert_eq!(query.hits.len(), 2);
-        assert_eq!(*query.hits.get("Hit_One").unwrap(), high);
-        assert_eq!(*query.hits.get("Hit_Two").unwrap(), other);
+        assert_eq!(*query.hits.get("hit_One").unwrap(), high);
+        assert_eq!(*query.hits.get("hit_Two").unwrap(), other);
         query.add_hit(&highest);
         assert_eq!(query.hits.len(), 2);
-        assert_eq!(*query.hits.get("Hit_One").unwrap(), highest);
-        assert_eq!(*query.hits.get("Hit_Two").unwrap(), other);
+        assert_eq!(*query.hits.get("hit_One").unwrap(), highest);
+        assert_eq!(*query.hits.get("hit_Two").unwrap(), other);
     }
 }

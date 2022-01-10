@@ -37,13 +37,13 @@ mod tests {
     #[test]
     fn parse_hit_from_strs() {
         let h1 = Hit::new(
-            "Hit_One", "123.4", "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
+            "hit_One", "123.4", "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
             );
-        assert_eq!(h1.id, String::from("Hit_One"));
+        assert_eq!(h1.id, String::from("hit_One"));
         assert_eq!(h1.bitscore, F64(123.4));
         assert_eq!(
             h1.description,
-            "Probable LRR receptor-like serine/threonine-protein kinase At3g47570"
+            "lrr receptor serine/threonine-protein kinase at3g47570"
         );
     }
 }

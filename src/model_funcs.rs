@@ -30,7 +30,8 @@ pub fn filter_stitle(stitle: &str, regexs: &Vec<Regex>) -> String {
             .fold(stitle.to_string(), |accumulated, current| {
                 current.replace_all(&accumulated, "").to_string()
             })
-            .trim(),
+            .trim()
+            .to_lowercase(),
     )
 }
 
@@ -42,9 +43,10 @@ mod tests {
     #[test]
     fn default_filter_regexs_extract_uni_prot_descriptions() {
         let t1 = "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1";
+        println!("\n\n{}\n\n", t1);
         assert_eq!(
             filter_stitle(t1, &(*FILTER_REGEXS)),
-            "Probable LRR receptor-like serine/threonine-protein kinase At3g47570"
+            "lrr receptor serine/threonine-protein kinase at3g47570"
         );
     }
 

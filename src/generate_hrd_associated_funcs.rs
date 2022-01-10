@@ -1,5 +1,5 @@
+use super::default::BLACKLIST_DESCRIPTION_WORDS_REGEXS;
 use super::default::SPLIT_DESCRIPTION_REGEX;
-use super::default::UNINFORMATIVE_REGEXS;
 use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -8,12 +8,12 @@ use std::collections::HashSet;
 ///
 /// # Arguments
 ///
-/// * `Vec<String>` A vector of strings containing all candidate descriptions.
-pub fn generate_human_readable_description(candidate_hrds: Vec<String>) -> String {
+/// * `Vec<String>` A vector of strings containing all Hit descriptions.
+pub fn generate_human_readable_description(hit_hrds: Vec<String>) -> String {
     // Covert Vec<String> input into Vec<&str>
-    let candidate_hdr: Vec<&str> = candidate_hrds.iter().map(AsRef::as_ref).collect();
+    let hit_hdr: Vec<&str> = hit_hrds.iter().map(AsRef::as_ref).collect();
     // Build universe word-set
-    let universe = candidate_hdrs_word_universe(candidate_hdr.clone());
+    let universe = hit_hdrs_word_universe(hit_hdr.clone());
 
     // Filter words and create a vector non-informative words
     let uninformative_words = uninformative_words_vec(universe.clone());
@@ -30,18 +30,18 @@ pub fn generate_human_readable_description(candidate_hrds: Vec<String>) -> Strin
 
     // All possible phrases using the powerset function
     let mut phrases_universe = vec![];
-    for candidate in candidate_hdr.clone().iter() {
-        let word_candidate_vec = split_candidates_descripts(candidate);
-        let phrase = phrases(word_candidate_vec);
+    for hit in hit_hdr.clone().iter() {
+        let hit_desc_words = split_hits_descripts(hit);
+        let phrase = phrases(hit_desc_words);
         phrases_universe.push(phrase);
     }
 
-    // Hashset of phrases from all the candidates, a universe of all phrases
+    // Hashset of phrases from all the Hits, a universe of all phrases
     let mut phrases_universe_set: HashSet<Vec<&str>> = HashSet::new();
     for vec_ph in phrases_universe.iter() {
         for ph in vec_ph.iter() {
             // convert the phrases to a vector
-            phrases_universe_set.insert(split_candidates_descripts(ph));
+            phrases_universe_set.insert(split_hits_descripts(ph));
         }
     }
 
@@ -57,38 +57,35 @@ pub fn generate_human_readable_description(candidate_hrds: Vec<String>) -> Strin
     }
 }
 
-/// Given filtered candidate descriptions it splits each word and returns a universe of all descriptions.
+/// Given filtered Hit descriptions it splits each word and returns a universe of all descriptions.
 ///
 /// # Arguments
 ///
-/// * `Vec<&str>` vector of all candidate descriptions
-pub fn candidate_hdrs_word_universe(vec: Vec<&str>) -> Vec<&str> {
-    let mut splitted_candidates_universe = vec![];
-    for candidate in vec.into_iter() {
-        let mut split_candidate: Vec<&str> = (*SPLIT_DESCRIPTION_REGEX)
-            .split(&candidate)
-            .into_iter()
-            .collect();
-        splitted_candidates_universe.append(&mut split_candidate);
+/// * `Vec<&str>` vector of all Hit descriptions
+pub fn hit_hdrs_word_universe(vec: Vec<&str>) -> Vec<&str> {
+    let mut splitted_hits_universe = vec![];
+    for hit in vec.into_iter() {
+        let mut split_hit: Vec<&str> = (*SPLIT_DESCRIPTION_REGEX).split(&hit).into_iter().collect();
+        splitted_hits_universe.append(&mut split_hit);
     }
-    // splitted_candidates_universe.retain(|x| *x != "");
-    splitted_candidates_universe
+    // splitted_hits_universe.retain(|x| *x != "");
+    splitted_hits_universe
 }
 
-/// Given filtered candidate descriptions it splits each word and returns a vector.
+/// Given filtered Hit descriptions it splits each word and returns a vector.
 ///
 /// # Arguments
 ///
-/// * `String of a candidate HRD description` & `Vector containing Regex strings`
-pub fn split_candidates_descripts(candidate_words: &str) -> Vec<&str> {
+/// * `String of a Hit HRD description` & `Vector containing Regex strings`
+pub fn split_hits_descripts(hit_words: &str) -> Vec<&str> {
     let word_vec: Vec<&str> = (*SPLIT_DESCRIPTION_REGEX)
-        .split(candidate_words)
+        .split(hit_words)
         .into_iter()
         .collect();
     word_vec
 }
 
-/// Creates a HashMap containing individual candidate descriptions(keys) and if its informative (value : bool).
+/// Creates a HashMap containing individual Hit descriptions(keys) and if its informative (value : bool).
 /// The matches are converted by the if condition to match the logic. bool (True) is assigned to an informative word.
 ///
 /// # Arguments
@@ -109,7 +106,7 @@ pub fn word_classification_map(universe_hrd_words: Vec<&str>) -> HashMap<String,
     word_classif
 }
 
-/// Generates a vector of uninformative words from the universe of candidate hrd words
+/// Generates a vector of uninformative words from the universe of Hit hrd words
 ///
 /// Arguments
 ///
@@ -132,7 +129,7 @@ pub fn uninformative_words_vec(universe_hrd_words: Vec<&str>) -> Vec<String> {
 /// * `String` - word & `Vec<Regex>` - Vector of Regex strings
 pub fn matches_uninformative_list(word: &str) -> bool {
     //TODO: update unformative words in defaults.rs
-    (*UNINFORMATIVE_REGEXS)
+    (*BLACKLIST_DESCRIPTION_WORDS_REGEXS)
         .iter()
         .any(|x| x.is_match(&word.to_string()))
 }
@@ -160,14 +157,14 @@ pub fn powerset<T: Clone>(slice: &[T]) -> Vec<Vec<T>> {
     v
 }
 
-/// Given candidate descriptions gets all phrases from the candidate descriptions
+/// Given Hit descriptions gets all phrases from the Hit descriptions
 /// Gets all phrases using the powerset function`powerset`
 ///
 ///  # Arguments
 ///
-/// * `Vec<&str>`- Vector containing candidate descriptions as strings.
-pub fn phrases(candidate_vector_description: Vec<&str>) -> Vec<String> {
-    let all_phrases = powerset(&candidate_vector_description);
+/// * `Vec<&str>`- Vector containing Hit descriptions as strings.
+pub fn phrases(hit_vector_description: Vec<&str>) -> Vec<String> {
+    let all_phrases = powerset(&hit_vector_description);
     let mut return_vec = vec![];
     for vec in all_phrases {
         let vec_type_string: Vec<String> = vec.iter().map(|s| s.to_string()).collect(); // convert from Vec<&str> to Vec<String>
@@ -177,11 +174,11 @@ pub fn phrases(candidate_vector_description: Vec<&str>) -> Vec<String> {
     return_vec
 }
 
-/// Gets word frequencies of all candidate words
+/// Gets word frequencies of all Hit words
 ///
 /// # Arguments
 ///
-/// * `Vector<String>` - vector of strings containing all candidate HRDS.
+/// * `Vector<String>` - vector of strings containing all Hit HRDS.
 pub fn frequencies(vec: Vec<&str>) -> HashMap<&str, f32> {
     let mut freq_map: HashMap<&str, f32> = HashMap::new();
     let mut map: HashMap<String, i32> = HashMap::new();
@@ -334,8 +331,8 @@ mod tests {
 
     use super::*;
     #[test]
-    fn candidate_word_universe() {
-        let candidates_vector = vec![
+    fn hit_word_universe() {
+        let hits_vector = vec![
             "Alcohol dehydrogenase",
             "manitol dehydrogenase",
             "Cinnamyl alcohol-dehydrogenase",
@@ -361,12 +358,12 @@ mod tests {
             "c",
             "terminal",
         ];
-        assert_eq!(result, candidate_hdrs_word_universe(candidates_vector));
+        assert_eq!(result, hit_hdrs_word_universe(hits_vector));
     }
 
     #[test]
-    fn test_candidate_hdrs_word_universe() {
-        let candidate_hrds = vec![
+    fn test_hit_hdrs_word_universe() {
+        let hit_hrds = vec![
             "alcohol dehydrogenase",
             "manitol dehydrogenase",
             "cinnamyl alcohol-dehydrogenase",
@@ -396,18 +393,18 @@ mod tests {
             "c",
             "terminal",
         ];
-        assert_eq!(result, candidate_hdrs_word_universe(candidate_hrds));
+        assert_eq!(result, hit_hdrs_word_universe(hit_hrds));
     }
 
     #[test]
-    fn test_split_candidates_descripts() {
-        let candidate_words = "alcohol dehydrogenase c terminal";
+    fn test_split_hits_descripts() {
+        let hit_words = "alcohol dehydrogenase c terminal";
         let result = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-        assert_eq!(result, split_candidates_descripts(candidate_words));
+        assert_eq!(result, split_hits_descripts(hit_words));
     }
     #[test]
     fn test_match_uninformative_list() {
-        let word = "terminal";
+        let word = "protein";
         let another_word = "alcohol";
         assert_eq!(true, matches_uninformative_list(&word));
         assert_eq!(false, matches_uninformative_list(&another_word));
@@ -415,22 +412,22 @@ mod tests {
 
     #[test]
     fn test_word_classification_map() {
-        let candidate_words = vec!["alcohol", "dehydrogenase", "c", "terminal"];
+        let hit_words = vec!["alcohol", "dehydrogenase", "protein", "homolog"];
 
         let result = HashMap::from([
             ("alcohol".to_string(), true),
-            ("c".to_string(), false),
+            ("protein".to_string(), false),
             ("dehydrogenase".to_string(), true),
-            ("terminal".to_string(), false),
+            ("homolog".to_string(), false),
         ]);
-        assert_eq!(result, word_classification_map(candidate_words));
+        assert_eq!(result, word_classification_map(hit_words));
     }
 
     #[test]
     fn test_uninformative_words_vector() {
-        let candidate_words = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-        let result = vec!["c".to_string(), "terminal".to_string()];
-        assert_eq!(result, uninformative_words_vec(candidate_words));
+        let hit_words = vec!["alcohol", "dehydrogenase", "protein", "homolog"];
+        let result = vec!["protein".to_string(), "homolog".to_string()];
+        assert_eq!(result, uninformative_words_vec(hit_words));
     }
 
     #[test]
@@ -459,7 +456,7 @@ mod tests {
 
     #[test]
     fn test_phrases() {
-        let candidate_descript_vec = vec!["alcohol", "dehydrogenase", "c", "terminal"];
+        let hit_descript_vec = vec!["alcohol", "dehydrogenase", "c", "terminal"];
         let result = vec![
             "alcohol".to_string(),
             "dehydrogenase".to_string(),
@@ -477,7 +474,7 @@ mod tests {
             "dehydrogenase c terminal".to_string(),
             "alcohol dehydrogenase c terminal".to_string(),
         ];
-        assert_eq!(result, phrases(candidate_descript_vec));
+        assert_eq!(result, phrases(hit_descript_vec));
     }
 
     #[test]
@@ -589,7 +586,7 @@ mod tests {
 
     #[test]
     fn test_generate_human_readable_description() {
-        let candidate_hrds = vec![
+        let hit_hrds = vec![
             "manitol dehydrogenase".to_string(),
             "cinnamyl alcohol-dehydrogenase".to_string(),
             "geraniol dehydrogenase".to_string(),
@@ -597,8 +594,10 @@ mod tests {
             "manitol dehydrogenase".to_string(),
             "alcohol dehydrogenase c-terminal".to_string(),
         ];
-        let result = "dehydrogenase c terminal".to_string();
+        let expected = "dehydrogenase".to_string();
+        let result = generate_human_readable_description(hit_hrds);
+        println!("\n\n{}\n\n", result);
 
-        assert_eq!(result, generate_human_readable_description(candidate_hrds));
+        assert_eq!(expected, result);
     }
 }

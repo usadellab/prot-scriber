@@ -372,11 +372,11 @@ mod tests {
         let mut ap = AnnotationProcess::new();
         let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         let h1 = Hit::new(
-            "Hit_One", "123.4",
+            "hit_One", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         let h2 = Hit::new(
-            "Hit_Two", "123.4",
+            "hit_Two", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         nq1.add_hit(&h1);
@@ -388,11 +388,11 @@ mod tests {
         // New query, but for the same `qacc`, supposedly parsed from another Blast result table:
         let mut nq2 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         let h3 = Hit::new(
-            "Hit_Three", "123.4",
+            "hit_Three", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         let h4 = Hit::new(
-            "Hit_Four", "123.4",
+            "hit_Four", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         nq2.add_hit(&h3);
@@ -523,11 +523,11 @@ mod tests {
         let mut ap = AnnotationProcess::new();
         let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         let h1 = Hit::new(
-            "Hit_One", "123.4",
+            "hit_One", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         let h2 = Hit::new(
-            "Hit_Two", "123.4",
+            "hit_Two", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         nq1.add_hit(&h1);
@@ -635,7 +635,7 @@ mod tests {
             "Soltu.DM.09G022410.3".to_string(),
             "Soltu.DM.10G003150.1".to_string(),
             "Soltu.DM.S001650.1".to_string(),
-            "The_Protein_Without_Blast_Hits".to_string(),
+            "The_Protein_Without_Blast_hits".to_string(),
         ];
         ap.insert_seq_family(sf1_id.clone(), sf1);
         ap.insert_seq_family(sf2_id.clone(), sf2);

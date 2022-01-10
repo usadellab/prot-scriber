@@ -31,10 +31,11 @@ pub fn generate_human_readable_description(descriptions: &Vec<String>) -> String
     let phrases: Vec<Vec<String>> = phrases_set.into_iter().collect();
 
     // Score phrases using centered inverse information content
-    let phrases_score_map = centered_word_scores_phrases(word_frequencies, phrases);
+    let phrase_scores: Vec<f32> = score_phrases(&word_frequencies, &phrases);
 
     // Hrd description
-    let hrd_res = predicted_hrd(phrases_score_map);
+    let hrd_res = predicted_hrd(&phrases, &phrase_scores);
+
     match hrd_res {
         Ok(hrd_vec) => hrd_vec.join(" "),
         Err(()) => (*UNKNOWN_PROTEIN_DESCRIPTION).to_string(),
@@ -248,7 +249,7 @@ pub fn mean_inv_inf_cntn(
 ///
 /// * `word_frequencies`  An instance of dictionary of all words with their frequencies.
 /// * `phrases_universe_set` HashSet of Vectors containing all possible phrases (universe phrases)
-pub fn centered_word_scores_phrases(
+pub fn score_phrases(
     word_frequencies_map: &HashMap<String, f32>,
     phrases_universe_set: &Vec<Vec<String>>,
 ) -> Vec<f32> {
@@ -270,43 +271,41 @@ pub fn centered_word_scores_phrases(
 }
 
 /// Selects the highest scoring phrase from a map of phrases (keys) and overall scores (values)
-/// outputs vector of the highest scoring phrases and length.
+/// outputs vector of the highest scoring phrases and length. Returns the index (`Option<usize>`)
+/// of the best performing argument phrase (`phrases`).
 ///
 /// # Arguments
 ///
-/// * `HashMap<Vec<&str>, f32> `, map of scored phrases
-pub fn predicted_hrd(phrases_score_map: HashMap<Vec<&str>, f32>) -> Result<Vec<String>, ()> {
-    if phrases_score_map.len() > 0 {
-        let phrases_score_values = phrases_score_map.values();
-        let mut phrases_score_vec = vec![];
-        for i in phrases_score_values {
-            phrases_score_vec.push(i)
-        }
-
-        phrases_score_vec.sort_by(|a, b| b.partial_cmp(a).unwrap());
-
-        let phrases_high_score = phrases_score_vec[0].to_owned();
-        let mut highest_scored_phrases = vec![];
-        for (key, value) in phrases_score_map {
-            if value == phrases_high_score {
-                highest_scored_phrases.push(key);
+/// * `phrases: &Vec<Vec<String>>` - The phrases that have been scored and of which the best
+/// performing shall be selected and returned.
+/// * `phrase_scores: &Vec<f32>` - The scores of the phrases matching by their index (`usize`).
+pub fn find_best_scoring_phrase(
+    phrases: &Vec<Vec<String>>,
+    phrase_scores: &Vec<f32>,
+) -> Option<usize> {
+    if phrases.len() > 0 {
+        // get max score without changing the order of phrase_scores
+        phrase_scores.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        let max_score: f32 = phrase_scores[0];
+        // Vector of tuples (phrase index, phrase length):
+        let mut high_scoring_phrases_tuples: Vec<(usize, usize)> = vec![];
+        for (i, phr_scr) in phrase_scores.iter().enumerate() {
+            if (*phr_scr) == max_score {
+                (high_scoring_phrases_tuples.push(i),);
             }
         }
-        let mut length_of_h_s_p = vec![];
-        for phrase in highest_scored_phrases.clone() {
-            length_of_h_s_p.push(phrase.len())
+        if high_scoring_phrases_tuples.len() > 0 {
+            Some(0)
+        } else {
+            Some(
+                phrase_scores
+                    .iter()
+                    .position(|phr_scr| (*phr_scr) == max_score)
+                    .unwrap(),
+            )
         }
-
-        let mut hrd: Vec<String> = vec![];
-        let largest_phrase = length_of_h_s_p.iter().max().unwrap();
-        for phrase in highest_scored_phrases.clone() {
-            if phrase.len() == largest_phrase.to_owned() {
-                hrd = phrase.iter().map(|x| (*x).to_string()).collect();
-            }
-        }
-        Ok(hrd)
     } else {
-        Err(())
+        None
     }
 }
 
@@ -554,7 +553,7 @@ mod tests {
         result.insert(vec!["c"], 0.036636263 as f32);
         result.insert(vec!["b"], 0.036636263 as f32);
         result.insert(vec!["e"], -0.08114673 as f32);
-        assert_eq!(result, centered_word_scores_phrases(freq_map, word_set));
+        assert_eq!(result, score_phrases(freq_map, word_set));
     }
 
     #[test]

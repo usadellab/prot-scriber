@@ -28,6 +28,29 @@ impl Hit {
             description: filter_stitle(&stitle, &(*FILTER_REGEXS)),
         }
     }
+
+    /// Parses a line in the respective sequence similarity search result table. The line is already
+    /// split into cells (columns). Returns a new instance of `Hit`.
+    ///
+    /// # Arguments
+    ///
+    /// * `record_cols: &Vec<String>` - The record parsed from splitting the respective line
+    /// * `sacc_col_ind: &usize` - The index of argument `record_cols` where the `sacc` is stored.
+    /// * `bitscore_col_ind: &usize` - The index of argument `record_cols` where the `bitscore` is
+    ///                               stored.
+    /// * `stitle_col_ind: &usize` - The index of argument `record_cols` where the `stitle` is stored.
+    pub fn parse_hit(
+        record_cols: &Vec<String>,
+        sacc_col_ind: &usize,
+        bitscore_col_ind: &usize,
+        stitle_col_ind: &usize,
+    ) -> Hit {
+        Hit::new(
+            &record_cols[*sacc_col_ind],
+            &record_cols[*bitscore_col_ind],
+            &record_cols[*stitle_col_ind],
+        )
+    }
 }
 
 #[cfg(test)]
@@ -45,5 +68,25 @@ mod tests {
             h1.description,
             "lrr receptor serine/threonine-protein kinase at3g47570"
         );
+    }
+
+    #[test]
+    fn parses_hit_from_record_line() {
+        let record_cols = vec![
+            "Soltu.DM.02G015700.1".to_string(),
+            "sp|C0LGP4|Y3475_ARATH".to_string(),
+            "2209".to_string(),
+            "1284".to_string(),
+            "2199".to_string(),
+            "1010".to_string(),
+            "64".to_string(),
+            "998".to_string(),
+            "580".to_string(),
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1".to_string()
+        ];
+        let hit = Hit::parse_hit(&record_cols, &1, &8, &9);
+        let expected = Hit::new( "sp|C0LGP4|Y3475_ARATH", "580",
+            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1");
+        assert_eq!(hit, expected);
     }
 }

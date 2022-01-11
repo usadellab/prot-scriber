@@ -1,10 +1,12 @@
-use super::default::{SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
+use super::default::{BLACKLIST_STITLE_REGEXS, SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
+use super::hit::Hit;
+use super::model_funcs::matches_blacklist;
 use super::query::Query;
 use super::seq_family::SeqFamily;
-use super::seq_sim_table_reader::parse_table;
+use super::seq_sim_table_reader::parse_file;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::mpsc;
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::thread;
 
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
@@ -52,27 +54,31 @@ pub enum AnnotationProcessMode {
 ///
 /// * `mut annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
 pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
-    // Prepare:
-    let sssr_tables: Vec<String> = annotation_process
-        .seq_sim_search_tables
-        .iter()
-        .map(|x| x.clone())
-        .collect();
-    let (tx, rx) = mpsc::channel();
+    // "Do not communicate by sharing memory; instead, share memory by communicating." (Go language
+    // documentation):
+    let (tx, rx): (
+        SyncSender<(Option<Vec<String>>, Option<String>)>,
+        Receiver<(Option<Vec<String>>, Option<String>)>,
+    ) = sync_channel(0);
+
+    // The column index in which to find the `qacc` of sequence similarity search results:
+    let qacc_col = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap();
+    // The index of the column in which to find the `stitle`:
+    let stitle_col = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap();
+    // The index of the column in which to find the `bitscore`:
+    let bitscore_col = (*SEQ_SIM_TABLE_COLUMNS).get("bitscore").unwrap();
+    // The index of the column in which to find the `sacc`:
+    let sacc_col = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap();
 
     // Parse and process each sequence similarity search result table in a dedicated
     // thread:
-    for sss_tbl in sssr_tables {
+    for sss_tbl in annotation_process.seq_sim_search_tables.iter().cloned() {
         let tx_i = tx.clone();
 
         // Start this sss_tbl's dedicated threat:
         thread::spawn(move || {
-            parse_table(
-                sss_tbl,
-                *SSSR_TABLE_FIELD_SEPARATOR,
-                &(*SEQ_SIM_TABLE_COLUMNS),
-                tx_i,
-            );
+            parse_file(&sss_tbl, &(*SSSR_TABLE_FIELD_SEPARATOR), &qacc_col, tx_i);
+            println!("Parsed file '{}'", &sss_tbl);
         });
     }
     // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
@@ -81,9 +87,30 @@ pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
 
     // Process messages sent by the above threads. Note that this might trigger the annotation of
     // some queries or sequence families, if their data has been parsed completely:
-    for mut received_query in rx {
-        annotation_process.insert_query(&mut received_query);
+    for msg in rx {
+        let (row_cells_opt, parsed_query_id_opt) = msg;
+        // Process the parsed sequence similarity search result, a.k.a Blast Hit:
+        match row_cells_opt {
+            Some(row_cells) => annotation_process.process_seq_sim_search_result_row(
+                &row_cells,
+                &qacc_col,
+                &sacc_col,
+                &bitscore_col,
+                &stitle_col,
+            ),
+            None => {}
+        }
+        // If this message indicates that parsing the Blast Hits found for a Query has been
+        // finished successfully, act on this accordingly:
+        match parsed_query_id_opt {
+            Some(parsed_query_id) => {
+                annotation_process.mark_query_as_complete(&parsed_query_id);
+            }
+            None => {}
+        }
+        print!(".");
     }
+    println!("Yeah");
 
     // Make sure all queries or sequence families are annotated:
     annotation_process.process_rest_data();
@@ -96,6 +123,52 @@ impl AnnotationProcess {
     /// Creates an empty (`Default`) instance of struct AnnotationProcess.
     pub fn new() -> AnnotationProcess {
         Default::default()
+    }
+
+    pub fn process_seq_sim_search_result_row(
+        &mut self,
+        row_cells: &Vec<String>,
+        qacc_col: &usize,
+        sacc_col: &usize,
+        bitscore_col: &usize,
+        stitle_col: &usize,
+    ) {
+        let stitle = row_cells[*stitle_col].clone();
+        if !matches_blacklist(&stitle, &(*BLACKLIST_STITLE_REGEXS)) {
+            let qacc = row_cells[*qacc_col].clone();
+            // panic! if query.id already in results, this means the input SSSR files were not
+            // sorted by query identifiers (`qacc` in Blast terminology):
+            if self.human_readable_descriptions.contains_key(&qacc) {
+                panic!( "Found an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &qacc);
+            }
+            // Add the Query data, if not already parsed before:
+            if !self.queries.contains_key(&qacc) {
+                let q = Query::from_qacc(qacc.clone());
+                self.queries.insert(qacc.clone(), q);
+            }
+            // Add the current Blast Hit to the respective Query:
+            let query = self.queries.get_mut(&qacc).unwrap();
+            let hit = Hit::parse_hit(&row_cells, sacc_col, bitscore_col, stitle_col);
+            query.add_hit(&hit);
+        }
+    }
+
+    pub fn mark_query_as_complete(&mut self, query_id: &String) {
+        if self.queries.contains_key(query_id) {
+            let stored_query = self.queries.get_mut(query_id).unwrap();
+            stored_query.n_parsed_from_sssr_tables += 1;
+            // Have all input SSSR files provided data for the argument `query`?
+            if stored_query.n_parsed_from_sssr_tables == self.seq_sim_search_tables.len() as u16 {
+                let sqi = stored_query.id.clone();
+                // If yes, then process the parsed data:
+                self.process_query_data_complete(sqi);
+            }
+        } else {
+            eprintln!(
+                "ERROR: Query '{}' requested to be marked as complete, but could not find it in memory!",
+                query_id
+            );
+        }
     }
 
     /// Processes the sequence similarity search result (SSSR) data parsed for the argument

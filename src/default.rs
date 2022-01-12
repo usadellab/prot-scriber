@@ -62,10 +62,9 @@ lazy_static! {
     /// column names to their factual position in the to be parsed table.
     pub static ref SEQ_SIM_TABLE_COLUMNS: HashMap<String, usize> = {
         let mut h = HashMap::new();
-        // Default header is 'qacc sacc bitscore stitle'
+        // Default header is 'qacc sacc stitle'
         h.insert("qacc".to_string(), 0);
         h.insert("sacc".to_string(), 1);
-        h.insert("bitscore".to_string(), 8);
         h.insert("stitle".to_string(), 9);
         h
     };

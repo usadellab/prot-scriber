@@ -1,5 +1,5 @@
-use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
-use super::hit::*;
+use super::default::{BLACKLIST_STITLE_REGEXS, FILTER_REGEXS, UNKNOWN_PROTEIN_DESCRIPTION};
+use super::model_funcs::{filter_stitle, matches_blacklist};
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
 use std::collections::HashMap;
 
@@ -11,7 +11,8 @@ pub struct Query {
     /// The sequence identifier
     pub id: String,
     /// The sequence similarity search results (Blast Hits)
-    pub hits: HashMap<String, Hit>,
+    pub hit_ids: Vec<String>,
+    pub hit_descriptions: Vec<String>,
     /// A counter of how many times this query was parsed in sequence similarity search results
     pub n_parsed_from_sssr_tables: u16,
 }
@@ -22,7 +23,8 @@ impl Query {
     pub fn new() -> Query {
         Query {
             id: Default::default(),
-            hits: HashMap::<String, Hit>::new(),
+            hit_ids: Default::default(),
+            hit_descriptions: Default::default(),
             n_parsed_from_sssr_tables: 0,
         }
     }
@@ -37,7 +39,8 @@ impl Query {
     pub fn from_qacc(id: String) -> Query {
         Query {
             id,
-            hits: HashMap::<String, Hit>::new(),
+            hit_ids: Default::default(),
+            hit_descriptions: Default::default(),
             n_parsed_from_sssr_tables: 0,
         }
     }
@@ -50,26 +53,17 @@ impl Query {
     /// # Arguments
     ///
     /// * `&mut self` - mutable reference to self (the query)
-    /// * `hit` - a reference to the hit instance to be added
-    pub fn add_hit(&mut self, hit: &Hit) -> usize {
-        if !self.hits.contains_key(&hit.id)
-            || self.hits.get(&hit.id).unwrap().bitscore < hit.bitscore
+    /// * `hit_id` - A String representing the Hit identifier (`sacc` in Blast Hit terminology)
+    /// * `hit_description` - A String representing the Hit description (`stitle` in Blast Hit terminology).
+    pub fn add_hit(&mut self, hit_id: String, hit_description: String) {
+        if !self.hit_ids.contains(&hit_id)
+            && !matches_blacklist(&hit_description, &(*BLACKLIST_STITLE_REGEXS))
         {
-            self.hits.insert(hit.id.clone(), hit.clone());
-        }
-        self.hits.len()
-    }
-
-    /// Simple helper method that iteratively adds the Hit instances of argument `query` to
-    /// self.hits.
-    ///
-    /// # Arguments
-    ///
-    /// * `&mut self` - mutable reference to self (the query)
-    /// * `&query` - reference to a Query whose hits to add to self
-    pub fn add_hits(&mut self, query: &Query) {
-        for h in query.hits.values() {
-            self.add_hit(&h);
+            let filtered_hit_description = filter_stitle(&hit_description, &(*FILTER_REGEXS));
+            if !filtered_hit_description.is_empty() {
+                self.hit_ids.push(hit_id);
+                self.hit_descriptions.push(hit_description.to_lowercase());
+            }
         }
     }
 
@@ -81,9 +75,8 @@ impl Query {
     /// * `&self` - A mutable reference to self, this instance of Query
     pub fn annotate(&self) -> String {
         let mut hrd: String = (*UNKNOWN_PROTEIN_DESCRIPTION).to_string();
-        if self.hits.len() > 0 {
-            let hit_descriptions = self.hits.values().map(|h| h.description.clone()).collect();
-            let hrd_option = generate_human_readable_description(&hit_descriptions);
+        if self.hit_descriptions.len() > 0 {
+            let hrd_option = generate_human_readable_description(&self.hit_descriptions);
             match hrd_option {
                 Some(hum_read_desc) => hrd = hum_read_desc,
                 None => {}

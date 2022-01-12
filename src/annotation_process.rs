@@ -1,12 +1,9 @@
-use super::default::{BLACKLIST_STITLE_REGEXS, SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
-use super::hit::Hit;
-use super::model_funcs::matches_blacklist;
+use super::default::{SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
 use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_file;
-use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
@@ -42,87 +39,84 @@ pub enum AnnotationProcessMode {
     FamilyAnnotation,
 }
 
-/// The central function that runs an annotation process. Note that this is implemented as a
-/// "static" function (in Java terminology - apologies offered), because using a reference to an
-/// instance of `AnnotationProcess` would cause lifetime issues. This is, because a
-/// Arc<Mutex<AnnotationProcess>> is constructed and shared between threads. Thus this function
-/// that actually executes an instance of `AnnotationProcess` takes ownership of an argument
-/// `annotation_process`. Returns the results of running the Annotation-Process in the form of a
-/// `HashMap<String, String>`.
-///
-/// # Arguments
-///
-/// * `mut annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
-pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
-    // "Do not communicate by sharing memory; instead, share memory by communicating." (Go language
-    // documentation):
-    let (tx, rx): (
-        SyncSender<(Option<Vec<String>>, Option<String>)>,
-        Receiver<(Option<Vec<String>>, Option<String>)>,
-    ) = sync_channel(0);
-
-    // The column index in which to find the `qacc` of sequence similarity search results:
-    let qacc_col = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap();
-    // The index of the column in which to find the `stitle`:
-    let stitle_col = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap();
-    // The index of the column in which to find the `bitscore`:
-    let bitscore_col = (*SEQ_SIM_TABLE_COLUMNS).get("bitscore").unwrap();
-    // The index of the column in which to find the `sacc`:
-    let sacc_col = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap();
-
-    // Parse and process each sequence similarity search result table in a dedicated
-    // thread:
-    for sss_tbl in annotation_process.seq_sim_search_tables.iter().cloned() {
-        let tx_i = tx.clone();
-
-        // Start this sss_tbl's dedicated threat:
-        thread::spawn(move || {
-            parse_file(&sss_tbl, &(*SSSR_TABLE_FIELD_SEPARATOR), &qacc_col, tx_i);
-            println!("Parsed file '{}'", &sss_tbl);
-        });
-    }
-    // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
-    // otherwise the below receiver loop will wait forever for tx to send some messages.
-    drop(tx);
-
-    // Process messages sent by the above threads. Note that this might trigger the annotation of
-    // some queries or sequence families, if their data has been parsed completely:
-    for msg in rx {
-        let (row_cells_opt, parsed_query_id_opt) = msg;
-        // Process the parsed sequence similarity search result, a.k.a Blast Hit:
-        match row_cells_opt {
-            Some(row_cells) => annotation_process.process_seq_sim_search_result_row(
-                &row_cells,
-                &qacc_col,
-                &sacc_col,
-                &bitscore_col,
-                &stitle_col,
-            ),
-            None => {}
-        }
-        // If this message indicates that parsing the Blast Hits found for a Query has been
-        // finished successfully, act on this accordingly:
-        match parsed_query_id_opt {
-            Some(parsed_query_id) => {
-                annotation_process.mark_query_as_complete(&parsed_query_id);
-            }
-            None => {}
-        }
-        print!(".");
-    }
-    println!("Yeah");
-
-    // Make sure all queries or sequence families are annotated:
-    annotation_process.process_rest_data();
-
-    // Return modified version of input argument `annotation_process`:
-    annotation_process
-}
-
 impl AnnotationProcess {
     /// Creates an empty (`Default`) instance of struct AnnotationProcess.
     pub fn new() -> AnnotationProcess {
         Default::default()
+    }
+
+    /// The central function that runs an annotation process. Note that this is implemented as a
+    /// "static" function (in Java terminology - apologies offered), because using a reference to an
+    /// instance of `AnnotationProcess` would cause lifetime issues. This is, because a
+    /// Arc<Mutex<AnnotationProcess>> is constructed and shared between threads. Thus this function
+    /// that actually executes an instance of `AnnotationProcess` takes ownership of an argument
+    /// `annotation_process`. Returns the results of running the Annotation-Process in the form of a
+    /// `HashMap<String, String>`.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - The instance of `AnnotationProcess` to run.
+    pub fn run(&mut self) {
+        // "Do not communicate by sharing memory; instead, share memory by communicating." (Go language
+        // documentation):
+        let (tx, rx): (
+            Sender<(Option<Vec<String>>, Option<String>)>,
+            Receiver<(Option<Vec<String>>, Option<String>)>,
+        ) = channel();
+
+        // The column index in which to find the `qacc` of sequence similarity search results:
+        let qacc_col = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap();
+        // The index of the column in which to find the `stitle`:
+        let stitle_col = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap();
+        // The index of the column in which to find the `sacc`:
+        let sacc_col = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap();
+
+        // Parse and process each sequence similarity search result table in a dedicated
+        // thread:
+        for sss_tbl in self.seq_sim_search_tables.iter().cloned() {
+            let tx_i = tx.clone();
+
+            // Start this sss_tbl's dedicated threat:
+            thread::spawn(move || {
+                parse_file(&sss_tbl, &(*SSSR_TABLE_FIELD_SEPARATOR), &qacc_col, tx_i);
+                println!("Parsed file '{}'", &sss_tbl);
+            });
+        }
+        // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
+        // otherwise the below receiver loop will wait forever for tx to send some messages.
+        drop(tx);
+
+        // Process messages sent by the above threads. Note that this might trigger the annotation of
+        // some queries or sequence families, if their data has been parsed completely:
+        for msg in rx {
+            let (row_cells_opt, parsed_query_id_opt) = msg;
+            // Process the parsed sequence similarity search result, a.k.a Blast Hit:
+            match row_cells_opt {
+                Some(row_cells) => {
+                    self.process_seq_sim_search_result_row(
+                        &row_cells,
+                        &qacc_col,
+                        &sacc_col,
+                        &stitle_col,
+                    );
+                    print!("{}", self.queries.len());
+                }
+                None => {}
+            };
+            // If this message indicates that parsing the Blast Hits found for a Query has been
+            // finished successfully, act on this accordingly:
+            match parsed_query_id_opt {
+                Some(parsed_query_id) => {
+                    self.mark_query_as_complete(&parsed_query_id);
+                    print!(",");
+                }
+                None => {}
+            };
+        }
+        println!("Yeah");
+
+        // Make sure all queries or sequence families are annotated:
+        self.process_rest_data();
     }
 
     pub fn process_seq_sim_search_result_row(
@@ -130,27 +124,22 @@ impl AnnotationProcess {
         row_cells: &Vec<String>,
         qacc_col: &usize,
         sacc_col: &usize,
-        bitscore_col: &usize,
         stitle_col: &usize,
     ) {
-        let stitle = row_cells[*stitle_col].clone();
-        if !matches_blacklist(&stitle, &(*BLACKLIST_STITLE_REGEXS)) {
-            let qacc = row_cells[*qacc_col].clone();
-            // panic! if query.id already in results, this means the input SSSR files were not
-            // sorted by query identifiers (`qacc` in Blast terminology):
-            if self.human_readable_descriptions.contains_key(&qacc) {
-                panic!( "Found an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &qacc);
-            }
-            // Add the Query data, if not already parsed before:
-            if !self.queries.contains_key(&qacc) {
-                let q = Query::from_qacc(qacc.clone());
-                self.queries.insert(qacc.clone(), q);
-            }
-            // Add the current Blast Hit to the respective Query:
-            let query = self.queries.get_mut(&qacc).unwrap();
-            let hit = Hit::parse_hit(&row_cells, sacc_col, bitscore_col, stitle_col);
-            query.add_hit(&hit);
+        let qacc = row_cells[*qacc_col].clone();
+        // panic! if query.id already in results, this means the input SSSR files were not
+        // sorted by query identifiers (`qacc` in Blast terminology):
+        if self.human_readable_descriptions.contains_key(&qacc) {
+            panic!( "Found an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &qacc);
         }
+        // Add the Query data, if not already parsed before:
+        if !self.queries.contains_key(&qacc) {
+            let q = Query::from_qacc(qacc.clone());
+            self.queries.insert(qacc.clone(), q);
+        }
+        // Add the current Blast Hit to the respective Query:
+        let query = self.queries.get_mut(&qacc).unwrap();
+        query.add_hit(row_cells[*sacc_col].clone(), row_cells[*stitle_col].clone());
     }
 
     pub fn mark_query_as_complete(&mut self, query_id: &String) {
@@ -168,46 +157,6 @@ impl AnnotationProcess {
                 "ERROR: Query '{}' requested to be marked as complete, but could not find it in memory!",
                 query_id
             );
-        }
-    }
-
-    /// Processes the sequence similarity search result (SSSR) data parsed for the argument
-    /// `query`. Adds the data to existing one, of data already has been parsed for the argument
-    /// `query` from a different SSSR file or inserts the new data into the in-memory database
-    /// `self.queries`. If for the argument query all input SSSR tables
-    /// (`self.seq_sim_search_tables`) have produced data, this data will be processed by invoking
-    /// `self.process_query_data_complete`.
-    ///
-    /// # Arguments
-    ///
-    /// * `&mut self` - A mutable reference to the current instance of AnnotationProcess, which
-    ///                 serves as an in memory database into which to insert the parsed query.
-    /// * `query: &mut Query` - A reference to the query to be inserted into the in memory
-    ///                         database.
-    pub fn insert_query(&mut self, query: &mut Query) {
-        // panic! if query.id already in results, this means the input SSSR files were not sorted
-        // by query identifiers (`qacc` in Blast terminology):
-        if self.human_readable_descriptions.contains_key(&query.id) {
-            panic!( "Found an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &query.id);
-        }
-        let stored_query: &mut Query;
-        if self.queries.contains_key(&query.id) {
-            // Insert sequence similarity search results (SSSR) in the format of a Query, where this
-            // Query has been parsed from another input SSSR file before:
-            stored_query = self.queries.get_mut(&query.id).unwrap();
-            // Add the parsed results to the already existing data:
-            stored_query.add_hits(query);
-        } else {
-            // Insert new Query that has NOT been parsed from another input SSSR file before:
-            self.queries.insert(query.id.clone(), query.clone());
-            stored_query = self.queries.get_mut(&query.id).unwrap();
-        }
-        stored_query.n_parsed_from_sssr_tables += 1;
-        // Have all input SSSR files provided data for the argument `query`?
-        if stored_query.n_parsed_from_sssr_tables == self.seq_sim_search_tables.len() as u16 {
-            let sqi = stored_query.id.clone();
-            // If yes, then process the parsed data:
-            self.process_query_data_complete(sqi);
         }
     }
 
@@ -346,7 +295,7 @@ impl AnnotationProcess {
                     self.annotate_query(query_id);
                 }
             }
-        }
+        };
     }
 
     /// Invoked after all parsing of input sequence similarity search result (SSSR) files has
@@ -375,7 +324,7 @@ impl AnnotationProcess {
                     .keys()
                     .cloned()
                     .collect::<Vec<String>>()
-                    .par_iter()
+                    .iter()
                     .map(|query_id| {
                         let query = self.queries.get(query_id).unwrap();
                         let hrd = query.annotate();
@@ -392,7 +341,7 @@ impl AnnotationProcess {
                     .keys()
                     .cloned()
                     .collect::<Vec<String>>()
-                    .par_iter()
+                    .iter()
                     .map(|seq_fam_id| {
                         let seq_fam = self.seq_families.get(seq_fam_id).unwrap();
                         let hrd = seq_fam.annotate(&self.queries);
@@ -400,7 +349,7 @@ impl AnnotationProcess {
                     })
                     .collect();
             }
-        }
+        };
 
         // Free memory:
         self.queries = Default::default();
@@ -417,7 +366,6 @@ impl AnnotationProcess {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hit::Hit;
     use std::path::Path;
 
     #[test]
@@ -438,61 +386,6 @@ mod tests {
         ap.seq_families
             .insert("Family1".to_string(), SeqFamily::new());
         assert!(matches!(ap.mode(), AnnotationProcessMode::FamilyAnnotation));
-    }
-
-    #[test]
-    fn insert_query_works() {
-        let mut ap = AnnotationProcess::new();
-        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        let h1 = Hit::new(
-            "hit_One", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        let h2 = Hit::new(
-            "hit_Two", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        nq1.add_hit(&h1);
-        nq1.add_hit(&h2);
-        // Test insert_query
-        ap.insert_query(&mut nq1);
-        assert!(ap.queries.contains_key(&nq1.id));
-        assert_eq!(ap.queries.get(&nq1.id).unwrap().hits.len(), 2);
-        // New query, but for the same `qacc`, supposedly parsed from another Blast result table:
-        let mut nq2 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        let h3 = Hit::new(
-            "hit_Three", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        let h4 = Hit::new(
-            "hit_Four", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        nq2.add_hit(&h3);
-        nq2.add_hit(&h4);
-        // Test inserting the same `qacc` parsed from another input Blast result:
-        ap.insert_query(&mut nq2);
-        assert!(ap.queries.contains_key(&nq2.id));
-        assert_eq!(ap.queries.len(), 1);
-        // Assert that the hits from nq1 and nq2 were in fact joined in the stored query:
-        assert_eq!(ap.queries.get(&nq2.id).unwrap().hits.len(), 4);
-        let sq = ap.queries.get(&nq2.id).unwrap();
-        assert!(sq.hits.contains_key(&h1.id));
-        assert!(sq.hits.contains_key(&h2.id));
-        assert!(sq.hits.contains_key(&h3.id));
-        assert!(sq.hits.contains_key(&h4.id));
-    }
-
-    #[test]
-    #[should_panic]
-    fn insert_query_panics_in_case_of_unsorted_blast_table() {
-        let mut ap = AnnotationProcess::new();
-        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        // Mark nq1 as already processed:
-        ap.human_readable_descriptions
-            .insert(nq1.id.clone(), "Unknown protein".to_string());
-        // Should panic:
-        ap.insert_query(&mut nq1);
     }
 
     #[test]

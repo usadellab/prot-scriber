@@ -1,14 +1,13 @@
 #[macro_use]
 extern crate lazy_static;
 
-use annotation_process::{run, AnnotationProcess};
+use annotation_process::AnnotationProcess;
 use clap::{App, Arg};
 use seq_family_reader::parse_seq_families_file;
 
 mod annotation_process;
 mod default;
 mod generate_hrd_associated_funcs;
-mod hit;
 mod model_funcs;
 mod output_writer;
 mod playground;
@@ -78,7 +77,7 @@ fn main() {
         .collect();
 
     // Execute the Annotation-Process:
-    annotation_process = run(annotation_process);
+    annotation_process.run();
 
     // Save output:
     if let Some(o) = matches.value_of("output") {

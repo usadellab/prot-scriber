@@ -1,13 +1,8 @@
 //! Code used to parse sequence similarity search result tables is implemented in this module.
-use super::default::BLACKLIST_STITLE_REGEXS;
-use super::hit::*;
-use super::model_funcs::matches_blacklist;
-use super::query::*;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::sync::mpsc::SyncSender;
+use std::sync::mpsc::Sender;
 
 pub fn row_to_cells(row: &str, butt_splitter_of_doom: &char) -> Vec<String> {
     row.split(*butt_splitter_of_doom)
@@ -20,7 +15,7 @@ pub fn parse_file(
     path: &String,
     butt_splitter_of_doom: &char,
     qacc_col: &usize,
-    tx: SyncSender<(Option<Vec<String>>, Option<String>)>,
+    tx: Sender<(Option<Vec<String>>, Option<String>)>,
 ) {
     let file = File::open(path).unwrap();
     let mut reader = BufReader::new(file);

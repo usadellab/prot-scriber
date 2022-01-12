@@ -67,9 +67,7 @@ impl SeqFamily {
         for qid in self.query_ids.iter() {
             // If the searches found hits of significant similarity for the query sequence:
             if queries.contains_key(qid) {
-                for (_, hit) in &queries.get(qid).unwrap().hits {
-                    hit_descriptions.push(hit.description.clone());
-                }
+                hit_descriptions.extend(queries.get(qid).unwrap().hit_descriptions.clone());
             }
         }
         // Generate a human readable description, if any source Hit descriptions are

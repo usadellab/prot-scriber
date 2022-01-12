@@ -1,10 +1,10 @@
 use super::default::{SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
 use super::query::Query;
 use super::seq_family::SeqFamily;
-use super::seq_sim_table_reader::parse_file;
+use super::seq_sim_table_reader::row_to_cells;
 use std::collections::HashMap;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::thread;
+use std::fs::File;
+use std::io::{self, prelude::*, BufReader};
 
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
 /// human readable descriptions, i.e. the annotation of queries or sets of these (biological
@@ -45,6 +45,46 @@ impl AnnotationProcess {
         Default::default()
     }
 
+    pub fn parse_file(
+        &mut self,
+        path: &String,
+        butt_splitter_of_doom: &char,
+        qacc_col: &usize,
+        sacc_col: &usize,
+        stitle_col: &usize,
+    ) {
+        let file = File::open(path).unwrap();
+        let mut reader = BufReader::new(file);
+        let mut buf = String::new();
+        let mut curr_query_id = String::new();
+
+        loop {
+            match reader.read_line(&mut buf) {
+                Err(_) | Ok(0) => {
+                    // The file has been parsed, or an error occurred, mark the last query as parsed
+                    // completely:
+                    self.mark_query_as_complete(&curr_query_id);
+                    break;
+                }
+                Ok(_) => {
+                    let row_cells = row_to_cells(&buf, &butt_splitter_of_doom);
+                    self.process_seq_sim_search_result_row(
+                        &row_cells,
+                        &qacc_col,
+                        &sacc_col,
+                        &stitle_col,
+                    );
+                    // Check, whether the currently processed query has been parsed completely:
+                    if !curr_query_id.is_empty() && curr_query_id != row_cells[*qacc_col] {
+                        self.mark_query_as_complete(&curr_query_id);
+                    }
+                    curr_query_id = row_cells[*qacc_col].clone();
+                    buf.clear();
+                }
+            };
+        }
+    }
+
     /// The central function that runs an annotation process. Note that this is implemented as a
     /// "static" function (in Java terminology - apologies offered), because using a reference to an
     /// instance of `AnnotationProcess` would cause lifetime issues. This is, because a
@@ -57,13 +97,6 @@ impl AnnotationProcess {
     ///
     /// * `&mut self` - The instance of `AnnotationProcess` to run.
     pub fn run(&mut self) {
-        // "Do not communicate by sharing memory; instead, share memory by communicating." (Go language
-        // documentation):
-        let (tx, rx): (
-            Sender<(Option<Vec<String>>, Option<String>)>,
-            Receiver<(Option<Vec<String>>, Option<String>)>,
-        ) = channel();
-
         // The column index in which to find the `qacc` of sequence similarity search results:
         let qacc_col = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap();
         // The index of the column in which to find the `stitle`:
@@ -73,45 +106,21 @@ impl AnnotationProcess {
 
         // Parse and process each sequence similarity search result table in a dedicated
         // thread:
-        for sss_tbl in self.seq_sim_search_tables.iter().cloned() {
-            let tx_i = tx.clone();
-
+        for sss_tbl in self
+            .seq_sim_search_tables
+            .iter()
+            .map(|x| (*x).clone())
+            .collect::<Vec<String>>()
+        {
             // Start this sss_tbl's dedicated threat:
-            thread::spawn(move || {
-                parse_file(&sss_tbl, &(*SSSR_TABLE_FIELD_SEPARATOR), &qacc_col, tx_i);
-                println!("Parsed file '{}'", &sss_tbl);
-            });
-        }
-        // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
-        // otherwise the below receiver loop will wait forever for tx to send some messages.
-        drop(tx);
-
-        // Process messages sent by the above threads. Note that this might trigger the annotation of
-        // some queries or sequence families, if their data has been parsed completely:
-        for msg in rx {
-            let (row_cells_opt, parsed_query_id_opt) = msg;
-            // Process the parsed sequence similarity search result, a.k.a Blast Hit:
-            match row_cells_opt {
-                Some(row_cells) => {
-                    self.process_seq_sim_search_result_row(
-                        &row_cells,
-                        &qacc_col,
-                        &sacc_col,
-                        &stitle_col,
-                    );
-                    print!("{}", self.queries.len());
-                }
-                None => {}
-            };
-            // If this message indicates that parsing the Blast Hits found for a Query has been
-            // finished successfully, act on this accordingly:
-            match parsed_query_id_opt {
-                Some(parsed_query_id) => {
-                    self.mark_query_as_complete(&parsed_query_id);
-                    print!(",");
-                }
-                None => {}
-            };
+            self.parse_file(
+                &sss_tbl,
+                &(*SSSR_TABLE_FIELD_SEPARATOR),
+                &qacc_col,
+                &sacc_col,
+                &stitle_col,
+            );
+            println!("Parsed file '{}'", &sss_tbl);
         }
         println!("Yeah");
 

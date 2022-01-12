@@ -78,7 +78,7 @@ fn main() {
         .collect();
 
     // Execute the Annotation-Process:
-    annotation_process = run(annotation_process);
+    run(&mut annotation_process);
 
     // Save output:
     if let Some(o) = matches.value_of("output") {

@@ -2,9 +2,8 @@ use super::default::{SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
 use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
-use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
@@ -50,46 +49,28 @@ pub enum AnnotationProcessMode {
 ///
 /// # Arguments
 ///
-/// * `mut annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
-pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
+/// * `annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
+pub fn run(annotation_process: &mut AnnotationProcess) {
     // Prepare:
     let sssr_tables: Vec<String> = annotation_process
         .seq_sim_search_tables
         .iter()
         .map(|x| x.clone())
         .collect();
-    let (tx, rx) = mpsc::channel();
 
     // Parse and process each sequence similarity search result table in a dedicated
     // thread:
     for sss_tbl in sssr_tables {
-        let tx_i = tx.clone();
-
-        // Start this sss_tbl's dedicated threat:
-        thread::spawn(move || {
-            parse_table(
-                sss_tbl,
-                *SSSR_TABLE_FIELD_SEPARATOR,
-                &(*SEQ_SIM_TABLE_COLUMNS),
-                tx_i,
-            );
-        });
-    }
-    // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
-    // otherwise the below receiver loop will wait forever for tx to send some messages.
-    drop(tx);
-
-    // Process messages sent by the above threads. Note that this might trigger the annotation of
-    // some queries or sequence families, if their data has been parsed completely:
-    for mut received_query in rx {
-        annotation_process.insert_query(&mut received_query);
+        parse_table(
+            sss_tbl,
+            *SSSR_TABLE_FIELD_SEPARATOR,
+            &(*SEQ_SIM_TABLE_COLUMNS),
+            annotation_process,
+        );
     }
 
     // Make sure all queries or sequence families are annotated:
     annotation_process.process_rest_data();
-
-    // Return modified version of input argument `annotation_process`:
-    annotation_process
 }
 
 impl AnnotationProcess {
@@ -285,58 +266,31 @@ impl AnnotationProcess {
     /// * `&mut self` - A mutable reference to the current instance of AnnotationProcess, which
     ///                 serves as an in memory database into which to insert the parsed query.
     pub fn process_rest_data(&mut self) {
-        // Note that below `par_iter` is used to process the data _in parallel_. To make this work
-        // the parallel processes need to be independent and cannot write results of annotations
-        // (HRDs) into the current instance of AnnotationProcess without using something like an
-        // Mutex. Thus results are collected in terms of tuples containing the annotee identifier
-        // and the generated human readable description.
-        let mode = self.mode();
-        let hrd_tuples: Vec<(String, String)>;
-        match mode {
-            // Handle annotation of single biological sequences:
-            AnnotationProcessMode::SequenceAnnotation => {
-                // Process queries that might have gotten parsed results only from a subset of the input
-                // sequence similarity search result (SSSR) files:
-                hrd_tuples = self
-                    .queries
-                    .keys()
-                    .cloned()
-                    .collect::<Vec<String>>()
-                    .par_iter()
-                    .map(|query_id| {
-                        let query = self.queries.get(query_id).unwrap();
-                        let hrd = query.annotate();
-                        ((*query_id).to_string(), hrd)
-                    })
-                    .collect();
-            }
-            // Handle annotation of sets of biological sequences, so called "Gene Families":
-            AnnotationProcessMode::FamilyAnnotation => {
-                // Process seq families that might have queries that got no blast hits in some
-                // input blast tables:
-                hrd_tuples = self
-                    .seq_families
-                    .keys()
-                    .cloned()
-                    .collect::<Vec<String>>()
-                    .par_iter()
-                    .map(|seq_fam_id| {
-                        let seq_fam = self.seq_families.get(seq_fam_id).unwrap();
-                        let hrd = seq_fam.annotate(&self.queries);
-                        ((*seq_fam_id).to_string(), hrd)
-                    })
-                    .collect();
-            }
+        // Cannot get away without cloning the keys. Rust compiler complains about an immutable
+        // borrow and at the same time a mutable borrow of `self` in the call of
+        // process_rest_data or annotate_seq_family, respectively.
+
+        // Process seq families that might have queries that got no blast hits in any input blast
+        // table:
+        for seq_family_id in self
+            .seq_families
+            .iter()
+            .map(|(k, _v)| k.clone())
+            .collect::<Vec<String>>()
+            .iter()
+        {
+            self.annotate_seq_family(seq_family_id);
         }
-
-        // Free memory:
-        self.queries = Default::default();
-        self.seq_families = Default::default();
-        self.query_id_to_seq_family_id_index = Default::default();
-
-        // Set the human readable descriptions generated in parallel:
-        for i_tpl in hrd_tuples {
-            self.human_readable_descriptions.insert(i_tpl.0, i_tpl.1);
+        // Process queries that might have gotten parsed results only from a subset of the input
+        // sequence similarity search result (SSSR) files:
+        for query_id in self
+            .queries
+            .iter()
+            .map(|(k, _v)| k.clone())
+            .collect::<Vec<String>>()
+            .iter()
+        {
+            self.process_query_data_complete(query_id.to_string());
         }
     }
 }
@@ -372,11 +326,11 @@ mod tests {
         let mut ap = AnnotationProcess::new();
         let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         let h1 = Hit::new(
-            "hit_One", "123.4",
+            "Hit_One", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         let h2 = Hit::new(
-            "hit_Two", "123.4",
+            "Hit_Two", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         nq1.add_hit(&h1);
@@ -388,11 +342,11 @@ mod tests {
         // New query, but for the same `qacc`, supposedly parsed from another Blast result table:
         let mut nq2 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         let h3 = Hit::new(
-            "hit_Three", "123.4",
+            "Hit_Three", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         let h4 = Hit::new(
-            "hit_Four", "123.4",
+            "Hit_Four", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         nq2.add_hit(&h3);
@@ -523,11 +477,11 @@ mod tests {
         let mut ap = AnnotationProcess::new();
         let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         let h1 = Hit::new(
-            "hit_One", "123.4",
+            "Hit_One", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         let h2 = Hit::new(
-            "hit_Two", "123.4",
+            "Hit_Two", "100", "1", "50", "200", "51", "110", "123.4",
             "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
         );
         nq1.add_hit(&h1);
@@ -576,8 +530,7 @@ mod tests {
                 .unwrap()
                 .to_string(),
         );
-        ap = run(ap);
-        let hrds = ap.human_readable_descriptions;
+        let hrds = run(ap);
         assert!(hrds.len() > 0);
         let queries_with_expected_result = vec![
             "Soltu.DM.01G022510.1".to_string(),
@@ -635,12 +588,10 @@ mod tests {
             "Soltu.DM.09G022410.3".to_string(),
             "Soltu.DM.10G003150.1".to_string(),
             "Soltu.DM.S001650.1".to_string(),
-            "The_Protein_Without_Blast_hits".to_string(),
         ];
         ap.insert_seq_family(sf1_id.clone(), sf1);
         ap.insert_seq_family(sf2_id.clone(), sf2);
-        ap = run(ap);
-        let hrds = ap.human_readable_descriptions;
+        let hrds = run(ap);
         assert_eq!(hrds.len(), 2);
         let queries_with_expected_result = vec![sf1_id, sf2_id];
         for qid in queries_with_expected_result {

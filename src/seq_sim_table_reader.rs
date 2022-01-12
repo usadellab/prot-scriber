@@ -1,4 +1,5 @@
 //! Code used to parse sequence similarity search result tables is implemented in this module.
+use super::annotation_process::AnnotationProcess;
 use super::default::BLACKLIST_STITLE_REGEXS;
 use super::hit::*;
 use super::model_funcs::matches_blacklist;
@@ -7,7 +8,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::sync::mpsc::Sender;
 
 /// Finds a tabular file (`path`) and parses it in a stream approach, i.e. line by line. Every time
 /// an instance of Query is successfully and completely pares it is send using the argument
@@ -24,7 +24,7 @@ pub fn parse_table(
     path: String,
     separator: char,
     table_cols: &HashMap<String, usize>,
-    transmitter: Sender<Query>,
+    annotation_process: &mut AnnotationProcess,
 ) {
     // Open stream to the sequence similarity search result table:
     let file = File::open(path).unwrap();
@@ -58,7 +58,7 @@ pub fn parse_table(
                     if curr_query.id != String::new() {
                         // Inform about an instance of `Query` being successfully and completely
                         // parsed:
-                        transmitter.send(curr_query).unwrap();
+                        annotation_process.insert_query(&mut curr_query);
                     }
                     // Prepare gathering of results for the next query:
                     curr_query = Query::from_qacc(qacc_i.to_string());
@@ -82,7 +82,7 @@ pub fn parse_table(
 
     // Inform about the last instance of `Query` being successfully and completely
     // parsed:
-    transmitter.send(curr_query).unwrap();
+    annotation_process.insert_query(&mut curr_query);
 }
 
 /// Parses a line in the respective sequence similarity search result table. The line is already

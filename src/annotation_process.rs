@@ -40,62 +40,55 @@ pub enum AnnotationProcessMode {
     FamilyAnnotation,
 }
 
-/// The central function that runs an annotation process. Note that this is implemented as a
-/// "static" function (in Java terminology - apologies offered), because using a reference to an
-/// instance of `AnnotationProcess` would cause lifetime issues. This is, because a
-/// Arc<Mutex<AnnotationProcess>> is constructed and shared between threads. Thus this function
-/// that actually executes an instance of `AnnotationProcess` takes ownership of an argument
-/// `annotation_process`. Returns the results of running the Annotation-Process in the form of a
-/// `HashMap<String, String>`.
-///
-/// # Arguments
-///
-/// * `mut annotation_process: AnnotationProcess` - The instance of `AnnotationProcess` to run.
-pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
-    // Prepare:
-    let sssr_tables: Vec<String> = annotation_process
-        .seq_sim_search_tables
-        .iter()
-        .map(|x| x.clone())
-        .collect();
-    let (tx, rx) = mpsc::channel();
-
-    // Parse and process each sequence similarity search result table in a dedicated
-    // thread:
-    for sss_tbl in sssr_tables {
-        let tx_i = tx.clone();
-
-        // Start this sss_tbl's dedicated threat:
-        thread::spawn(move || {
-            parse_table(
-                sss_tbl,
-                *SSSR_TABLE_FIELD_SEPARATOR,
-                &(*SEQ_SIM_TABLE_COLUMNS),
-                tx_i,
-            );
-        });
-    }
-    // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
-    // otherwise the below receiver loop will wait forever for tx to send some messages.
-    drop(tx);
-
-    // Process messages sent by the above threads. Note that this might trigger the annotation of
-    // some queries or sequence families, if their data has been parsed completely:
-    for mut received_query in rx {
-        annotation_process.insert_query(&mut received_query);
-    }
-
-    // Make sure all queries or sequence families are annotated:
-    annotation_process.process_rest_data();
-
-    // Return modified version of input argument `annotation_process`:
-    annotation_process
-}
-
 impl AnnotationProcess {
     /// Creates an empty (`Default`) instance of struct AnnotationProcess.
     pub fn new() -> AnnotationProcess {
         Default::default()
+    }
+
+    /// The central function that runs an annotation process. Note that this is implemented as a
+    /// "static" function (in Java terminology - apologies offered), because using a reference to an
+    /// instance of `AnnotationProcess` would cause lifetime issues. This is, because a
+    /// Arc<Mutex<AnnotationProcess>> is constructed and shared between threads. Thus this function
+    /// that actually executes an instance of `AnnotationProcess` takes ownership of an argument
+    /// `annotation_process`. Returns the results of running the Annotation-Process in the form of a
+    /// `HashMap<String, String>`.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - The instance of `AnnotationProcess` to run.
+    pub fn run(&mut self) {
+        // Setup communication between threads:
+        let (tx, rx) = mpsc::channel();
+
+        // Sequence Similarity Search (Blast) Result column indices:
+        // let qacc_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap();
+        // let sacc_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap();
+        // let stitle_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap();
+
+        // Parse and process each sequence similarity search result table in a dedicated
+        // thread:
+        for sss_tbl in self.seq_sim_search_tables.iter().map(|x| x.clone()) {
+            let tx_i = tx.clone();
+
+            // Start this sss_tbl's dedicated threat:
+            thread::spawn(move || {
+                parse_table(sss_tbl, tx_i);
+            });
+        }
+        // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
+        // otherwise the below receiver loop will wait forever for tx to send some messages.
+        drop(tx);
+
+        // Process messages sent by the above threads. Note that this might trigger the annotation of
+        // some queries or sequence families, if their data has been parsed completely:
+        for (qacc, query) in rx {
+            self.insert_query(qacc, query);
+        }
+
+        // Make sure all queries or sequence families are annotated:
+        println!("\n\n\n************process_rest_data starts NOW*************\n\n\n");
+        self.process_rest_data();
     }
 
     /// Processes the sequence similarity search result (SSSR) data parsed for the argument
@@ -109,32 +102,25 @@ impl AnnotationProcess {
     ///
     /// * `&mut self` - A mutable reference to the current instance of AnnotationProcess, which
     ///                 serves as an in memory database into which to insert the parsed query.
-    /// * `query: &mut Query` - A reference to the query to be inserted into the in memory
-    ///                         database.
-    pub fn insert_query(&mut self, query: &mut Query) {
+    /// * `qacc: String` - The identifier of the argument query, i.e. the to be key in
+    ///                    self.queries.
+    /// * `query: Query` - A reference to the query to be inserted into the in memory database.
+    pub fn insert_query(&mut self, qacc: String, query: Query) {
         // panic! if query.id already in results, this means the input SSSR files were not sorted
         // by query identifiers (`qacc` in Blast terminology):
-        if self.human_readable_descriptions.contains_key(&query.id) {
-            panic!( "Found an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &query.id);
+        if self.human_readable_descriptions.contains_key(&qacc) {
+            panic!( "Found an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &qacc);
         }
-        let stored_query: &mut Query;
-        if self.queries.contains_key(&query.id) {
-            // Insert sequence similarity search results (SSSR) in the format of a Query, where this
-            // Query has been parsed from another input SSSR file before:
-            stored_query = self.queries.get_mut(&query.id).unwrap();
-            // Add the parsed results to the already existing data:
-            stored_query.add_hits(query);
-        } else {
-            // Insert new Query that has NOT been parsed from another input SSSR file before:
-            self.queries.insert(query.id.clone(), query.clone());
-            stored_query = self.queries.get_mut(&query.id).unwrap();
+        if !self.queries.contains_key(&qacc) {
+            self.queries.insert(qacc.clone(), query);
         }
+        let mut stored_query = self.queries.get_mut(&qacc).unwrap();
         stored_query.n_parsed_from_sssr_tables += 1;
         // Have all input SSSR files provided data for the argument `query`?
         if stored_query.n_parsed_from_sssr_tables == self.seq_sim_search_tables.len() as u16 {
-            let sqi = stored_query.id.clone();
+            drop(stored_query);
             // If yes, then process the parsed data:
-            self.process_query_data_complete(sqi);
+            self.process_query_data_complete(qacc);
         }
     }
 
@@ -344,7 +330,6 @@ impl AnnotationProcess {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hit::Hit;
     use std::path::Path;
 
     #[test]

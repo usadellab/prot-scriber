@@ -7,10 +7,10 @@ use regex::Regex;
 ///
 /// # Arguments
 ///
-/// * stitle - The sequence title string
-/// * regexs - A vector of regular expression to be applied to the stitle argument.
-pub fn matches_blacklist(stitle: &str, regexs: &Vec<Regex>) -> bool {
-    regexs.iter().any(|x| x.is_match(&stitle.to_string()))
+/// * testee - The text to be tested for any matching argument regular expression (`regexs`)
+/// * regexs - A vector of regular expression to be applied to the testee argument.
+pub fn matches_blacklist(testee: &str, regexs: &Vec<Regex>) -> bool {
+    regexs.iter().any(|x| x.is_match(&testee.to_string()))
 }
 
 /// Fasta entries have a long title in which the sequence identifier and often taxonomic

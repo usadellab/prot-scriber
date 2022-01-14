@@ -4,6 +4,9 @@ use std::collections::HashMap;
 
 lazy_static! {
 
+    /// The score assigned to non informative words:
+    pub static ref NON_INFORMATIVE_WORD_SCORE : f32 = 0.000000001;
+
     /// The default Blacklist of regular expressions used to check for non-informative words
     /// in the description to be excluded from scoring. If ANY of these expression matches
     /// the word is considered as non-informative
@@ -21,15 +24,15 @@ lazy_static! {
     /// if they match ANY of these expressions.
     pub static ref BLACKLIST_STITLE_REGEXS: Vec<Regex> = vec![
         Regex::new(r"(?i)^similar\s+to").unwrap(),
-        Regex::new(r"(?i)^probable ").unwrap(),
-        Regex::new(r"(?i)^putative ").unwrap(),
-        Regex::new(r"(?i)^predicted ").unwrap(),
-        Regex::new(r"(?i)^uncharacterized").unwrap(),
-        Regex::new(r"(?i)^unknown").unwrap(),
-        Regex::new(r"(?i)^hypothetical").unwrap(),
-        Regex::new(r"(?i)^unnamed").unwrap(),
-        Regex::new(r"(?i)^whole\s+genome\s+shotgun\s+sequence").unwrap(),
-        Regex::new(r"(?i)^clone").unwrap(),
+        Regex::new(r"(?i)^probable\b").unwrap(),
+        Regex::new(r"(?i)^putative\b").unwrap(),
+        Regex::new(r"(?i)^predicted\b").unwrap(),
+        Regex::new(r"(?i)^uncharacterized\b").unwrap(),
+        Regex::new(r"(?i)^unknown\b").unwrap(),
+        Regex::new(r"(?i)^hypothetical\b").unwrap(),
+        Regex::new(r"(?i)^unnamed\b").unwrap(),
+        Regex::new(r"(?i)^whole\s+genome\s+shotgun\s+sequence\b").unwrap(),
+        Regex::new(r"(?i)^clone\b").unwrap(),
     ];
 
     /// The default regular expressions used to filter a Hit title (`stitle`) and retain the short
@@ -65,13 +68,13 @@ lazy_static! {
         // Default header is 'qacc sacc bitscore stitle'
         h.insert("qacc".to_string(), 0);
         h.insert("sacc".to_string(), 1);
-        h.insert("bitscore".to_string(), 8);
         h.insert("stitle".to_string(), 9);
         h
     };
 
     /// A Hit's description is split into words using this default regular expression.
-    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([-/|/\\;,':().\s+]+)").unwrap();
+    //pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([-/|/\\;,':().\s+]+)").unwrap();
+    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r" ").unwrap();
 
     /// Default sequence similarity search result table field separator:
     pub static ref SSSR_TABLE_FIELD_SEPARATOR: char = '\t';

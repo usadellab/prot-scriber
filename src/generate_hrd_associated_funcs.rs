@@ -1,21 +1,32 @@
 use super::default::{
-    BLACKLIST_DESCRIPTION_WORDS_REGEXS, NON_INFORMATIVE_WORD_SCORE, SPLIT_DESCRIPTION_REGEX,
+    BLACKLIST_DESCRIPTION_WORDS_REGEXS, DESCRIPTION_REGEX_GSUB_TUPLES,
+    FILTERED_DESCRIPTION_SPLIT_REGEX, NON_INFORMATIVE_WORD_SCORE,
 };
 use super::model_funcs::matches_blacklist;
+use regex::Regex;
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 /// Main function for generating human-readable descriptions (hrds).
 ///
 /// # Arguments
 ///
 /// * `hit_hrds: &Vec<String>` - A vector of strings containing all Hit descriptions.
-pub fn generate_human_readable_description(descriptions: &Vec<String>) -> Option<String> {
+pub fn generate_human_readable_description(
+    descriptions: &Vec<String>,
+    split_regexs_gsub_tuples: &Vec<(Regex, String)>,
+    filtered_description_split_regex: &Regex,
+) -> Option<String> {
     if descriptions.len() > 0 {
         // Split the descriptions into vectors of words:
         let description_words: Vec<Vec<String>> = descriptions
             .iter()
-            .map(|dsc| split_descriptions(dsc))
+            .map(|dsc| {
+                split_descriptions(
+                    dsc,
+                    split_regexs_gsub_tuples,
+                    filtered_description_split_regex,
+                )
+            })
             .collect();
         // println!("\n description_words.len() = {}\n", description_words.len());
 
@@ -132,10 +143,18 @@ pub fn highest_scoring_phrase(
 /// # Arguments
 ///
 /// * `String of a Hit HRD description` & `Vector containing Regex strings`
-pub fn split_descriptions(description: &String) -> Vec<String> {
-    (*SPLIT_DESCRIPTION_REGEX)
-        .split(description)
-        .map(|x| (*x).to_string())
+pub fn split_descriptions(
+    description: &String,
+    regexs_gsub_tuples: &Vec<(Regex, String)>,
+    split_regex: &Regex,
+) -> Vec<String> {
+    let mut filtered_desc = description.clone();
+    for (regex_i, replacer_i) in regexs_gsub_tuples {
+        filtered_desc = regex_i.replace_all(&filtered_desc, replacer_i).to_string();
+    }
+    split_regex
+        .split(&filtered_desc)
+        .map(|wrd| wrd.to_string())
         .collect()
 }
 
@@ -208,14 +227,20 @@ pub fn centered_inverse_information_content(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_approx_eq::assert_approx_eq;
     use std::vec;
 
     #[test]
     fn test_split_hits_descripts() {
         let hit_words = "alcohol dehydrogenase c terminal".to_string();
         let result = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-        assert_eq!(result, split_descriptions(&hit_words));
+        assert_eq!(
+            result,
+            split_descriptions(
+                &hit_words,
+                &(*DESCRIPTION_REGEX_GSUB_TUPLES),
+                &(*FILTERED_DESCRIPTION_SPLIT_REGEX)
+            )
+        );
     }
 
     #[test]
@@ -247,7 +272,7 @@ mod tests {
 
         let freq_sum: f32 = freq_map.values().into_iter().sum();
 
-        let expected: HashMap<String, f32> = HashMap::new();
+        let mut expected: HashMap<String, f32> = HashMap::new();
         expected.insert(
             "a".to_string(),
             -1. * f32::log(1. - 3. / freq_sum, std::f32::consts::E),
@@ -302,8 +327,13 @@ mod tests {
             "manitol dehydrogenase".to_string(),
             "alcohol dehydrogenase c-terminal".to_string(),
         ];
-        let expected = "dehydrogenase".to_string();
-        let result = generate_human_readable_description(&hit_hrds).unwrap();
+        let mut expected = "dehydrogenase".to_string();
+        let result = generate_human_readable_description(
+            &hit_hrds,
+            &(*DESCRIPTION_REGEX_GSUB_TUPLES),
+            &(*FILTERED_DESCRIPTION_SPLIT_REGEX),
+        )
+        .unwrap();
 
         assert_eq!(expected, result);
     }

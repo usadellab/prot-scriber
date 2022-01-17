@@ -1,4 +1,7 @@
-use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
+use super::default::{
+    BLACKLIST_DESCRIPTION_WORDS_REGEXS, DESCRIPTION_REGEX_GSUB_TUPLES,
+    FILTERED_DESCRIPTION_SPLIT_REGEX, NON_INFORMATIVE_WORD_SCORE, UNKNOWN_PROTEIN_DESCRIPTION,
+};
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
 use std::collections::HashMap;
 
@@ -35,7 +38,11 @@ impl Query {
                 .values()
                 .map(|hit_desc| (*hit_desc).clone())
                 .collect();
-            let hrd_option = generate_human_readable_description(&hit_descriptions);
+            let hrd_option = generate_human_readable_description(
+                &hit_descriptions,
+                &(*DESCRIPTION_REGEX_GSUB_TUPLES),
+                &(*FILTERED_DESCRIPTION_SPLIT_REGEX),
+            );
             match hrd_option {
                 Some(hum_read_desc) => {
                     hrd = hum_read_desc;

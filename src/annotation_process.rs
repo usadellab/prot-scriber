@@ -355,56 +355,38 @@ mod tests {
     #[test]
     fn insert_query_works() {
         let mut ap = AnnotationProcess::new();
-        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        let h1 = Hit::new(
-            "hit_One", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        let h2 = Hit::new(
-            "hit_Two", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        nq1.add_hit(&h1);
-        nq1.add_hit(&h2);
+        // let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        let mut nq1 = Query::new();
+        let h1 = ("hit_One","sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1");
+        let h2 = ("hit_Two","sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1");
+        nq1.hits.insert(h1.0.to_string(), h1.1.to_string());
+        nq1.hits.insert(h2.0.to_string(), h2.1.to_string());
         // Test insert_query
-        ap.insert_query(&mut nq1);
-        assert!(ap.queries.contains_key(&nq1.id));
-        assert_eq!(ap.queries.get(&nq1.id).unwrap().hits.len(), 2);
-        // New query, but for the same `qacc`, supposedly parsed from another Blast result table:
-        let mut nq2 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        let h3 = Hit::new(
-            "hit_Three", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        let h4 = Hit::new(
-            "hit_Four", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        nq2.add_hit(&h3);
-        nq2.add_hit(&h4);
-        // Test inserting the same `qacc` parsed from another input Blast result:
-        ap.insert_query(&mut nq2);
-        assert!(ap.queries.contains_key(&nq2.id));
-        assert_eq!(ap.queries.len(), 1);
-        // Assert that the hits from nq1 and nq2 were in fact joined in the stored query:
-        assert_eq!(ap.queries.get(&nq2.id).unwrap().hits.len(), 4);
-        let sq = ap.queries.get(&nq2.id).unwrap();
-        assert!(sq.hits.contains_key(&h1.id));
-        assert!(sq.hits.contains_key(&h2.id));
-        assert!(sq.hits.contains_key(&h3.id));
-        assert!(sq.hits.contains_key(&h4.id));
+        let qacc = "Soltu.DM.02G015700.1".to_string(); 
+        ap.insert_query(qacc.clone(), nq1);
+
+        // check if query got inserted correctly
+        assert!(ap.queries.contains_key(&qacc));
+        assert_eq!(ap.queries.get(&qacc).unwrap().hits.len(), 2);
+
+        // check if the hits for the query are present
+        let sq = ap.queries.get(&qacc).unwrap();
+        assert!(sq.hits.contains_key(h1.0));
+        assert!(sq.hits.contains_key(h2.0));
     }
 
     #[test]
     #[should_panic]
     fn insert_query_panics_in_case_of_unsorted_blast_table() {
         let mut ap = AnnotationProcess::new();
-        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        let nq1 = Query::new();
+        let qacc = "Soltu.DM.02G015700.1".to_string(); 
+
         // Mark nq1 as already processed:
         ap.human_readable_descriptions
-            .insert(nq1.id.clone(), "Unknown protein".to_string());
+            .insert(qacc.clone(), "Unknown protein".to_string());
         // Should panic:
-        ap.insert_query(&mut nq1);
+        ap.insert_query(qacc, nq1);
     }
 
     #[test]
@@ -481,11 +463,13 @@ mod tests {
         // Test queries:
         let mut ap = AnnotationProcess::new();
         ap.seq_sim_search_tables = vec!["blast_out_table.txt".to_string()];
-        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        ap.insert_query(&mut nq1);
+        // let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+        let mut nq1 = Query::new();
+        let qacc = "Soltu.DM.02G015700.1".to_string(); 
+        ap.insert_query(qacc.clone(),nq1);
         // Query should have been annotated:
-        assert!(ap.human_readable_descriptions.contains_key(&nq1.id));
-        assert!(!ap.queries.contains_key(&nq1.id));
+        assert!(ap.human_readable_descriptions.contains_key(&qacc));
+        assert!(!ap.queries.contains_key(&qacc));
         // Test families:
         ap = AnnotationProcess::new();
         ap.seq_sim_search_tables = vec!["blast_out_table.txt".to_string()];
@@ -493,43 +477,41 @@ mod tests {
         sf1.query_ids = vec!["Soltu.DM.02G015700.1".to_string()];
         let sf_id1 = "SeqFamily1".to_string();
         ap.insert_seq_family(sf_id1.clone(), sf1);
-        nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        ap.insert_query(&mut nq1);
+        nq1 = Query::new();
+        ap.insert_query(qacc.clone(), nq1);
         // Family should have been annotated:
         assert!(ap.human_readable_descriptions.contains_key(&sf_id1));
-        assert!(!ap.queries.contains_key(&nq1.id));
+        assert!(!ap.queries.contains_key(&qacc));
         assert!(!ap.seq_families.contains_key(&sf_id1));
-        assert!(!ap.query_id_to_seq_family_id_index.contains_key(&nq1.id));
+        assert!(!ap.query_id_to_seq_family_id_index.contains_key(&qacc));
     }
 
     #[test]
     fn process_rest_data_works() {
         // Test Queries:
         let mut ap = AnnotationProcess::new();
-        let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        let h1 = Hit::new(
-            "hit_One", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        let h2 = Hit::new(
-            "hit_Two", "123.4",
-            "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1"
-        );
-        nq1.add_hit(&h1);
-        nq1.add_hit(&h2);
-        ap.insert_query(&mut nq1);
+        // let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
+
+        let mut nq1 = Query::new();
+        let qacc = "Soltu.DM.02G015700.1".to_string();
+        let h1 = ("hit_One","sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1");
+        let h2 = ("hit_Two","sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1");
+        nq1.hits.insert(h1.0.to_string(), h1.1.to_string());
+        nq1.hits.insert(h1.0.to_string(), h1.1.to_string());
+
+        ap.insert_query(qacc.clone(),nq1);
         ap.process_rest_data();
         // Query should have been annotated:
-        assert!(ap.human_readable_descriptions.contains_key(&nq1.id));
-        assert!(!ap.queries.contains_key(&nq1.id));
+        assert!(ap.human_readable_descriptions.contains_key(&qacc));
+        assert!(!ap.queries.contains_key(&qacc));
         // Test Families:
         ap = AnnotationProcess::new();
         let mut sf1 = SeqFamily::new();
-        sf1.query_ids = vec!["Soltu.DM.02G015700.1".to_string()];
+        sf1.query_ids = vec![qacc.clone()];
         let sf_id1 = "SeqFamily1".to_string();
         ap.insert_seq_family(sf_id1.clone(), sf1);
-        nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
-        ap.insert_query(&mut nq1);
+        nq1 = Query::new();
+        ap.insert_query(qacc.clone(),nq1);
         let mut sf2 = SeqFamily::new();
         sf2.query_ids = vec!["The protein without known relatives".to_string()];
         let sf_id2 = "SeqFamily2".to_string();
@@ -537,9 +519,9 @@ mod tests {
         ap.process_rest_data();
         // Families should have been annotated:
         assert!(ap.human_readable_descriptions.contains_key(&sf_id1));
-        assert!(!ap.queries.contains_key(&nq1.id));
+        assert!(!ap.queries.contains_key(&qacc));
         assert!(!ap.seq_families.contains_key(&sf_id1));
-        assert!(!ap.query_id_to_seq_family_id_index.contains_key(&nq1.id));
+        assert!(!ap.query_id_to_seq_family_id_index.contains_key(&qacc));
         assert!(ap.human_readable_descriptions.contains_key(&sf_id2));
         assert!(!ap.seq_families.contains_key(&sf_id2));
     }
@@ -561,7 +543,7 @@ mod tests {
                 .unwrap()
                 .to_string(),
         );
-        ap = run(ap);
+        ap.run();
         let hrds = ap.human_readable_descriptions;
         assert!(hrds.len() > 0);
         let queries_with_expected_result = vec![
@@ -624,7 +606,7 @@ mod tests {
         ];
         ap.insert_seq_family(sf1_id.clone(), sf1);
         ap.insert_seq_family(sf2_id.clone(), sf2);
-        ap = run(ap);
+       ap.run();
         let hrds = ap.human_readable_descriptions;
         assert_eq!(hrds.len(), 2);
         let queries_with_expected_result = vec![sf1_id, sf2_id];

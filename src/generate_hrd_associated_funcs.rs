@@ -47,7 +47,7 @@ pub fn generate_human_readable_description(descriptions: &Vec<String>) -> Option
             hsp.push(highest_scoring_phrase(&desc, &ciic));
         }
         let mut high_score_ind: usize = 0;
-        for i in 0..(hsp.len() - 1) {
+        for i in 0..hsp.len() {
             if hsp[i].1 > hsp[high_score_ind].1 {
                 high_score_ind = i;
             }
@@ -68,34 +68,49 @@ pub fn highest_scoring_phrase(
     description: &Vec<String>,
     ciic: &HashMap<String, f32>,
 ) -> (Vec<String>, f32) {
+    // Each word in argument `description` is a vertex in a directed acyclic graph (DAG). An
+    // additional start vertex (index 0) is added that has edges to all words:
     let n_vertices = description.len() + 1;
+    // Initialize backtracing for dynamic programming; that is the highest scoring path through the
+    // word DAG:
     let mut path_predecessors: Vec<usize> = vec![0; n_vertices];
+    // The score of the highest scoring path to each vertex is stored in this vector:
     let mut length_to: Vec<f32> = vec![0.0; n_vertices];
     for vertex_indx in 0..n_vertices {
         let v_edges_to_descendants: Vec<usize> = if vertex_indx == n_vertices - 1 {
+            // Last word in argument `description`
             vec![]
         } else {
-            ((vertex_indx + 1)..(n_vertices - 1)).collect()
+            // Any word in argument `description` has edges to all word following it in
+            // `description`:
+            ((vertex_indx + 1)..n_vertices).collect()
         };
         for desc_vertex_indx in v_edges_to_descendants {
+            // The word matching the vertex is index minus one:
             let desc_vertex = &description[desc_vertex_indx - 1];
+            // Label edges with the score of the word (vertex) the respective edge leads to. If it
+            // is an informative word, lookup its score, otherwise use the minimum default score
+            // for non-informative words:
             let edge_label: f32 = if ciic.contains_key(desc_vertex) {
                 *ciic.get(desc_vertex).unwrap()
             } else {
                 *NON_INFORMATIVE_WORD_SCORE
             };
+            // Set the score of the path to the currently processed vertex (word):
             if length_to[desc_vertex_indx] <= length_to[vertex_indx] + edge_label {
                 length_to[desc_vertex_indx] = length_to[vertex_indx] + edge_label;
                 path_predecessors[desc_vertex_indx] = vertex_indx;
             }
         }
     }
+    // Find the path that yielded the highest score:
     let mut max_length_to_indx: usize = 0;
     for i in 1..length_to.len() {
         if length_to[i] > length_to[max_length_to_indx] {
             max_length_to_indx = i;
         }
     }
+    // Backtrace using dynamic programming the path with the highest score:
     let mut high_score_path: Vec<String> = vec![];
     let mut next_pred_indx: usize = path_predecessors[max_length_to_indx];
     loop {
@@ -169,186 +184,127 @@ pub fn centered_inverse_information_content(
         }
     }
 
-    // Calculate mean inverse information content for centering:
-    let mut sum_iic = 0.0;
-    for (_, iic) in &inv_inf_cntnt {
-        sum_iic += iic;
-    }
-    let mean_iic = sum_iic / inv_inf_cntnt.len() as f32;
-    // Center inverse information content:
+    // Result:
     let mut centered_iic: HashMap<String, f32> = HashMap::new();
-    for word_iic_tuple in inv_inf_cntnt {
-        // Center and add 1.0 to enable the subsequent Graph traversal and _only_ positive scores:
-        centered_iic.insert(word_iic_tuple.0, (word_iic_tuple.1 - mean_iic) + 1.0);
+    if wrd_frequencies.len() as f32 > 1. {
+        // Calculate mean inverse information content for centering:
+        let mut sum_iic = 0.0;
+        for (_, iic) in &inv_inf_cntnt {
+            sum_iic += iic;
+        }
+        let mean_iic = sum_iic / inv_inf_cntnt.len() as f32;
+        // Center inverse information content:
+        for word_iic_tuple in inv_inf_cntnt {
+            centered_iic.insert(word_iic_tuple.0, word_iic_tuple.1 - mean_iic);
+        }
+    } else {
+        // Single word's IIC must not be centered:
+        let the_word_iic = &inv_inf_cntnt[0];
+        centered_iic.insert(the_word_iic.0.clone(), the_word_iic.1.clone());
     }
     centered_iic
 }
 
-// #[cfg(test)]
-// mod tests {
-// use super::*;
-// use assert_approx_eq::assert_approx_eq;
-// use std::vec;
-//
-// #[test]
-// fn test_split_hits_descripts() {
-// let hit_words = "alcohol dehydrogenase c terminal".to_string();
-// let result = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-// assert_eq!(result, split_descriptions(&hit_words));
-// }
-//
-// #[test]
-// fn test_powerset() {
-// let test_vec = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-// let result = vec![
-// vec![], // this removed in the function that puts the phrases together
-// vec!["alcohol"],
-// vec!["dehydrogenase"],
-// vec!["alcohol", "dehydrogenase"],
-// vec!["c"],
-// vec!["alcohol", "c"],
-// vec!["dehydrogenase", "c"],
-// vec!["alcohol", "dehydrogenase", "c"],
-// vec!["terminal"],
-// vec!["alcohol", "terminal"],
-// vec!["dehydrogenase", "terminal"],
-// vec!["alcohol", "dehydrogenase", "terminal"],
-// vec!["c", "terminal"],
-// vec!["alcohol", "c", "terminal"],
-// vec!["dehydrogenase", "c", "terminal"],
-// vec!["alcohol", "dehydrogenase", "c", "terminal"],
-// ];
-// assert_eq!(result, powerset(&test_vec))
-// }
-//
-// #[test]
-// fn test_frequencies() {
-// let vec = vec![
-// "alcohol".to_string(),
-// "dehydrogenase".to_string(),
-// "c".to_string(),
-// "terminal".to_string(),
-// ];
-// let mut result = HashMap::new();
-// result.insert("terminal".to_string(), 1.0);
-// result.insert("dehydrogenase".to_string(), 1.0);
-// result.insert("alcohol".to_string(), 1.0);
-// result.insert("c".to_string(), 1.0);
-//
-// assert_eq!(result, frequencies(&vec));
-// }
-//
-// #[test]
-// fn test_inverse_information_content() {
-// let word = "a".to_string();
-// let mut freq_map = HashMap::new();
-// freq_map.insert("a".to_string(), 3. as f32);
-// freq_map.insert("b".to_string(), 2. as f32);
-// freq_map.insert("c".to_string(), 2. as f32);
-// freq_map.insert("d".to_string(), 1. as f32);
-// freq_map.insert("e".to_string(), 1. as f32);
-// freq_map.insert("f".to_string(), 1. as f32);
-//
-// let pw: f32 = freq_map.values().into_iter().sum();
-//
-// let expected = f32::log(1. / (1. - 3. / pw), std::f32::consts::E);
-//
-// assert_eq!(expected, inverse_information_content(&word, &freq_map))
-// }
-//
-// #[test]
-// fn test_mean() {
-// let mut score_map = HashMap::new();
-// score_map.insert("a".to_string(), 3. as f32);
-// score_map.insert("b".to_string(), 2. as f32);
-// score_map.insert("c".to_string(), 2. as f32);
-// score_map.insert("d".to_string(), 3. as f32);
-// score_map.insert("e".to_string(), 1. as f32);
-// score_map.insert("f".to_string(), 1. as f32);
-// let expected = 2. as f32;
-// assert_eq!(expected, mean(&score_map));
-// }
-//
-// #[test]
-// fn test_scores_phrases() {
-// let mut phrases: Vec<Vec<String>> = vec![];
-// phrases.push(vec!["a".to_string()]);
-// phrases.push(vec!["b".to_string()]);
-// phrases.push(vec!["c".to_string()]);
-// phrases.push(vec!["d".to_string()]);
-// phrases.push(vec!["e".to_string()]);
-// phrases.push(vec!["f".to_string()]);
-//
-// // Note that we assume a universe of ten words:
-// let mut freq_map: HashMap<String, f32> = HashMap::new();
-// freq_map.insert("a".to_string(), 3. as f32);
-// freq_map.insert("b".to_string(), 2. as f32);
-// freq_map.insert("c".to_string(), 2. as f32);
-// freq_map.insert("d".to_string(), 1. as f32);
-// freq_map.insert("e".to_string(), 1. as f32);
-// freq_map.insert("f".to_string(), 1. as f32);
-//
-// // All of the above phrases consist just of a single word, thus their phrase-scores should
-// // be identical to the centered frequency of their word:
-// let expected: Vec<f32> = vec![
-// -1.0 * f32::log(1. - 0.3, std::f32::consts::E),
-// -1.0 * f32::log(1. - 0.2, std::f32::consts::E),
-// -1.0 * f32::log(1. - 0.2, std::f32::consts::E),
-// -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
-// -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
-// -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
-// ];
-// let mean_inv_inf_cntnt: f32 = expected.iter().sum::<f32>() / expected.len() as f32;
-// let expected_centered = expected
-// .iter()
-// .map(|x| x - mean_inv_inf_cntnt)
-// .collect::<Vec<f32>>();
-// let result = score_phrases(&freq_map, &phrases);
-// assert_approx_eq!(expected_centered[0], result[0], 0.00001 as f32);
-// assert_approx_eq!(expected_centered[1], result[1], 1.11111 as f32);
-// assert_approx_eq!(expected_centered[2], result[2], 2.22221 as f32);
-// assert_approx_eq!(expected_centered[3], result[3], 3.33331 as f32);
-// assert_approx_eq!(expected_centered[4], result[4], 4.44441 as f32);
-// assert_approx_eq!(expected_centered[5], result[5], 5.55551 as f32);
-// }
-//
-// #[test]
-// fn test_find_best_scoring_phrase() {
-// let phrases: Vec<Vec<String>> = vec![
-// vec!["dehydrogenase".to_string(), "c".to_string()],
-// vec![
-// "dehydrogenase".to_string(),
-// "c".to_string(),
-// "terminal".to_string(),
-// ],
-// vec!["alcohol".to_string(), "dehydrogenase".to_string()],
-// vec![
-// "cinnamyl".to_string(),
-// "alcohol".to_string(),
-// "dehydrogenase".to_string(),
-// ],
-// ];
-// let phrase_scores: Vec<f32> = vec![0.265823, 0.265823, 0.22149113, -0.110522866];
-//
-// assert_eq!(
-// 1 as usize,
-// find_best_scoring_phrase(&phrases, &phrase_scores).unwrap()
-// );
-// }
-//
-// #[test]
-// fn test_generate_human_readable_description() {
-// let hit_hrds = vec![
-// "manitol dehydrogenase".to_string(),
-// "cinnamyl alcohol-dehydrogenase".to_string(),
-// "geraniol dehydrogenase".to_string(),
-// "geraniol|dehydrogenase terminal".to_string(),
-// "manitol dehydrogenase".to_string(),
-// "alcohol dehydrogenase c-terminal".to_string(),
-// ];
-// let expected = "dehydrogenase".to_string();
-// let result = generate_human_readable_description(&hit_hrds).unwrap();
-//
-// assert_eq!(expected, result);
-// }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_approx_eq::assert_approx_eq;
+    use std::vec;
+
+    #[test]
+    fn test_split_hits_descripts() {
+        let hit_words = "alcohol dehydrogenase c terminal".to_string();
+        let result = vec!["alcohol", "dehydrogenase", "c", "terminal"];
+        assert_eq!(result, split_descriptions(&hit_words));
+    }
+
+    #[test]
+    fn test_frequencies() {
+        let vec = vec![
+            "alcohol".to_string(),
+            "dehydrogenase".to_string(),
+            "c".to_string(),
+            "terminal".to_string(),
+        ];
+        let mut result = HashMap::new();
+        result.insert("terminal".to_string(), 1.0);
+        result.insert("dehydrogenase".to_string(), 1.0);
+        result.insert("alcohol".to_string(), 1.0);
+        result.insert("c".to_string(), 1.0);
+
+        assert_eq!(result, frequencies(&vec));
+    }
+
+    #[test]
+    fn test_centered_inverse_information_content() {
+        let mut freq_map = HashMap::new();
+        freq_map.insert("a".to_string(), 3. as f32);
+        freq_map.insert("b".to_string(), 2. as f32);
+        freq_map.insert("c".to_string(), 2. as f32);
+        freq_map.insert("d".to_string(), 1. as f32);
+        freq_map.insert("e".to_string(), 1. as f32);
+        freq_map.insert("f".to_string(), 1. as f32);
+
+        let freq_sum: f32 = freq_map.values().into_iter().sum();
+
+        let expected: HashMap<String, f32> = HashMap::new();
+        expected.insert(
+            "a".to_string(),
+            -1. * f32::log(1. - 3. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "b".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "c".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "d".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "e".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "f".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+
+        assert_eq!(expected, centered_inverse_information_content(&freq_map))
+    }
+
+    #[test]
+    fn test_highest_scoring_phrase() {
+        let description = vec![
+            "Solute".to_string(),
+            "carrier".to_string(),
+            "family".to_string(),
+            "12".to_string(),
+            "member".to_string(),
+            "9".to_string(),
+        ];
+
+        let ciic: HashMap<String, f32> = HashMap::new();
+
+        //assert_eq!(1 as usize, highest_scoring_phrase(description));
+    }
+
+    #[test]
+    fn test_generate_human_readable_description() {
+        let hit_hrds = vec![
+            "manitol dehydrogenase".to_string(),
+            "cinnamyl alcohol-dehydrogenase".to_string(),
+            "geraniol dehydrogenase".to_string(),
+            "geraniol|dehydrogenase terminal".to_string(),
+            "manitol dehydrogenase".to_string(),
+            "alcohol dehydrogenase c-terminal".to_string(),
+        ];
+        let expected = "dehydrogenase".to_string();
+        let result = generate_human_readable_description(&hit_hrds).unwrap();
+
+        assert_eq!(expected, result);
+    }
+}

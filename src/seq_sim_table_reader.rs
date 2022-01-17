@@ -20,7 +20,7 @@ use std::sync::mpsc::Sender;
 /// * `stitle_col: &usize` - The column index in which to find the `stitle`
 /// * `transmitter: Sender<Query>` - Used to send instances of `Query` to any receiver.
 pub fn parse_table(
-    path: String,
+    path: &String,
     field_separator: &char,
     qacc_col: &usize,
     sacc_col: &usize,

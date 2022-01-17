@@ -76,13 +76,15 @@ impl AnnotationProcess {
             // Start this sss_tbl's dedicated threat:
             thread::spawn(move || {
                 parse_table(
-                    sss_tbl,
+                    &sss_tbl,
                     &field_separator,
                     &qacc_col,
                     &sacc_col,
                     &stitle_col,
                     tx_i,
                 );
+                // Log:
+                println!("Finished parsing '{}'", &sss_tbl);
             });
         }
         // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
@@ -96,7 +98,6 @@ impl AnnotationProcess {
         }
 
         // Make sure all queries or sequence families are annotated:
-        println!("\n\n\n************process_rest_data starts NOW*************\n\n\n");
         self.process_rest_data();
     }
 

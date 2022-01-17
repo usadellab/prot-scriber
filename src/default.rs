@@ -5,14 +5,17 @@ use std::collections::HashMap;
 lazy_static! {
 
     /// The score assigned to non informative words:
-    pub static ref NON_INFORMATIVE_WORD_SCORE : f32 = 0.000000001;
+    pub static ref NON_INFORMATIVE_WORD_SCORE : f32 = 0.000001;
 
     /// The default Blacklist of regular expressions used to check for non-informative words
     /// in the description to be excluded from scoring. If ANY of these expression matches
     /// the word is considered as non-informative
     pub static ref BLACKLIST_DESCRIPTION_WORDS_REGEXS: Vec<Regex> = vec![
+        Regex::new(r"(?i)\band\b").unwrap(),
+        Regex::new(r"(?i)\bor\b").unwrap(),
         Regex::new(r"(?i)\bmember\b").unwrap(),
         Regex::new(r"(?i)\bprotein\b").unwrap(),
+        Regex::new(r"(?i)\bisoform\b").unwrap(),
         Regex::new(r"(?i)\bgene\b").unwrap(),
         Regex::new(r"(?i)\btair\b").unwrap(),
         Regex::new(r"(?i)\bfragment\b").unwrap(),
@@ -73,7 +76,7 @@ lazy_static! {
     };
 
     /// A Hit's description is split into words using this default regular expression.
-    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([-/|/\\;,':().\s+]+)").unwrap();
+    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([-/|/\\;,':.\s]+)").unwrap();
     // pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r" ").unwrap();
 
     /// Default sequence similarity search result table field separator:

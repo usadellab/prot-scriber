@@ -1,6 +1,4 @@
-use super::default::{
-    BLACKLIST_DESCRIPTION_WORDS_REGEXS, NON_INFORMATIVE_WORD_SCORE, SPLIT_DESCRIPTION_REGEX,
-};
+use super::default::{BLACKLIST_DESCRIPTION_WORDS_REGEXS, NON_INFORMATIVE_WORD_SCORE};
 use super::model_funcs::matches_blacklist;
 use regex::Regex;
 use std::collections::HashMap;
@@ -196,49 +194,63 @@ pub fn frequencies(universe_words: &Vec<String>) -> HashMap<String, f32> {
 pub fn centered_inverse_information_content(
     wrd_frequencies: &HashMap<String, f32>,
 ) -> HashMap<String, f32> {
+    // Initialize default result:
+    let mut ciic_result: HashMap<String, f32> = HashMap::new();
+
     if wrd_frequencies.len() > 0 {
-        // Calculate inverse information content:
+        // Calculate inverse information content (IIC):
         let sum_wrd_frequencies: f32 = wrd_frequencies.values().into_iter().sum();
         let mut inv_inf_cntnt: Vec<(String, f32)> = vec![];
         for word in wrd_frequencies.keys() {
             if wrd_frequencies.len() as f32 > 1. {
                 let pw = wrd_frequencies[word] / sum_wrd_frequencies;
-                inv_inf_cntnt.push((
-                    word.to_string(),
-                    -1.0 * f32::log(1. - pw, std::f32::consts::E),
-                ));
+                let iic: f32 = -1.0 * f32::log(1. - pw, std::f32::consts::E);
+                inv_inf_cntnt.push((word.to_string(), iic));
             } else {
                 inv_inf_cntnt.push((word.to_string(), 1.0));
             }
         }
 
-        // Result:
-        let mut centered_iic: HashMap<String, f32> = HashMap::new();
-        if wrd_frequencies.len() as f32 > 1. {
-            // Calculate mean inverse information content for centering:
+        // Center inverse information content (IIC) values, if and only if there is variation
+        // between the calculated IIC values. Variation can only result from varying frequencies,
+        // so find out if the argument `wrd_frequencies` contains such values:
+        let wrd_frequency_vals: Vec<f32> = wrd_frequencies.values().map(|pw| *pw).collect();
+        let mut iic_values_all_identical: (bool, f32) = (true, wrd_frequency_vals[0]);
+        for i in 1..wrd_frequency_vals.len() {
+            iic_values_all_identical.0 = iic_values_all_identical.1 == wrd_frequency_vals[i];
+            if !iic_values_all_identical.0 {
+                // Once a comparison was false, we _must not_ compare more pairs, because if the
+                // last pair is in fact identical the boolean result would not be correct:
+                break;
+            }
+            iic_values_all_identical.1 = wrd_frequency_vals[i];
+        }
+
+        // Calculate mean inverse information content for centering:
+        let mut mean_iic = 0.0;
+        if !iic_values_all_identical.0 {
             let mut sum_iic = 0.0;
             for (_, iic) in &inv_inf_cntnt {
                 sum_iic += iic;
             }
-            let mean_iic = sum_iic / inv_inf_cntnt.len() as f32;
-            // Center inverse information content:
-            for word_iic_tuple in inv_inf_cntnt {
-                centered_iic.insert(word_iic_tuple.0, word_iic_tuple.1 - mean_iic);
-            }
-        } else {
-            // Single word's IIC _must not_ be centered:
-            let the_word_iic = &inv_inf_cntnt[0];
-            centered_iic.insert(the_word_iic.0.clone(), the_word_iic.1.clone());
+            // Note that only in case of variance between IIC values, we calculate the mean IIC to
+            // be subtracted from the actual IIC. Otherwise the above default zero will be
+            // subtracted:
+            mean_iic = sum_iic / inv_inf_cntnt.len() as f32;
         }
-        centered_iic
-    } else {
-        HashMap::<String, f32>::new()
+        // Center inverse information content:
+        for word_iic_tuple in inv_inf_cntnt {
+            ciic_result.insert(word_iic_tuple.0, word_iic_tuple.1 - mean_iic);
+        }
     }
+
+    ciic_result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::default::SPLIT_DESCRIPTION_REGEX;
     use assert_approx_eq::assert_approx_eq;
     use std::vec;
 
@@ -309,7 +321,7 @@ mod tests {
         freq_map.insert("e".to_string(), 1. as f32);
         freq_map.insert("f".to_string(), 1. as f32);
 
-        let freq_sum: f32 = freq_map.values().into_iter().sum();
+        let mut freq_sum: f32 = freq_map.values().into_iter().sum();
 
         let mut expected: HashMap<String, f32> = HashMap::new();
         expected.insert(
@@ -356,6 +368,81 @@ mod tests {
                 1e-6f32
             );
         }
+
+        // Test 2:
+        freq_map = HashMap::new();
+        freq_map.insert("alcohol".to_string(), 2.0);
+        freq_map.insert("terminal".to_string(), 2.0);
+        freq_map.insert("geraniol".to_string(), 2.0);
+        freq_map.insert("manitol".to_string(), 3.0);
+        freq_map.insert("dehydrogenase".to_string(), 7.0);
+        freq_map.insert("c".to_string(), 1.0);
+        freq_map.insert("cinnamyl".to_string(), 1.0);
+        freq_sum = freq_map.values().into_iter().sum();
+        expected = HashMap::new();
+        expected.insert(
+            "alcohol".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "terminal".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "geraniol".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "manitol".to_string(),
+            -1. * f32::log(1. - 3. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "dehydrogenase".to_string(),
+            -1. * f32::log(1. - 7. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "c".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "cinnamyl".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+        let mut mean_ciic: f32 = 0.0;
+        for (_, x_ciic) in &expected {
+            mean_ciic += x_ciic;
+        }
+        mean_ciic = mean_ciic / expected.len() as f32;
+        // center the expected IIC:
+        let mut centered_expected: HashMap<String, f32> = HashMap::new();
+        for (word, iic) in &expected {
+            centered_expected.insert((*word).clone(), iic - mean_ciic);
+        }
+        // test iteratively:
+        let result: HashMap<String, f32> = centered_inverse_information_content(&freq_map);
+        for (word, _) in &centered_expected {
+            assert_approx_eq!(
+                centered_expected.get(word).unwrap(),
+                result.get(word).unwrap(),
+                1e-6f32
+            );
+        }
+
+        // test special case of all equally frequent words:
+        freq_map = HashMap::new();
+        freq_map.insert("foo".to_string(), 1.0);
+        freq_map.insert("bar".to_string(), 1.0);
+        freq_map.insert("baz".to_string(), 1.0);
+        centered_expected = HashMap::new();
+        // All words should have this NON CENTERED inverse information content:
+        let iic: f32 = -1.0 * f32::log(1. - 1. / 3., std::f32::consts::E);
+        centered_expected.insert("foo".to_string(), iic);
+        centered_expected.insert("bar".to_string(), iic);
+        centered_expected.insert("baz".to_string(), iic);
+        assert_eq!(
+            centered_expected,
+            centered_inverse_information_content(&freq_map)
+        );
     }
 
     #[test]
@@ -368,6 +455,12 @@ mod tests {
             "6".to_string(),
         ];
         let desc3: Vec<String> = vec!["ran".to_string(), "6".to_string()];
+        let desc4: Vec<String> = vec![
+            "protein".to_string(),
+            "narrow".to_string(),
+            "leaf".to_string(),
+            "1".to_string(),
+        ];
 
         let mut word_freqs: HashMap<String, f32> = HashMap::new();
         word_freqs.insert("6".to_string(), 2.0);
@@ -379,7 +472,7 @@ mod tests {
         word_freqs.insert("5".to_string(), 3.0);
         word_freqs.insert("binding".to_string(), 2.0);
 
-        let ciic = centered_inverse_information_content(&word_freqs);
+        let mut ciic = centered_inverse_information_content(&word_freqs);
 
         let phrase1 = highest_scoring_phrase(&desc1, &ciic).unwrap();
         let expected1 = vec!["importin".to_string(), "5".to_string()];
@@ -391,6 +484,31 @@ mod tests {
 
         let phrase3 = highest_scoring_phrase(&desc3, &ciic);
         assert!(phrase3.is_none());
+
+        word_freqs = HashMap::new();
+        for word in &desc4 {
+            word_freqs.insert(word.clone(), 1.0);
+        }
+        ciic = centered_inverse_information_content(&word_freqs);
+        let phrase4 = highest_scoring_phrase(&desc4, &ciic).unwrap();
+        // Expect the full input description to be replicated:
+        assert_eq!(desc4, phrase4.0);
+
+        let desc5 = vec![
+            "receptor".to_string(),
+            "protein".to_string(),
+            "eix2".to_string(),
+        ];
+        word_freqs = HashMap::new();
+        word_freqs.insert("receptor".to_string(), 2.0);
+        word_freqs.insert("eix1".to_string(), 1.0);
+        word_freqs.insert("eix2".to_string(), 1.0);
+        ciic = centered_inverse_information_content(&word_freqs);
+        let phrase5 = highest_scoring_phrase(&desc5, &ciic).unwrap();
+        assert_eq!(
+            vec!["receptor".to_string(), "protein".to_string()],
+            phrase5.0
+        );
     }
 
     #[test]
@@ -425,6 +543,16 @@ mod tests {
             "importin subunit beta-3".to_string(),
         ];
         expected = "importin 5".to_string();
+        result =
+            generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX)).unwrap();
+        assert_eq!(expected, result);
+
+        // Test 3:
+        hit_hrds = vec![
+            "receptor protein eix1".to_string(),
+            "receptor protein eix2".to_string(),
+        ];
+        expected = "receptor protein".to_string();
         result =
             generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX)).unwrap();
         assert_eq!(expected, result);

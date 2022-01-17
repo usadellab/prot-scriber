@@ -1,51 +1,155 @@
-use super::default::SPLIT_DESCRIPTION_REGEX;
+use super::default::{BLACKLIST_DESCRIPTION_WORDS_REGEXS, NON_INFORMATIVE_WORD_SCORE};
+use super::model_funcs::matches_blacklist;
+use regex::Regex;
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 /// Main function for generating human-readable descriptions (hrds).
+///
+/// # TODO
+///
+/// If one of the following 'manitol dehydrogenase' is removed the phrases 'manitol dehydrogenase'
+/// *and* 'geraniol dehydrogenase' will receive identical scores. Currently, in such cases their
+/// order of appearance decides, which is chosen as a result. Meaning in these cases the result is
+/// chosen somewhat randomly. Find a solution for this!
 ///
 /// # Arguments
 ///
 /// * `hit_hrds: &Vec<String>` - A vector of strings containing all Hit descriptions.
-pub fn generate_human_readable_description(descriptions: &Vec<String>) -> Option<String> {
-    // Split the descriptions into vectors of words:
-    let description_words: Vec<Vec<String>> = descriptions
-        .iter()
-        .map(|dsc| split_descriptions(dsc))
-        .collect();
+pub fn generate_human_readable_description(
+    descriptions: &Vec<String>,
+    split_regex: &Regex,
+) -> Option<String> {
+    // Initialize default result:
+    let mut human_readable_rescription_result: Option<String> = None;
 
-    // All possible phrases using the power-set function and build the universe of words, i.e. the
-    // flattened Vec<String> of description_words:
-    let mut phrases_set: HashSet<Vec<String>> = HashSet::new();
-    let mut word_universe: Vec<String> = vec![];
-    for desc_words in description_words.into_iter() {
-        word_universe.extend_from_slice(&desc_words);
-        // Get all possible subsets of the current description `desc_words` vector:
-        let desc_phrases: Vec<Vec<String>> = powerset(&desc_words);
-        // Add those, that are not already present in the `phrases_set`:
-        for phrase in desc_phrases.into_iter() {
-            phrases_set.insert(phrase);
+    if descriptions.len() > 0 {
+        // Split the descriptions into vectors of words:
+        let description_words: Vec<Vec<String>> = descriptions
+            .iter()
+            .map(|dsc| split_descriptions(dsc, split_regex))
+            .collect();
+
+        // The universe if informative words, maintaining the word-frequencies:
+        let mut informative_words_universe: Vec<String> = vec![];
+        for desc_words in &description_words {
+            for word in desc_words {
+                // Build the word universe for later calculation of word-frequencies, but only consider
+                // words that are not classified as non-informative. Note that if a word already is
+                // contained in the universe, it has passed the blacklist in a past iteration, so we
+                // don't need to check again:
+                if informative_words_universe.contains(&word)
+                    || !matches_blacklist(&word, &(*BLACKLIST_DESCRIPTION_WORDS_REGEXS))
+                {
+                    informative_words_universe.push(word.clone());
+                }
+            }
+        }
+
+        // Calculate the frequency of the informative universe words:
+        let word_frequencies = frequencies(&informative_words_universe);
+        let ciic: HashMap<String, f32> = centered_inverse_information_content(&word_frequencies);
+
+        // Find highest scoring phrase
+        let mut phrases: Vec<(Vec<String>, f32)> = vec![];
+        for desc in &description_words {
+            let hsp_option = highest_scoring_phrase(&desc, &ciic);
+            match hsp_option {
+                Some(hsp) => {
+                    phrases.push(hsp);
+                }
+                None => {}
+            }
+        }
+        if phrases.len() > 0 {
+            let mut high_score_ind: usize = 0;
+            for i in 0..phrases.len() {
+                if phrases[i].1 > phrases[high_score_ind].1 {
+                    high_score_ind = i;
+                }
+            }
+
+            let human_readable_description: String = phrases[high_score_ind].0.join(" ");
+            human_readable_rescription_result = Some(human_readable_description);
         }
     }
+    human_readable_rescription_result
+}
 
-    // Calculate the frequency of the universe words:
-    let word_frequencies = frequencies(&word_universe);
-
-    // Convert to vector to ease usage and save memory in scoring. `phrases_set` is moved by the
-    // `into_iter` and thus does not exist any more below the following expression:
-    let phrases: Vec<Vec<String>> = phrases_set.into_iter().collect();
-
-    // Score phrases using centered inverse information content:
-    let phrase_scores: Vec<f32> = score_phrases(&word_frequencies, &phrases);
-
-    // Find the index of the best performing phrase:
-    let best_phrase_index = find_best_scoring_phrase(&phrases, &phrase_scores);
-
-    // Return the result, if any:
-    match best_phrase_index {
-        Some(phrase_ind) => Some(phrases[phrase_ind].join(" ")),
-        None => None,
+pub fn highest_scoring_phrase(
+    description: &Vec<String>,
+    ciic: &HashMap<String, f32>,
+) -> Option<(Vec<String>, f32)> {
+    // Initialize the default result:
+    let mut result: Option<(Vec<String>, f32)> = None;
+    // There's only work to do, if the argument `description` _has_ words:
+    if description.len() > 0 {
+        // Each word in argument `description` is a vertex in a directed acyclic graph (DAG). An
+        // additional start vertex (index 0) is added that has edges to all words:
+        let n_vertices = description.len() + 1;
+        // Initialize backtracing for dynamic programming; that is the highest scoring path through the
+        // word DAG:
+        let mut path_predecessors: Vec<usize> = vec![0; n_vertices];
+        // The score of the highest scoring path to each vertex _i_ is stored in this vector:
+        let mut vertex_path_scores: Vec<f32> = vec![0.0; n_vertices];
+        for vertex_indx in 0..n_vertices {
+            let v_edges_to_descendants: Vec<usize> = if vertex_indx == n_vertices - 1 {
+                // Last word in argument `description`
+                vec![]
+            } else {
+                // Any word i in argument `description` has edges to all words k>i following it in
+                // `description`:
+                ((vertex_indx + 1)..n_vertices).collect()
+            };
+            for desc_vertex_indx in v_edges_to_descendants {
+                // The word matching the vertex is index minus one, because we inserted a start vertex
+                // at index zero:
+                let desc_vertex = &description[desc_vertex_indx - 1];
+                // Label edges with the score of the word (vertex) the respective edge leads to. If it
+                // is an informative word, lookup its score, otherwise use the minimum default score
+                // for non-informative words:
+                let edge_label: f32 = if ciic.contains_key(desc_vertex) {
+                    *ciic.get(desc_vertex).unwrap()
+                } else {
+                    *NON_INFORMATIVE_WORD_SCORE
+                };
+                // Set the score of the path to the currently processed vertex (word):
+                if vertex_path_scores[desc_vertex_indx]
+                    <= vertex_path_scores[vertex_indx] + edge_label
+                {
+                    vertex_path_scores[desc_vertex_indx] =
+                        vertex_path_scores[vertex_indx] + edge_label;
+                    path_predecessors[desc_vertex_indx] = vertex_indx;
+                }
+            }
+        }
+        // Find the path that yielded the highest score:
+        let mut max_path_score_indx: usize = 0;
+        for i in 1..vertex_path_scores.len() {
+            if vertex_path_scores[i] > vertex_path_scores[max_path_score_indx] {
+                max_path_score_indx = i;
+            }
+        }
+        if max_path_score_indx > 0 {
+            // Backtrace using dynamic programming the path with the highest score:
+            let mut high_score_path: Vec<String> = vec![];
+            let mut next_pred_indx: usize = max_path_score_indx;
+            loop {
+                // Get the word matching the vertex index `next_pred_indx` by subtracting one from it. This
+                // needs to be done, because we inserted a start vertex with index zero:
+                high_score_path.push(description[next_pred_indx - 1].clone());
+                next_pred_indx = path_predecessors[next_pred_indx];
+                if next_pred_indx == 0 {
+                    break;
+                }
+            }
+            // Highest scoring phrase and it's score:
+            result = Some((
+                high_score_path.into_iter().rev().collect(),
+                vertex_path_scores[max_path_score_indx],
+            ));
+        }
     }
+    result
 }
 
 /// Given filtered Hit descriptions it splits each word and returns a vector.
@@ -53,34 +157,11 @@ pub fn generate_human_readable_description(descriptions: &Vec<String>) -> Option
 /// # Arguments
 ///
 /// * `String of a Hit HRD description` & `Vector containing Regex strings`
-pub fn split_descriptions(description: &String) -> Vec<String> {
-    (*SPLIT_DESCRIPTION_REGEX)
+pub fn split_descriptions(description: &String, split_regex: &Regex) -> Vec<String> {
+    split_regex
         .split(description)
-        .map(|x| (*x).to_string())
+        .map(|wrd| wrd.to_string())
         .collect()
-}
-
-/// Powersets any slice
-///
-/// # Arguments
-///
-/// * `slice`- Given a slice vector get all possible powersets of the items.
-pub fn powerset<T: Clone>(slice: &[T]) -> Vec<Vec<T>> {
-    let mut v: Vec<Vec<T>> = Vec::new();
-
-    for mask in 0..(1 << slice.len()) {
-        let mut ss: Vec<T> = vec![];
-        let mut bitset = mask;
-        while bitset > 0 {
-            let rightmost: u64 = bitset & !(bitset - 1);
-            let idx = rightmost.trailing_zeros();
-            let item = (*slice.get(idx as usize).unwrap()).clone();
-            ss.push(item);
-            bitset &= bitset - 1;
-        }
-        v.push(ss);
-    }
-    v
 }
 
 /// Calculates the word frequencies for argument `universe_words` and returns a `HashMap<String,
@@ -101,111 +182,75 @@ pub fn frequencies(universe_words: &Vec<String>) -> HashMap<String, f32> {
     word_freqs
 }
 
-/// Computes the score of a word using 'inverse information content' calculated as `-1 * log(1 -
-/// p.word)`. In order to avoid infinite values for a word that is the single element of the
-/// word-set, i.e. it has a frequency of one, the score of one is returned.
+/// Computes the score of the informative words in argument `wrd_frequencies.keys()` using 'inverse
+/// information content' calculated as `-1 * log(1 - probability(word))`, where 'probability' =
+/// frequency elem [0,1]. In order to avoid infinite values for a word that is the single element
+/// of the word-set, i.e. it has a frequency of one, the score of one is used. Returns a HashMap of
+/// word centered IIC key-value-pairs (`HashMap<String, f32>`).
 ///
 /// # Arguments
 ///
-/// * `word` - A string representing the word
 /// * `wrd.frequencies` - An instance of dictionary of all words with their frequencies.
-pub fn inverse_information_content(word: &String, wrd_frequencies: &HashMap<String, f32>) -> f32 {
-    let sum_wrd_frequencies: f32 = wrd_frequencies.values().into_iter().sum();
-    if wrd_frequencies.values().len() as f32 > 1. {
-        let pw = wrd_frequencies[word] / sum_wrd_frequencies;
-        -1.0 * f32::log(1. - pw, std::f32::consts::E)
-    } else if wrd_frequencies.values().len() as f32 == 1. && wrd_frequencies.contains_key(word) {
-        1.0
-    } else {
-        panic!("Invalid or no word frequency parsed");
-    }
-}
+pub fn centered_inverse_information_content(
+    wrd_frequencies: &HashMap<String, f32>,
+) -> HashMap<String, f32> {
+    // Initialize default result:
+    let mut ciic_result: HashMap<String, f32> = HashMap::new();
 
-/// Returns the mean of list or vector containing f32 values.
-///
-/// # Arguments
-///
-/// * `score_map` A vector of f32 values
-pub fn mean(score_map: &HashMap<String, f32>) -> f32 {
-    let sum: f32 = Iterator::sum(score_map.values());
-    f32::from(sum) / (score_map.len() as f32)
-}
-
-/// Computes the score of each word in a phrase using 'inverse information content' and centering.
-/// Outputs a HashMap of phrases and the sum of centered iic scores.
-///
-/// # Arguments
-///
-/// * `word_frequencies` - An instance of dictionary of all words with their frequencies.
-/// * `phrases` - HashSet of Vectors containing all possible phrases (universe phrases)
-pub fn score_phrases(
-    word_frequencies: &HashMap<String, f32>,
-    phrases: &Vec<Vec<String>>,
-) -> Vec<f32> {
-    let mut word_inv_inf_cntnt: HashMap<String, f32> = HashMap::new();
-    for word in word_frequencies.keys() {
-        word_inv_inf_cntnt.insert(
-            (*word).clone(),
-            inverse_information_content(word, word_frequencies),
-        );
-    }
-    let mean_word_inv_inf_cntnt = mean(&word_inv_inf_cntnt);
-    let mut phrase_scores: Vec<f32> = vec![];
-    for phrase in phrases.iter() {
-        let mut phr_score = 0.0;
-        for word in phrase.iter() {
-            if word_inv_inf_cntnt.contains_key(word) {
-                phr_score += word_inv_inf_cntnt.get(word).unwrap() - mean_word_inv_inf_cntnt;
+    if wrd_frequencies.len() > 0 {
+        // Calculate inverse information content (IIC):
+        let sum_wrd_frequencies: f32 = wrd_frequencies.values().into_iter().sum();
+        let mut inv_inf_cntnt: Vec<(String, f32)> = vec![];
+        for word in wrd_frequencies.keys() {
+            if wrd_frequencies.len() as f32 > 1. {
+                let pw = wrd_frequencies[word] / sum_wrd_frequencies;
+                let iic: f32 = -1.0 * f32::log(1. - pw, std::f32::consts::E);
+                inv_inf_cntnt.push((word.to_string(), iic));
+            } else {
+                inv_inf_cntnt.push((word.to_string(), 1.0));
             }
         }
-        phrase_scores.push(phr_score);
-    }
-    phrase_scores
-}
 
-/// Selects the highest scoring phrase from a map of phrases (keys) and overall scores (values)
-/// outputs vector of the highest scoring phrases and length. Returns the index (`Option<usize>`)
-/// of the best performing argument phrase (`phrases`).
-///
-/// # Arguments
-///
-/// * `phrases: &Vec<Vec<String>>` - The phrases that have been scored and of which the best
-/// performing shall be selected and returned.
-/// * `phrase_scores: &Vec<f32>` - The scores of the phrases matching by their index (`usize`).
-pub fn find_best_scoring_phrase(
-    phrases: &Vec<Vec<String>>,
-    phrase_scores: &Vec<f32>,
-) -> Option<usize> {
-    if phrases.len() > 0 {
-        let mut max_score: f32 = 0.0;
-        for phr_scr in phrase_scores {
-            if (*phr_scr) > max_score {
-                max_score = *phr_scr
+        // Center inverse information content (IIC) values, if and only if there is variation
+        // between the calculated IIC values. Variation can only result from varying frequencies,
+        // so find out if the argument `wrd_frequencies` contains such values:
+        let wrd_frequency_vals: Vec<f32> = wrd_frequencies.values().map(|pw| *pw).collect();
+        let mut iic_values_all_identical: (bool, f32) = (true, wrd_frequency_vals[0]);
+        for i in 1..wrd_frequency_vals.len() {
+            iic_values_all_identical.0 = iic_values_all_identical.1 == wrd_frequency_vals[i];
+            if !iic_values_all_identical.0 {
+                // Once a comparison was false, we _must not_ compare more pairs, because if the
+                // last pair is in fact identical the boolean result would not be correct:
+                break;
             }
+            iic_values_all_identical.1 = wrd_frequency_vals[i];
         }
-        // Vector of tuples (phrase index, phrase length):
-        let mut high_scoring_phrases_tuples: Vec<(usize, usize)> = vec![];
-        for (i, phr_scr) in phrase_scores.iter().enumerate() {
-            if (*phr_scr) == max_score {
-                high_scoring_phrases_tuples.push((i, phrases[i].len()));
+
+        // Calculate mean inverse information content for centering:
+        let mut mean_iic = 0.0;
+        if !iic_values_all_identical.0 {
+            let mut sum_iic = 0.0;
+            for (_, iic) in &inv_inf_cntnt {
+                sum_iic += iic;
             }
+            // Note that only in case of variance between IIC values, we calculate the mean IIC to
+            // be subtracted from the actual IIC. Otherwise the above default zero will be
+            // subtracted:
+            mean_iic = sum_iic / inv_inf_cntnt.len() as f32;
         }
-        if high_scoring_phrases_tuples.len() > 0 {
-            // Sort equally high scoring phrases by their length descending:
-            high_scoring_phrases_tuples.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        // Center inverse information content:
+        for word_iic_tuple in inv_inf_cntnt {
+            ciic_result.insert(word_iic_tuple.0, word_iic_tuple.1 - mean_iic);
         }
-        // TODO: If several high scoring phrases have the same length, apply some other measure to
-        // select among these the best fitting one. For now, the one appearing first by chance is
-        // returned.
-        Some(high_scoring_phrases_tuples[0].0)
-    } else {
-        None
     }
+
+    ciic_result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::default::SPLIT_DESCRIPTION_REGEX;
     use assert_approx_eq::assert_approx_eq;
     use std::vec;
 
@@ -213,53 +258,61 @@ mod tests {
     fn test_split_hits_descripts() {
         let hit_words = "alcohol dehydrogenase c terminal".to_string();
         let result = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-        assert_eq!(result, split_descriptions(&hit_words));
-    }
-
-    #[test]
-    fn test_powerset() {
-        let test_vec = vec!["alcohol", "dehydrogenase", "c", "terminal"];
-        let result = vec![
-            vec![], // this removed in the function that puts the phrases together
-            vec!["alcohol"],
-            vec!["dehydrogenase"],
-            vec!["alcohol", "dehydrogenase"],
-            vec!["c"],
-            vec!["alcohol", "c"],
-            vec!["dehydrogenase", "c"],
-            vec!["alcohol", "dehydrogenase", "c"],
-            vec!["terminal"],
-            vec!["alcohol", "terminal"],
-            vec!["dehydrogenase", "terminal"],
-            vec!["alcohol", "dehydrogenase", "terminal"],
-            vec!["c", "terminal"],
-            vec!["alcohol", "c", "terminal"],
-            vec!["dehydrogenase", "c", "terminal"],
-            vec!["alcohol", "dehydrogenase", "c", "terminal"],
-        ];
-        assert_eq!(result, powerset(&test_vec))
+        assert_eq!(
+            result,
+            split_descriptions(&hit_words, &(*SPLIT_DESCRIPTION_REGEX),)
+        );
     }
 
     #[test]
     fn test_frequencies() {
-        let vec = vec![
+        let mut words = vec![
             "alcohol".to_string(),
             "dehydrogenase".to_string(),
             "c".to_string(),
             "terminal".to_string(),
         ];
-        let mut result = HashMap::new();
-        result.insert("terminal".to_string(), 1.0);
-        result.insert("dehydrogenase".to_string(), 1.0);
-        result.insert("alcohol".to_string(), 1.0);
-        result.insert("c".to_string(), 1.0);
+        let mut expected = HashMap::new();
+        expected.insert("terminal".to_string(), 1.0);
+        expected.insert("dehydrogenase".to_string(), 1.0);
+        expected.insert("alcohol".to_string(), 1.0);
+        expected.insert("c".to_string(), 1.0);
+        assert_eq!(expected, frequencies(&words));
 
-        assert_eq!(result, frequencies(&vec));
+        words = vec![
+            "importin".to_string(),
+            "5".to_string(),
+            "importin".to_string(),
+            "5".to_string(),
+            "ran".to_string(),
+            "binding".to_string(),
+            "6".to_string(),
+            "ran".to_string(),
+            "binding".to_string(),
+            "6".to_string(),
+            "importin".to_string(),
+            "subunit".to_string(),
+            "beta".to_string(),
+            "3".to_string(),
+            "importin".to_string(),
+            "subunit".to_string(),
+            "beta".to_string(),
+            "3".to_string(),
+        ];
+        expected = HashMap::new();
+        expected.insert("subunit".to_string(), 2.0);
+        expected.insert("5".to_string(), 2.0);
+        expected.insert("binding".to_string(), 2.0);
+        expected.insert("3".to_string(), 2.0);
+        expected.insert("ran".to_string(), 2.0);
+        expected.insert("6".to_string(), 2.0);
+        expected.insert("beta".to_string(), 2.0);
+        expected.insert("importin".to_string(), 4.0);
+        assert_eq!(expected, frequencies(&words));
     }
 
     #[test]
-    fn test_inverse_information_content() {
-        let word = "a".to_string();
+    fn test_centered_inverse_information_content() {
         let mut freq_map = HashMap::new();
         freq_map.insert("a".to_string(), 3. as f32);
         freq_map.insert("b".to_string(), 2. as f32);
@@ -268,106 +321,240 @@ mod tests {
         freq_map.insert("e".to_string(), 1. as f32);
         freq_map.insert("f".to_string(), 1. as f32);
 
-        let pw: f32 = freq_map.values().into_iter().sum();
+        let mut freq_sum: f32 = freq_map.values().into_iter().sum();
 
-        let expected = f32::log(1. / (1. - 3. / pw), std::f32::consts::E);
+        let mut expected: HashMap<String, f32> = HashMap::new();
+        expected.insert(
+            "a".to_string(),
+            -1. * f32::log(1. - 3. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "b".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "c".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "d".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "e".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "f".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+        let mut mean_ciic: f32 = 0.0;
+        for (_, x_ciic) in &expected {
+            mean_ciic += x_ciic;
+        }
+        mean_ciic = mean_ciic / expected.len() as f32;
+        // center the expected IIC:
+        let mut centered_expected: HashMap<String, f32> = HashMap::new();
+        for (word, iic) in &expected {
+            centered_expected.insert((*word).clone(), iic - mean_ciic);
+        }
 
-        assert_eq!(expected, inverse_information_content(&word, &freq_map))
-    }
+        // test iteratively:
+        let result: HashMap<String, f32> = centered_inverse_information_content(&freq_map);
+        for (word, _) in &centered_expected {
+            assert_approx_eq!(
+                centered_expected.get(word).unwrap(),
+                result.get(word).unwrap(),
+                1e-6f32
+            );
+        }
 
-    #[test]
-    fn test_mean() {
-        let mut score_map = HashMap::new();
-        score_map.insert("a".to_string(), 3. as f32);
-        score_map.insert("b".to_string(), 2. as f32);
-        score_map.insert("c".to_string(), 2. as f32);
-        score_map.insert("d".to_string(), 3. as f32);
-        score_map.insert("e".to_string(), 1. as f32);
-        score_map.insert("f".to_string(), 1. as f32);
-        let expected = 2. as f32;
-        assert_eq!(expected, mean(&score_map));
-    }
+        // Test 2:
+        freq_map = HashMap::new();
+        freq_map.insert("alcohol".to_string(), 2.0);
+        freq_map.insert("terminal".to_string(), 2.0);
+        freq_map.insert("geraniol".to_string(), 2.0);
+        freq_map.insert("manitol".to_string(), 3.0);
+        freq_map.insert("dehydrogenase".to_string(), 7.0);
+        freq_map.insert("c".to_string(), 1.0);
+        freq_map.insert("cinnamyl".to_string(), 1.0);
+        freq_sum = freq_map.values().into_iter().sum();
+        expected = HashMap::new();
+        expected.insert(
+            "alcohol".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "terminal".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "geraniol".to_string(),
+            -1. * f32::log(1. - 2. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "manitol".to_string(),
+            -1. * f32::log(1. - 3. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "dehydrogenase".to_string(),
+            -1. * f32::log(1. - 7. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "c".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+        expected.insert(
+            "cinnamyl".to_string(),
+            -1. * f32::log(1. - 1. / freq_sum, std::f32::consts::E),
+        );
+        let mut mean_ciic: f32 = 0.0;
+        for (_, x_ciic) in &expected {
+            mean_ciic += x_ciic;
+        }
+        mean_ciic = mean_ciic / expected.len() as f32;
+        // center the expected IIC:
+        let mut centered_expected: HashMap<String, f32> = HashMap::new();
+        for (word, iic) in &expected {
+            centered_expected.insert((*word).clone(), iic - mean_ciic);
+        }
+        // test iteratively:
+        let result: HashMap<String, f32> = centered_inverse_information_content(&freq_map);
+        for (word, _) in &centered_expected {
+            assert_approx_eq!(
+                centered_expected.get(word).unwrap(),
+                result.get(word).unwrap(),
+                1e-6f32
+            );
+        }
 
-    #[test]
-    fn test_scores_phrases() {
-        let mut phrases: Vec<Vec<String>> = vec![];
-        phrases.push(vec!["a".to_string()]);
-        phrases.push(vec!["b".to_string()]);
-        phrases.push(vec!["c".to_string()]);
-        phrases.push(vec!["d".to_string()]);
-        phrases.push(vec!["e".to_string()]);
-        phrases.push(vec!["f".to_string()]);
-
-        // Note that we assume a universe of ten words:
-        let mut freq_map: HashMap<String, f32> = HashMap::new();
-        freq_map.insert("a".to_string(), 3. as f32);
-        freq_map.insert("b".to_string(), 2. as f32);
-        freq_map.insert("c".to_string(), 2. as f32);
-        freq_map.insert("d".to_string(), 1. as f32);
-        freq_map.insert("e".to_string(), 1. as f32);
-        freq_map.insert("f".to_string(), 1. as f32);
-
-        // All of the above phrases consist just of a single word, thus their phrase-scores should
-        // be identical to the centered frequency of their word:
-        let expected: Vec<f32> = vec![
-            -1.0 * f32::log(1. - 0.3, std::f32::consts::E),
-            -1.0 * f32::log(1. - 0.2, std::f32::consts::E),
-            -1.0 * f32::log(1. - 0.2, std::f32::consts::E),
-            -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
-            -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
-            -1.0 * f32::log(1. - 0.1, std::f32::consts::E),
-        ];
-        let mean_inv_inf_cntnt: f32 = expected.iter().sum::<f32>() / expected.len() as f32;
-        let expected_centered = expected
-            .iter()
-            .map(|x| x - mean_inv_inf_cntnt)
-            .collect::<Vec<f32>>();
-        let result = score_phrases(&freq_map, &phrases);
-        assert_approx_eq!(expected_centered[0], result[0], 0.00001 as f32);
-        assert_approx_eq!(expected_centered[1], result[1], 1.11111 as f32);
-        assert_approx_eq!(expected_centered[2], result[2], 2.22221 as f32);
-        assert_approx_eq!(expected_centered[3], result[3], 3.33331 as f32);
-        assert_approx_eq!(expected_centered[4], result[4], 4.44441 as f32);
-        assert_approx_eq!(expected_centered[5], result[5], 5.55551 as f32);
-    }
-
-    #[test]
-    fn test_find_best_scoring_phrase() {
-        let phrases: Vec<Vec<String>> = vec![
-            vec!["dehydrogenase".to_string(), "c".to_string()],
-            vec![
-                "dehydrogenase".to_string(),
-                "c".to_string(),
-                "terminal".to_string(),
-            ],
-            vec!["alcohol".to_string(), "dehydrogenase".to_string()],
-            vec![
-                "cinnamyl".to_string(),
-                "alcohol".to_string(),
-                "dehydrogenase".to_string(),
-            ],
-        ];
-        let phrase_scores: Vec<f32> = vec![0.265823, 0.265823, 0.22149113, -0.110522866];
-
+        // test special case of all equally frequent words:
+        freq_map = HashMap::new();
+        freq_map.insert("foo".to_string(), 1.0);
+        freq_map.insert("bar".to_string(), 1.0);
+        freq_map.insert("baz".to_string(), 1.0);
+        centered_expected = HashMap::new();
+        // All words should have this NON CENTERED inverse information content:
+        let iic: f32 = -1.0 * f32::log(1. - 1. / 3., std::f32::consts::E);
+        centered_expected.insert("foo".to_string(), iic);
+        centered_expected.insert("bar".to_string(), iic);
+        centered_expected.insert("baz".to_string(), iic);
         assert_eq!(
-            1 as usize,
-            find_best_scoring_phrase(&phrases, &phrase_scores).unwrap()
+            centered_expected,
+            centered_inverse_information_content(&freq_map)
+        );
+    }
+
+    #[test]
+    fn test_highest_scoring_phrase() {
+        let desc1: Vec<String> = vec!["importin".to_string(), "5".to_string()];
+        let desc2: Vec<String> = vec![
+            "ran".to_string(),
+            "binding".to_string(),
+            "protein".to_string(),
+            "6".to_string(),
+        ];
+        let desc3: Vec<String> = vec!["ran".to_string(), "6".to_string()];
+        let desc4: Vec<String> = vec![
+            "protein".to_string(),
+            "narrow".to_string(),
+            "leaf".to_string(),
+            "1".to_string(),
+        ];
+
+        let mut word_freqs: HashMap<String, f32> = HashMap::new();
+        word_freqs.insert("6".to_string(), 2.0);
+        word_freqs.insert("importin".to_string(), 5.0);
+        word_freqs.insert("ran".to_string(), 2.0);
+        word_freqs.insert("3".to_string(), 2.0);
+        word_freqs.insert("subunit".to_string(), 2.0);
+        word_freqs.insert("beta".to_string(), 2.0);
+        word_freqs.insert("5".to_string(), 3.0);
+        word_freqs.insert("binding".to_string(), 2.0);
+
+        let mut ciic = centered_inverse_information_content(&word_freqs);
+
+        let phrase1 = highest_scoring_phrase(&desc1, &ciic).unwrap();
+        let expected1 = vec!["importin".to_string(), "5".to_string()];
+        assert_eq!(expected1, phrase1.0);
+
+        let phrase2 = highest_scoring_phrase(&desc2, &ciic).unwrap();
+        let expected2 = vec!["binding".to_string(), "protein".to_string()];
+        assert_eq!(expected2, phrase2.0);
+
+        let phrase3 = highest_scoring_phrase(&desc3, &ciic);
+        assert!(phrase3.is_none());
+
+        word_freqs = HashMap::new();
+        for word in &desc4 {
+            word_freqs.insert(word.clone(), 1.0);
+        }
+        ciic = centered_inverse_information_content(&word_freqs);
+        let phrase4 = highest_scoring_phrase(&desc4, &ciic).unwrap();
+        // Expect the full input description to be replicated:
+        assert_eq!(desc4, phrase4.0);
+
+        let desc5 = vec![
+            "receptor".to_string(),
+            "protein".to_string(),
+            "eix2".to_string(),
+        ];
+        word_freqs = HashMap::new();
+        word_freqs.insert("receptor".to_string(), 2.0);
+        word_freqs.insert("eix1".to_string(), 1.0);
+        word_freqs.insert("eix2".to_string(), 1.0);
+        ciic = centered_inverse_information_content(&word_freqs);
+        let phrase5 = highest_scoring_phrase(&desc5, &ciic).unwrap();
+        assert_eq!(
+            vec!["receptor".to_string(), "protein".to_string()],
+            phrase5.0
         );
     }
 
     #[test]
     fn test_generate_human_readable_description() {
-        let hit_hrds = vec![
+        // Test 1:
+        // TODO: If one of the following 'manitol dehydrogenase' is removed the phrases 'manitol
+        // dehydrogenase' *and* 'geraniol dehydrogenase' will receive identical scores. Currently,
+        // in such cases their order of appearance decides, which is chosen as a result. Meaning
+        // in these cases the result is chosen somewhat randomly. Find a solution for this!
+        let mut hit_hrds = vec![
             "manitol dehydrogenase".to_string(),
             "cinnamyl alcohol-dehydrogenase".to_string(),
             "geraniol dehydrogenase".to_string(),
             "geraniol|dehydrogenase terminal".to_string(),
             "manitol dehydrogenase".to_string(),
+            "manitol dehydrogenase".to_string(),
             "alcohol dehydrogenase c-terminal".to_string(),
         ];
-        let expected = "dehydrogenase".to_string();
-        let result = generate_human_readable_description(&hit_hrds).unwrap();
+        let mut expected = "manitol dehydrogenase".to_string();
+        let mut result =
+            generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX)).unwrap();
+        assert_eq!(expected, result);
 
+        // Test 2:
+        hit_hrds = vec![
+            "importin-5".to_string(),
+            "importin-5".to_string(),
+            "importin-5".to_string(),
+            "ran-binding protein 6".to_string(),
+            "ran-binding protein 6".to_string(),
+            "importin subunit beta-3".to_string(),
+            "importin subunit beta-3".to_string(),
+        ];
+        expected = "importin 5".to_string();
+        result =
+            generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX)).unwrap();
+        assert_eq!(expected, result);
+
+        // Test 3:
+        hit_hrds = vec![
+            "receptor protein eix1".to_string(),
+            "receptor protein eix2".to_string(),
+        ];
+        expected = "receptor protein".to_string();
+        result =
+            generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX)).unwrap();
         assert_eq!(expected, result);
     }
 }

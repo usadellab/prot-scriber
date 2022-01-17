@@ -62,7 +62,6 @@ mod tests {
             .unwrap()
             .to_string();
         parse_seq_families_file(&p, &mut ap);
-        println!("parsed seq-fams:\n{:?}", ap.seq_families);
         assert_eq!(ap.seq_families.len(), 6)
     }
 

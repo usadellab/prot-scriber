@@ -7,10 +7,10 @@ use regex::Regex;
 ///
 /// # Arguments
 ///
-/// * stitle - The sequence title string
-/// * regexs - A vector of regular expression to be applied to the stitle argument.
-pub fn matches_blacklist(stitle: &str, regexs: &Vec<Regex>) -> bool {
-    regexs.iter().any(|x| x.is_match(&stitle.to_string()))
+/// * testee - The text to be tested for any matching argument regular expression (`regexs`)
+/// * regexs - A vector of regular expression to be applied to the testee argument.
+pub fn matches_blacklist(testee: &str, regexs: &Vec<Regex>) -> bool {
+    regexs.iter().any(|x| x.is_match(&testee.to_string()))
 }
 
 /// Fasta entries have a long title in which the sequence identifier and often taxonomic
@@ -43,7 +43,6 @@ mod tests {
     #[test]
     fn default_filter_regexs_extract_uni_prot_descriptions() {
         let t1 = "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1";
-        println!("\n\n{}\n\n", t1);
         assert_eq!(
             filter_stitle(t1, &(*FILTER_REGEXS)),
             "lrr receptor serine/threonine-protein kinase at3g47570"

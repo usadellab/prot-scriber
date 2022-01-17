@@ -1,4 +1,4 @@
-use super::default::UNKNOWN_FAMILY_DESCRIPTION;
+use super::default::{SPLIT_DESCRIPTION_REGEX, UNKNOWN_FAMILY_DESCRIPTION};
 use super::query::Query;
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
 use std::collections::HashMap;
@@ -67,8 +67,8 @@ impl SeqFamily {
         for qid in self.query_ids.iter() {
             // If the searches found hits of significant similarity for the query sequence:
             if queries.contains_key(qid) {
-                for (_, hit) in &queries.get(qid).unwrap().hits {
-                    hit_descriptions.push(hit.description.clone());
+                for (_, hit_desc) in &queries.get(qid).unwrap().hits {
+                    hit_descriptions.push(hit_desc.clone());
                 }
             }
         }
@@ -76,7 +76,8 @@ impl SeqFamily {
         // available, return the default "unkown family" otherwise:
         let mut hrd: String = (*UNKNOWN_FAMILY_DESCRIPTION).to_string();
         if hit_descriptions.len() > 0 {
-            let hrd_option = generate_human_readable_description(&hit_descriptions);
+            let hrd_option =
+                generate_human_readable_description(&hit_descriptions, &(*SPLIT_DESCRIPTION_REGEX));
             match hrd_option {
                 Some(hum_read_desc) => hrd = hum_read_desc,
                 None => {}

@@ -14,11 +14,19 @@ use std::sync::mpsc::Sender;
 /// # Arguments
 ///
 /// * `path: String` - The path to the tabular sequence similarity search result file to parse
-/// * `separator: char` - The separator to use to split a line into an array of columns
-/// * `table_cols: &HashMap<String, usize>` - The header information, i.e. the column names and
-/// their respective position in the table (`path`).
+/// * `field_separator: char` - The separator to use to split a line into an array of columns
+/// * `qacc_col: &usize` - The column index in which to find the `qacc`
+/// * `sacc_col: &usize` - The column index in which to find the `sacc`
+/// * `stitle_col: &usize` - The column index in which to find the `stitle`
 /// * `transmitter: Sender<Query>` - Used to send instances of `Query` to any receiver.
-pub fn parse_table(path: String, transmitter: Sender<(String, Query)>) {
+pub fn parse_table(
+    path: String,
+    field_separator: &char,
+    qacc_col: &usize,
+    sacc_col: &usize,
+    stitle_col: &usize,
+    transmitter: Sender<(String, Query)>,
+) {
     let lines =
         read_lines(&path).expect(format!("An error occurred reading file '{}'", &path).as_str());
     let mut last_qacc = String::new();
@@ -26,10 +34,10 @@ pub fn parse_table(path: String, transmitter: Sender<(String, Query)>) {
     for line_rslt in lines {
         match line_rslt {
             Ok(line) => {
-                let cols: Vec<&str> = line.trim().split('\t').collect();
-                let qacc = cols[0];
-                let sacc = cols[1];
-                let stitle = cols[9];
+                let cols: Vec<&str> = line.trim().split(*field_separator).collect();
+                let qacc = cols[*qacc_col];
+                let sacc = cols[*sacc_col];
+                let stitle = cols[*stitle_col];
 
                 if qacc != last_qacc && !last_qacc.is_empty() {
                     transmitter.send((last_qacc, curr_query)).unwrap();

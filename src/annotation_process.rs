@@ -61,10 +61,12 @@ impl AnnotationProcess {
         // Setup communication between threads:
         let (tx, rx) = mpsc::channel();
 
+        // Field-Separator in Sequence Similarity Search (Blast) Result rows (lines):
+        let field_separator = *SSSR_TABLE_FIELD_SEPARATOR;
         // Sequence Similarity Search (Blast) Result column indices:
-        // let qacc_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap();
-        // let sacc_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap();
-        // let stitle_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap();
+        let qacc_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap();
+        let sacc_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap();
+        let stitle_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap();
 
         // Parse and process each sequence similarity search result table in a dedicated
         // thread:
@@ -73,7 +75,14 @@ impl AnnotationProcess {
 
             // Start this sss_tbl's dedicated threat:
             thread::spawn(move || {
-                parse_table(sss_tbl, tx_i);
+                parse_table(
+                    sss_tbl,
+                    &field_separator,
+                    &qacc_col,
+                    &sacc_col,
+                    &stitle_col,
+                    tx_i,
+                );
             });
         }
         // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
@@ -362,7 +371,7 @@ mod tests {
         nq1.hits.insert(h1.0.to_string(), h1.1.to_string());
         nq1.hits.insert(h2.0.to_string(), h2.1.to_string());
         // Test insert_query
-        let qacc = "Soltu.DM.02G015700.1".to_string(); 
+        let qacc = "Soltu.DM.02G015700.1".to_string();
         ap.insert_query(qacc.clone(), nq1);
 
         // check if query got inserted correctly
@@ -380,7 +389,7 @@ mod tests {
     fn insert_query_panics_in_case_of_unsorted_blast_table() {
         let mut ap = AnnotationProcess::new();
         let nq1 = Query::new();
-        let qacc = "Soltu.DM.02G015700.1".to_string(); 
+        let qacc = "Soltu.DM.02G015700.1".to_string();
 
         // Mark nq1 as already processed:
         ap.human_readable_descriptions
@@ -465,8 +474,8 @@ mod tests {
         ap.seq_sim_search_tables = vec!["blast_out_table.txt".to_string()];
         // let mut nq1 = Query::from_qacc("Soltu.DM.02G015700.1".to_string());
         let mut nq1 = Query::new();
-        let qacc = "Soltu.DM.02G015700.1".to_string(); 
-        ap.insert_query(qacc.clone(),nq1);
+        let qacc = "Soltu.DM.02G015700.1".to_string();
+        ap.insert_query(qacc.clone(), nq1);
         // Query should have been annotated:
         assert!(ap.human_readable_descriptions.contains_key(&qacc));
         assert!(!ap.queries.contains_key(&qacc));
@@ -497,9 +506,9 @@ mod tests {
         let h1 = ("hit_One","sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1");
         let h2 = ("hit_Two","sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1");
         nq1.hits.insert(h1.0.to_string(), h1.1.to_string());
-        nq1.hits.insert(h1.0.to_string(), h1.1.to_string());
+        nq1.hits.insert(h2.0.to_string(), h2.1.to_string());
 
-        ap.insert_query(qacc.clone(),nq1);
+        ap.insert_query(qacc.clone(), nq1);
         ap.process_rest_data();
         // Query should have been annotated:
         assert!(ap.human_readable_descriptions.contains_key(&qacc));
@@ -511,7 +520,7 @@ mod tests {
         let sf_id1 = "SeqFamily1".to_string();
         ap.insert_seq_family(sf_id1.clone(), sf1);
         nq1 = Query::new();
-        ap.insert_query(qacc.clone(),nq1);
+        ap.insert_query(qacc.clone(), nq1);
         let mut sf2 = SeqFamily::new();
         sf2.query_ids = vec!["The protein without known relatives".to_string()];
         let sf_id2 = "SeqFamily2".to_string();
@@ -606,7 +615,7 @@ mod tests {
         ];
         ap.insert_seq_family(sf1_id.clone(), sf1);
         ap.insert_seq_family(sf2_id.clone(), sf2);
-       ap.run();
+        ap.run();
         let hrds = ap.human_readable_descriptions;
         assert_eq!(hrds.len(), 2);
         let queries_with_expected_result = vec![sf1_id, sf2_id];

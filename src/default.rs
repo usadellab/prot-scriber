@@ -23,16 +23,16 @@ lazy_static! {
     /// The default Blacklist of regular expressions used to filter out Hit title (`stitle`) fields
     /// if they match ANY of these expressions.
     pub static ref BLACKLIST_STITLE_REGEXS: Vec<Regex> = vec![
-        Regex::new(r"(?i)^similar\s+to").unwrap(),
-        Regex::new(r"(?i)^probable\b").unwrap(),
-        Regex::new(r"(?i)^putative\b").unwrap(),
-        Regex::new(r"(?i)^predicted\b").unwrap(),
-        Regex::new(r"(?i)^uncharacterized\b").unwrap(),
-        Regex::new(r"(?i)^unknown\b").unwrap(),
-        Regex::new(r"(?i)^hypothetical\b").unwrap(),
-        Regex::new(r"(?i)^unnamed\b").unwrap(),
-        Regex::new(r"(?i)^whole\s+genome\s+shotgun\s+sequence\b").unwrap(),
-        Regex::new(r"(?i)^clone\b").unwrap(),
+        Regex::new(r"(?i)\bsimilar\s+to").unwrap(),
+        Regex::new(r"(?i)\bprobable\b").unwrap(),
+        Regex::new(r"(?i)\bputative\b").unwrap(),
+        Regex::new(r"(?i)\bpredicted\b").unwrap(),
+        Regex::new(r"(?i)\buncharacterized\b").unwrap(),
+        Regex::new(r"(?i)\bunknown\b").unwrap(),
+        Regex::new(r"(?i)\bhypothetical\b").unwrap(),
+        Regex::new(r"(?i)\bunnamed\b").unwrap(),
+        Regex::new(r"(?i)\bwhole\s+genome\s+shotgun\s+sequence\b").unwrap(),
+        Regex::new(r"(?i)\bclone\b").unwrap(),
     ];
 
     /// The default regular expressions used to filter a Hit title (`stitle`) and retain the short
@@ -72,20 +72,9 @@ lazy_static! {
         h
     };
 
-    /// A Hit's description is split into words using these regular expressions (tuple position
-    /// `0`), replacing match-groups with the replacer (tuple position `1`). See function
-    /// `split_descriptions` in module `generate_hrd_associated_funcs.rs` for details.
-    pub static ref DESCRIPTION_REGEX_GSUB_TUPLES: Vec<(Regex, String)> = {
-        let mut v : Vec<(Regex, String)> = vec![];
-        // Split words made of letters, but not single numbers:
-        v.push((Regex::new(r"(?i)\b(?P<first>[a-z]+|\d*)\b[-/|/\\;,':().\s+]+\b(?P<second>[a-z]+|\d*)\b").unwrap(), "$first $second".to_string()));
-        v
-    };
-
-    /// After filterering a Blast Hit description (see `DESCRIPTION_REGEX_GSUB_TUPLES` and
-    /// `split_descriptions`) this is the default regular expression used to split the resulting
-    /// string:
-    pub static ref FILTERED_DESCRIPTION_SPLIT_REGEX: Regex = Regex::new(r"\s+").unwrap();
+    /// A Hit's description is split into words using this default regular expression.
+    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([-/|/\\;,':().\s+]+)").unwrap();
+    // pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r" ").unwrap();
 
     /// Default sequence similarity search result table field separator:
     pub static ref SSSR_TABLE_FIELD_SEPARATOR: char = '\t';

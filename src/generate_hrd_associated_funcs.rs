@@ -1,6 +1,6 @@
 use super::default::{
     BLACKLIST_DESCRIPTION_WORDS_REGEXS, DESCRIPTION_REGEX_GSUB_TUPLES,
-    FILTERED_DESCRIPTION_SPLIT_REGEX, NON_INFORMATIVE_WORD_SCORE,
+    FILTERED_DESCRIPTION_SPLIT_REGEX, MAX_SUB_ITERATIONS, NON_INFORMATIVE_WORD_SCORE,
 };
 use super::model_funcs::matches_blacklist;
 use regex::Regex;
@@ -15,6 +15,7 @@ pub fn generate_human_readable_description(
     descriptions: &Vec<String>,
     split_regexs_gsub_tuples: &Vec<(Regex, String)>,
     filtered_description_split_regex: &Regex,
+    max_sub_iterations: &u8,
 ) -> Option<String> {
     if descriptions.len() > 0 {
         // Split the descriptions into vectors of words:
@@ -25,6 +26,7 @@ pub fn generate_human_readable_description(
                     dsc,
                     split_regexs_gsub_tuples,
                     filtered_description_split_regex,
+                    max_sub_iterations,
                 )
             })
             .collect();
@@ -145,12 +147,21 @@ pub fn highest_scoring_phrase(
 /// * `String of a Hit HRD description` & `Vector containing Regex strings`
 pub fn split_descriptions(
     description: &String,
-    regexs_gsub_tuples: &Vec<(Regex, String)>,
+    regexs_sub_tuples: &Vec<(Regex, String)>,
     split_regex: &Regex,
+    max_sub_iterations: &u8,
 ) -> Vec<String> {
     let mut filtered_desc = description.clone();
-    for (regex_i, replacer_i) in regexs_gsub_tuples {
-        filtered_desc = regex_i.replace_all(&filtered_desc, replacer_i).to_string();
+    for (regex_i, replacer_i) in regexs_sub_tuples {
+        let mut i: u8 = 0;
+        loop {
+            if regex_i.is_match(&filtered_desc) && i < *max_sub_iterations {
+                filtered_desc = regex_i.replace(&filtered_desc, replacer_i).to_string();
+                i += 1;
+            } else {
+                break;
+            }
+        }
     }
     split_regex
         .split(&filtered_desc)
@@ -231,14 +242,52 @@ mod tests {
 
     #[test]
     fn test_split_hits_descripts() {
-        let hit_words = "alcohol dehydrogenase c terminal".to_string();
-        let result = vec!["alcohol", "dehydrogenase", "c", "terminal"];
+        let mut hit_words = "alcohol dehydrogenase c terminal".to_string();
+        let mut expected = vec!["alcohol", "dehydrogenase", "c", "terminal"];
         assert_eq!(
-            result,
+            expected,
             split_descriptions(
                 &hit_words,
                 &(*DESCRIPTION_REGEX_GSUB_TUPLES),
-                &(*FILTERED_DESCRIPTION_SPLIT_REGEX)
+                &(*FILTERED_DESCRIPTION_SPLIT_REGEX),
+                &(*MAX_SUB_ITERATIONS)
+            )
+        );
+        hit_words = "abc-def ghi-jkl".to_string();
+        expected = vec!["abc", "def", "ghi", "jkl"];
+        assert_eq!(
+            expected,
+            split_descriptions(
+                &hit_words,
+                &(*DESCRIPTION_REGEX_GSUB_TUPLES),
+                &(*FILTERED_DESCRIPTION_SPLIT_REGEX),
+                &(*MAX_SUB_ITERATIONS)
+            )
+        );
+        hit_words = "abc-def-ghi".to_string();
+        expected = vec!["abc", "def", "ghi"];
+        assert_eq!(
+            expected,
+            split_descriptions(
+                &hit_words,
+                &(*DESCRIPTION_REGEX_GSUB_TUPLES),
+                &(*FILTERED_DESCRIPTION_SPLIT_REGEX),
+                &(*MAX_SUB_ITERATIONS)
+            )
+        );
+        hit_words =
+            "CDP-diacylglycerol--glycerol-3-phosphate 3-phosphatidyltransferase".to_string();
+        expected = vec![
+            "CDP-diacylglycerol--glycerol-3-phosphate",
+            "3-phosphatidyltransferase",
+        ];
+        assert_eq!(
+            expected,
+            split_descriptions(
+                &hit_words,
+                &(*DESCRIPTION_REGEX_GSUB_TUPLES),
+                &(*FILTERED_DESCRIPTION_SPLIT_REGEX),
+                &(*MAX_SUB_ITERATIONS)
             )
         );
     }
@@ -332,6 +381,7 @@ mod tests {
             &hit_hrds,
             &(*DESCRIPTION_REGEX_GSUB_TUPLES),
             &(*FILTERED_DESCRIPTION_SPLIT_REGEX),
+            &(*MAX_SUB_ITERATIONS),
         )
         .unwrap();
 

@@ -58,10 +58,29 @@ fn main() {
             .long("debug")
             .help("Turn debugging information on."),
         )
-        .get_matches();
+        .arg(
+            Arg::new("number of parallel threads")
+            .short('n')
+            .takes_value(true)
+            .long("n-threads")
+            .help("The maximum number of parallel threads to use. Default is the number of logical cores. Note that at most one thread is used per input sequence similarity search result (Blast table) file. After parsing these annotation may use up to this number of threads to generate human readable descriptions."),
+        ).get_matches();
 
     // Create a new AnnotationProcess instance and provide it with the necessary input data:
     let mut annotation_process = AnnotationProcess::new();
+
+    // Set number of parallel processes to use:
+    if let Some(n_threads) = matches.value_of("n-threads") {
+        annotation_process.n_threads = n_threads
+            .parse()
+            .expect("Could not parse argument 'n-threads' ('n') into a positive integer");
+    }
+    // Set the number of parallel processes to be used by `rayon` (see
+    // `AnnotationProcess::process_rest_data`):
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(annotation_process.n_threads)
+        .build_global()
+        .except("Could not set the number of parallel processes to be used to generate human readable descriptions (AnnotationProcess::process_rest_data).");
 
     // Add biological sequence families information, if provided as input by the user:
     if let Some(seq_families) = matches.value_of("seq-families") {

@@ -189,6 +189,7 @@ dependencies = [
  "assert_approx_eq",
  "clap",
  "lazy_static",
+ "num_cpus",
  "rayon",
  "regex",
 ]

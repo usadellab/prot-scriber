@@ -2,6 +2,7 @@ use super::default::{SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
 use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
+use num_cpus;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -27,6 +28,8 @@ pub struct AnnotationProcess {
     /// sequences or families (sets of query sequences). Stored here using the query identifier as
     /// key and the generated HRD as values.
     pub human_readable_descriptions: HashMap<String, String>,
+    /// The number of parallel threads to use.
+    pub n_threads: usize,
 }
 
 /// Representation of the mode an instance of AnnotationProcess runs in. Can be either (i)
@@ -43,7 +46,9 @@ pub enum AnnotationProcessMode {
 impl AnnotationProcess {
     /// Creates an empty (`Default`) instance of struct AnnotationProcess.
     pub fn new() -> AnnotationProcess {
-        Default::default()
+        let mut ap: AnnotationProcess = Default::default();
+        ap.n_threads = num_cpus::get();
+        ap
     }
 
     /// The central function that runs an annotation process. Note that this is implemented as a
@@ -70,6 +75,8 @@ impl AnnotationProcess {
 
         // Parse and process each sequence similarity search result table in a dedicated
         // thread:
+        // TODO: If there are more input tables than the self.n_threads, only use n_threads
+        // parallel processes.
         for sss_tbl in self.seq_sim_search_tables.iter().map(|x| x.clone()) {
             let tx_i = tx.clone();
 

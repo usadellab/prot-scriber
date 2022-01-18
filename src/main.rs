@@ -80,7 +80,7 @@ fn main() {
     rayon::ThreadPoolBuilder::new()
         .num_threads(annotation_process.n_threads)
         .build_global()
-        .except("Could not set the number of parallel processes to be used to generate human readable descriptions (AnnotationProcess::process_rest_data).");
+        .expect("Could not set the number of parallel processes to be used to generate human readable descriptions (AnnotationProcess::process_rest_data).");
 
     // Add biological sequence families information, if provided as input by the user:
     if let Some(seq_families) = matches.value_of("seq-families") {

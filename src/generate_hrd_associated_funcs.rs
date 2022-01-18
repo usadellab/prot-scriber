@@ -1,4 +1,6 @@
-use super::default::{BLACKLIST_DESCRIPTION_WORDS_REGEXS, NON_INFORMATIVE_WORD_SCORE};
+use super::default::{
+    BLACKLIST_DESCRIPTION_WORDS_REGEXS, MAX_MATCH_REPLACE_ITERATIONS, NON_INFORMATIVE_WORD_SCORE,
+};
 use super::model_funcs::matches_blacklist;
 use regex::Regex;
 use std::collections::HashMap;
@@ -15,9 +17,15 @@ use std::collections::HashMap;
 /// # Arguments
 ///
 /// * `hit_hrds: &Vec<String>` - A vector of strings containing all Hit descriptions.
+/// * `split_regex` - The regular expression used to split descriptions (parsed `stitle`) into
+/// vectors of words (`String`).
+/// * `replace_regexs` - An `Option` of a vector of tuples, pairing a regular expression and the
+/// capture-group replacement string. These are iteratively applied an the argument descriptions to
+/// prepare it for final splitting into words (see `split_descriptions` for details).
 pub fn generate_human_readable_description(
     descriptions: &Vec<String>,
     split_regex: &Regex,
+    replace_regexs: Option<&Vec<(Regex, String)>>,
 ) -> Option<String> {
     // Initialize default result:
     let mut human_readable_rescription_result: Option<String> = None;
@@ -26,7 +34,7 @@ pub fn generate_human_readable_description(
         // Split the descriptions into vectors of words:
         let description_words: Vec<Vec<String>> = descriptions
             .iter()
-            .map(|dsc| split_descriptions(dsc, split_regex))
+            .map(|dsc| split_descriptions(dsc, split_regex, replace_regexs))
             .collect();
 
         // The universe if informative words, maintaining the word-frequencies:
@@ -156,11 +164,35 @@ pub fn highest_scoring_phrase(
 ///
 /// # Arguments
 ///
-/// * `String of a Hit HRD description` & `Vector containing Regex strings`
-pub fn split_descriptions(description: &String, split_regex: &Regex) -> Vec<String> {
+/// * `description` - A reference to the parsed `stitle` to be split into words
+/// * `split_regex` - A reference to the regular expression to be used to split the argument
+/// `description` into words.
+/// * `replace_regexs` - An `Option` of a vector of tuples, pairing a regular expression and the
+/// capture-group replacement string. These are iteratively applied an the argument descriptions to
+/// prepare it for final splitting into words (see `split_descriptions` for details).
+pub fn split_descriptions(
+    description: &String,
+    split_regex: &Regex,
+    replace_regexs: Option<&Vec<(Regex, String)>>,
+) -> Vec<String> {
+    let mut split_desc = description.clone();
+    // Use regular expressions and replace with capture groups, if argument is given:
+    if let Some(rr_tuples) = replace_regexs {
+        for rr_tpl in rr_tuples {
+            for _ in 0..(*MAX_MATCH_REPLACE_ITERATIONS) {
+                if rr_tpl.0.is_match(&split_desc) {
+                    split_desc = rr_tpl.0.replace(&split_desc, &rr_tpl.1).to_string();
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    // Split the description using a simple regular expression:
     split_regex
-        .split(description)
+        .split(&split_desc.trim())
         .map(|wrd| wrd.to_string())
+        .filter(|x| !x.is_empty())
         .collect()
 }
 
@@ -250,17 +282,54 @@ pub fn centered_inverse_information_content(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::default::SPLIT_DESCRIPTION_REGEX;
+    use crate::default::{REPLACE_REGEXS_DESCRIPTION, SPLIT_DESCRIPTION_REGEX};
     use assert_approx_eq::assert_approx_eq;
     use std::vec;
 
     #[test]
-    fn test_split_hits_descripts() {
-        let hit_words = "alcohol dehydrogenase c terminal".to_string();
-        let result = vec!["alcohol", "dehydrogenase", "c", "terminal"];
+    fn test_split_descriptions() {
+        // Test 1:
+        let mut hit_words = "alcohol dehydrogenase c terminal".to_string();
+        let mut expected = vec!["alcohol", "dehydrogenase", "c", "terminal"];
         assert_eq!(
-            result,
-            split_descriptions(&hit_words, &(*SPLIT_DESCRIPTION_REGEX),)
+            expected,
+            split_descriptions(&hit_words, &(*SPLIT_DESCRIPTION_REGEX), None)
+        );
+
+        // Test 2 - using `default::REPLACE_REGEXS_DESCRIPTION`:
+        hit_words = "receptor-like protein eix2".to_string();
+        expected = vec!["receptor", "like", "protein", "eix"];
+        assert_eq!(
+            expected,
+            split_descriptions(
+                &hit_words,
+                &(*SPLIT_DESCRIPTION_REGEX),
+                Some(&(*REPLACE_REGEXS_DESCRIPTION))
+            )
+        );
+
+        // Test 3 - using `default::REPLACE_REGEXS_DESCRIPTION`:
+        hit_words = "subtilisin-like protease sbt4.15".to_string();
+        expected = vec!["subtilisin", "like", "protease", "sbt"];
+        assert_eq!(
+            expected,
+            split_descriptions(
+                &hit_words,
+                &(*SPLIT_DESCRIPTION_REGEX),
+                Some(&(*REPLACE_REGEXS_DESCRIPTION))
+            )
+        );
+
+        // Test 4 - using `default::REPLACE_REGEXS_DESCRIPTION`:
+        hit_words = "duf4228 domain protein".to_string();
+        expected = vec!["duf", "4228", "domain", "protein"];
+        assert_eq!(
+            expected,
+            split_descriptions(
+                &hit_words,
+                &(*SPLIT_DESCRIPTION_REGEX),
+                Some(&(*REPLACE_REGEXS_DESCRIPTION))
+            )
         );
     }
 
@@ -529,7 +598,8 @@ mod tests {
         ];
         let mut expected = "manitol dehydrogenase".to_string();
         let mut result =
-            generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX)).unwrap();
+            generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX), None)
+                .unwrap();
         assert_eq!(expected, result);
 
         // Test 2:
@@ -543,8 +613,8 @@ mod tests {
             "importin subunit beta-3".to_string(),
         ];
         expected = "importin 5".to_string();
-        result =
-            generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX)).unwrap();
+        result = generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX), None)
+            .unwrap();
         assert_eq!(expected, result);
 
         // Test 3:
@@ -553,8 +623,8 @@ mod tests {
             "receptor protein eix2".to_string(),
         ];
         expected = "receptor protein".to_string();
-        result =
-            generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX)).unwrap();
+        result = generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX), None)
+            .unwrap();
         assert_eq!(expected, result);
     }
 }

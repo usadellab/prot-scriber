@@ -1,4 +1,6 @@
-use super::default::{SPLIT_DESCRIPTION_REGEX, UNKNOWN_PROTEIN_DESCRIPTION};
+use super::default::{
+    REPLACE_REGEXS_DESCRIPTION, SPLIT_DESCRIPTION_REGEX, UNKNOWN_PROTEIN_DESCRIPTION,
+};
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
 use std::collections::HashMap;
 
@@ -35,8 +37,11 @@ impl Query {
                 .values()
                 .map(|hit_desc| (*hit_desc).clone())
                 .collect();
-            let hrd_option =
-                generate_human_readable_description(&hit_descriptions, &(*SPLIT_DESCRIPTION_REGEX));
+            let hrd_option = generate_human_readable_description(
+                &hit_descriptions,
+                &(*SPLIT_DESCRIPTION_REGEX),
+                Some(&(*REPLACE_REGEXS_DESCRIPTION)),
+            );
             match hrd_option {
                 Some(hum_read_desc) => {
                     hrd = hum_read_desc;

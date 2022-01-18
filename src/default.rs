@@ -13,6 +13,8 @@ lazy_static! {
     pub static ref BLACKLIST_DESCRIPTION_WORDS_REGEXS: Vec<Regex> = vec![
         Regex::new(r"(?i)\band\b").unwrap(),
         Regex::new(r"(?i)\bor\b").unwrap(),
+        Regex::new(r"(?i)\bfrom\b").unwrap(),
+        Regex::new(r"(?i)\bto\b").unwrap(),
         Regex::new(r"(?i)\bmember\b").unwrap(),
         Regex::new(r"(?i)\bprotein\b").unwrap(),
         Regex::new(r"(?i)\bisoform\b").unwrap(),
@@ -21,6 +23,7 @@ lazy_static! {
         Regex::new(r"(?i)\bfragment\b").unwrap(),
         Regex::new(r"(?i)\bhomolog\b").unwrap(),
         Regex::new(r"(?i)\bcontig\b").unwrap(),
+        Regex::new(r"\b\d+\b").unwrap(),
     ];
 
     /// The default Blacklist of regular expressions used to filter out Hit title (`stitle`) fields
@@ -34,6 +37,7 @@ lazy_static! {
         Regex::new(r"(?i)\bunknown\b").unwrap(),
         Regex::new(r"(?i)\bhypothetical\b").unwrap(),
         Regex::new(r"(?i)\bunnamed\b").unwrap(),
+        Regex::new(r"(?i)\bfragment\b").unwrap(),
         Regex::new(r"(?i)\bwhole\s+genome\s+shotgun\s+sequence\b").unwrap(),
         Regex::new(r"(?i)\bclone\b").unwrap(),
     ];
@@ -49,7 +53,7 @@ lazy_static! {
         Regex::new(r"\w{2,}\d{1,2}(g|G)\d+(\.\d)*\s+").unwrap(),
         Regex::new(r"\b\[.*").unwrap(),
         Regex::new(r"\b\S+\|\S+\|\S+").unwrap(),
-        Regex::new(r"\(\s*Fragment\s*\)").unwrap(),
+        //Regex::new(r"\(\s*Fragment\s*\)").unwrap(),
         Regex::new(r"^(\s|/|\(|\)|-|\+|\*|,|;|\.|:|\||\d)+$").unwrap(),
         Regex::new(r"(?i)\bunknown\b").unwrap(),
         Regex::new(r"(?i)-?\blike\b").unwrap(),
@@ -62,7 +66,7 @@ lazy_static! {
         Regex::new(r"(?i)\brelated\b").unwrap(),
         Regex::new(r"(?i)\bremark\b").unwrap(),
         Regex::new(r"(?i)\b\w?orf(\w?|\d+)\b").unwrap(),
-    ];
+        ];
 
     /// The default header definition of sequence similarity search result tables, i.e. mapping
     /// column names to their factual position in the to be parsed table.
@@ -76,8 +80,42 @@ lazy_static! {
     };
 
     /// A Hit's description is split into words using this default regular expression.
-    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([-/|/\\;,':.\s]+)").unwrap();
-    // pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r" ").unwrap();
+    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([~_\-/|\\;,':.\s]+)").unwrap();
+
+    /// The default vector of regular expressions _with_ match-groups to be used to split
+    /// descriptions (parsed `stitle`) into separate words by replacing the matched region with
+    /// the first and second captures:
+    pub static ref REPLACE_REGEXS_DESCRIPTION: Vec<(Regex, String)> = {
+        let mut rrd : Vec<(Regex, String)> = vec![];
+        rrd.push(
+            (
+                // Protects InterPro, PANTHER, Pfam annotations from being mangled by subsequent
+                // tuples:
+                Regex::new(r"(?i)\b(?P<first>duf|pf|ipr|pthr)(?P<second>[0-9:]+)\b").unwrap(),
+                r"$first~$second".to_string()
+            )
+        );
+        rrd.push(
+            (
+                // Transforms e.g. "eix2" into "eix" or "SBT4.15" into "SBT" - case insensitive:
+                Regex::new(r"(?i)\b(?P<first>[a-z]{2,})[-.,\d]+\b").unwrap(),
+                "$first ".to_string()
+            )
+        );
+        rrd.push(
+            (
+                // Deletes numbers:
+                Regex::new(r"\s+[.\d]+(\s+|$)").unwrap(),
+                " ".to_string()
+            )
+        );
+        rrd
+    };
+
+    /// The maximum number of applying one tuple of regular expression and match-group replacing in
+    /// generate_hrd_associated_funcs::split_descriptions( ..., `replace_regexs`) (see above
+    /// `REPLACE_REGEXS_DESCRIPTION`):
+    pub static ref MAX_MATCH_REPLACE_ITERATIONS: u8 = u8::MAX;
 
     /// Default sequence similarity search result table field separator:
     pub static ref SSSR_TABLE_FIELD_SEPARATOR: char = '\t';

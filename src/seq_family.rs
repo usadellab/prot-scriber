@@ -1,4 +1,6 @@
-use super::default::{SPLIT_DESCRIPTION_REGEX, UNKNOWN_FAMILY_DESCRIPTION};
+use super::default::{
+    REPLACE_REGEXS_DESCRIPTION, SPLIT_DESCRIPTION_REGEX, UNKNOWN_FAMILY_DESCRIPTION,
+};
 use super::query::Query;
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
 use std::collections::HashMap;
@@ -76,8 +78,11 @@ impl SeqFamily {
         // available, return the default "unkown family" otherwise:
         let mut hrd: String = (*UNKNOWN_FAMILY_DESCRIPTION).to_string();
         if hit_descriptions.len() > 0 {
-            let hrd_option =
-                generate_human_readable_description(&hit_descriptions, &(*SPLIT_DESCRIPTION_REGEX));
+            let hrd_option = generate_human_readable_description(
+                &hit_descriptions,
+                &(*SPLIT_DESCRIPTION_REGEX),
+                Some(&(*REPLACE_REGEXS_DESCRIPTION)),
+            );
             match hrd_option {
                 Some(hum_read_desc) => hrd = hum_read_desc,
                 None => {}

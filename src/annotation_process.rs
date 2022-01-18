@@ -30,6 +30,9 @@ pub struct AnnotationProcess {
     pub human_readable_descriptions: HashMap<String, String>,
     /// The number of parallel threads to use.
     pub n_threads: usize,
+    /// In mode FamilyAnnotation also annotate lonely queries, i.e. queries not comprised in a
+    /// sequence family?
+    pub annotate_lonely_queries: bool,
 }
 
 /// Representation of the mode an instance of AnnotationProcess runs in. Can be either (i)
@@ -270,7 +273,7 @@ impl AnnotationProcess {
                             self.annotate_seq_family(&seq_fam_id);
                         }
                     }
-                } else {
+                } else if self.annotate_lonely_queries {
                     // If no family for qs_id can be found, annotate query as in
                     // SequenceAnnotation:
                     self.annotate_query(query_id);

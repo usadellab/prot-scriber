@@ -169,7 +169,7 @@ pub fn highest_scoring_phrase(
 /// `description` into words.
 /// * `replace_regexs` - An `Option` of a vector of tuples, pairing a regular expression and the
 /// capture-group replacement string. These are iteratively applied an the argument descriptions to
-/// prepare it for final splitting into words (see `split_descriptions` for details).
+/// prepare it for final splitting into words.
 pub fn split_descriptions(
     description: &String,
     split_regex: &Regex,

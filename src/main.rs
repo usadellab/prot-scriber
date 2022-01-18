@@ -38,7 +38,7 @@ fn main() {
             .help("File in which to find sequence similarity search results in tabular format. Use e.g. Blast or Diamond to produce them. Required columns are: 'qacc sacc qlen qstart qend slen sstart send bitscore stitle'. If given in different order than shown here use the --header arg."),
         )
         .arg(
-            Arg::new("header columns of sequence similarity search result table")
+            Arg::new("header")
             .short('h')
             .takes_value(true)
             .long("header")
@@ -46,11 +46,18 @@ fn main() {
             .help("Header of the --seq-sim-table (-s) arg. Separated by space (' ') the names of the columns as they appear in the respective table. Required and default columns are 'qacc sacc qlen qstart qend slen sstart send bitscore stitle'. You can have additional columns that will be ignored. If multiple --seq-sim-table (-s) args are provided make sure the --header (-h) args appear in the correct order, e.g. the first -h arg will be used for the first -s arg, the second -h will be used for the second -s and so on."),
         )
         .arg(
-            Arg::new("biological sequence families")
+            Arg::new("seq-families")
             .short('f')
             .takes_value(true)
             .long("seq-families")
             .help("A file in which families of biological sequences are stored, one family per line. Each line must have format 'fam-name TAB gene1,gene2,gene3'. Make sure no gene appears in more than one family."),
+        )
+        .arg(
+            Arg::new("annotate-non-family-queries")
+            .short('a')
+            .takes_value(false)
+            .long("annotate-non-family-queries")
+            .help("If this flag is given, queries for which there are sequence similarity search (Blast) results but that are NOT member of a sequence family will receive an annotation (human readable description) in the output file, too. Default value of this setting is 'OFF' (false)."),
         )
         .arg(
             Arg::new("debug")
@@ -59,7 +66,7 @@ fn main() {
             .help("Turn debugging information on."),
         )
         .arg(
-            Arg::new("number of parallel threads")
+            Arg::new("n-threads")
             .short('n')
             .takes_value(true)
             .long("n-threads")
@@ -85,6 +92,15 @@ fn main() {
     // Add biological sequence families information, if provided as input by the user:
     if let Some(seq_families) = matches.value_of("seq-families") {
         parse_seq_families_file(seq_families, &mut annotation_process);
+        println!(
+            "Loaded {:?} sequence families from {:?}",
+            &annotation_process.seq_families.len(),
+            &seq_families
+        );
+    }
+    // Shall non family queries also be annotated?
+    if matches.is_present("annotate-non-family-queries") {
+        annotation_process.annotate_lonely_queries = true;
     }
 
     // Set the input sequence similarity search result (SSSR) tables (Blast or Diamond):

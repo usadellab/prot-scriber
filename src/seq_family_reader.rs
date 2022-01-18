@@ -26,7 +26,12 @@ pub fn parse_seq_families_file(path: &str, annotation_process: &mut AnnotationPr
 
 fn parse_seq_family(family: String) -> Result<(String, SeqFamily), Box<dyn Error>> {
     // split the line by "\t". There should be more than 1 element (>=2), panic if not
-    let family_cols: Vec<&str> = family.trim().split("\t").collect();
+    let family_cols: Vec<&str> = family
+        .trim()
+        .split("\t")
+        .map(|x| x.trim())
+        .filter(|x| !x.is_empty())
+        .collect();
     if family_cols.len() < 2 {
         return Err("Malformatted gene family".into());
     }
@@ -39,7 +44,8 @@ fn parse_seq_family(family: String) -> Result<(String, SeqFamily), Box<dyn Error
     // we need to re-join the remaining elements.
     let gene_cols: Vec<String> = SPLIT_GENE_FAMILY_GENES_REGEX
         .split(&family_cols[1..].join("\t"))
-        .map(String::from)
+        .map(|x| x.trim().to_string())
+        .filter(|x| !x.is_empty())
         .collect();
 
     // set family genes
@@ -68,7 +74,8 @@ mod tests {
     #[test]
     fn parses_correct_lines_ok() {
         let line_1: String = "OG0023617	VFABAHed036352,VFABAHed036353".to_string();
-        let line_2: String = "OG0023617	VFABAHed036490 ,	 VFABAHed036491  VFABAHed036353".to_string();
+        let line_2: String =
+            "OG0023617	VFABAHed036490 ,	 VFABAHed036491  VFABAHed036353  ".to_string();
         let line_3: String = "OG0023617	VFABAHed036352	VFABAHed036353, VFABAHed036354".to_string();
 
         match parse_seq_family(line_1) {

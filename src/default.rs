@@ -91,7 +91,7 @@ lazy_static! {
             (
                 // Protects InterPro, PANTHER, Pfam annotations from being mangled by subsequent
                 // tuples:
-                Regex::new(r"(?i)\b(?P<first>duf|pf|ipr|pthr)(?P<second>[0-9:]+)\b").unwrap(),
+                Regex::new(r"(?i)\b(?P<first>duf|pf|ipr|pthr|go|kegg|ec)(?P<second>[0-9:]+)\b").unwrap(),
                 r"$first~$second".to_string()
             )
         );

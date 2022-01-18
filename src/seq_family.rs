@@ -84,7 +84,9 @@ impl SeqFamily {
                 Some(&(*REPLACE_REGEXS_DESCRIPTION)),
             );
             match hrd_option {
-                Some(hum_read_desc) => hrd = hum_read_desc,
+                Some(hum_read_desc) => {
+                    hrd = hum_read_desc;
+                }
                 None => {}
             }
         }

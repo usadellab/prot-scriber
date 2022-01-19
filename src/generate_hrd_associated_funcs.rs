@@ -216,9 +216,9 @@ pub fn frequencies(universe_words: &Vec<String>) -> HashMap<String, f32> {
 
 /// Computes the score of the informative words in argument `wrd_frequencies.keys()` using 'inverse
 /// information content' calculated as `-1 * log(1 - probability(word))`, where 'probability' =
-/// frequency elem [0,1]. In order to avoid infinite values for a word that is the single element
-/// of the word-set, i.e. it has a frequency of one, the score of one is used. Returns a HashMap of
-/// word centered IIC key-value-pairs (`HashMap<String, f32>`).
+/// frequency tanges between zero and one. In order to avoid infinite values for a word that is the
+/// single element of the word-set, i.e. it has a frequency of one, the score of one is used.
+/// Returns a HashMap of word centered IIC key-value-pairs (`HashMap<String, f32>`).
 ///
 /// # Arguments
 ///

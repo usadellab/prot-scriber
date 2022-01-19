@@ -49,9 +49,15 @@ pub enum AnnotationProcessMode {
 impl AnnotationProcess {
     /// Creates an empty (`Default`) instance of struct AnnotationProcess.
     pub fn new() -> AnnotationProcess {
-        let mut ap: AnnotationProcess = Default::default();
-        ap.n_threads = num_cpus::get();
-        ap
+        AnnotationProcess {
+            seq_sim_search_tables: vec![],
+            queries: HashMap::new(),
+            seq_families: HashMap::new(),
+            query_id_to_seq_family_id_index: HashMap::new(),
+            human_readable_descriptions: HashMap::new(),
+            n_threads: num_cpus::get(),
+            annotate_lonely_queries: false,
+        }
     }
 
     /// The central function that runs an annotation process. Note that this is implemented as a

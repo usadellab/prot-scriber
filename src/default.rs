@@ -53,7 +53,6 @@ lazy_static! {
         Regex::new(r"\w{2,}\d{1,2}(g|G)\d+(\.\d)*\s+").unwrap(),
         Regex::new(r"\b\[.*").unwrap(),
         Regex::new(r"\b\S+\|\S+\|\S+").unwrap(),
-        //Regex::new(r"\(\s*Fragment\s*\)").unwrap(),
         Regex::new(r"^(\s|/|\(|\)|-|\+|\*|,|;|\.|:|\||\d)+$").unwrap(),
         Regex::new(r"(?i)\bunknown\b").unwrap(),
         Regex::new(r"(?i)-?\blike\b").unwrap(),

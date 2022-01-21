@@ -569,3 +569,76 @@ annotateProteinsAndEvaluatePerformance.MultiRegion <- function(sssr,
         })
     }))
 }
+
+#' Measures performance of query sequence function predictors a.k.a
+#' 'annotators', comparing the 'Best Blast' method with 'prot-scriber'. Note
+#' that performance is measured in terms of Matthew's Correlation Coefficient,
+#' F-Score, and their 'relative' counterparts. See respectively named functions
+#' in this package for details.
+#'
+#' @param query.id - A string representing the biological sequence identifier
+#' for which the competing annotators have produced annotations, i.e. human
+#' readable descriptions (HRDs)
+#' @param sssr - A named list, in which names represent searched reference
+#' sequence databases and values the read in tabular output (see function
+#' parseSeqSimSearchTable).
+#' @param ps.res - An instance of base::data.frame with two columns
+#' 'Annotee.Identifier' and 'Human.Readable.Description'. The table holds the
+#' results of prot-scriber for the respective queries. Note that this table is
+#' expected to have been produced by the Rust implementation of prot-scriber.
+#' @param refs - A named list in which for the argument query.id a vector of
+#' strings is expected to hold the 'truth', i.e. the words expected to be
+#' reproduced by the competing annotators.
+#'
+#' @return An instance of base::data.frame with the following columns:
+#' 'Protein.ID', 'F.Score', 'precision' 'recall', 'fScore.beta', 'HRD'
+#' 'n.words', 'F.Score.relative', 'F.Score.best.possible' 'MCC',
+#' 'MCC.relative', 'MCC.best.possible' 'univ.words', 'ref.words',
+#' 'univ.ref.words' 'Method', 'Method.Score'
+#' @export
+measurePredictionsPerformance <- function(query.id, sssr, ps.res, 
+    refs) {
+    if (query.id %in% names(refs)) {
+        
+        #' Best Blast Hits' performance:
+        query.ref <- refs[[query.id]]
+        #' The Rust implementation of prot-scriber actually adds words to the
+        #' universe, because it used regular expressions and capture-groups to
+        #' split stitle (Blast Hit descriptions) into words. See Rust module
+        #' 'generate_hrd_associated_funcs.rs' function 'split_descriptions' for
+        #' details. Thus, we need to add words from the prot-scriber annotation to
+        #' the word universe:
+        univ.words <- union(wordSet(ps.res[[query.id, "Human.Readable.Description"]], 
+            blacklist.regexs = NULL), wordUniverse(query.id, 
+            sssr))
+        best.blast.performance <- bestBlastHrds(query.id, sssr, 
+            query.ref, univ.words)
+        
+        #' prot-scriber performance:
+        query.ps.hrd <- if (query.id %in% ps.res$Annotee.Identifier) {
+            ps.res[[query.id, "Human.Readable.Description"]]
+        } else {
+            NA
+        }
+        ps.n.words <- if (is.na(query.ps.hrd)) {
+            0
+        } else {
+            length(strsplit(query.ps.hrd, " ")[[1]])
+        }
+        query.ps.tbl <- data.frame(HRD = query.ps.hrd, n.words = ps.n.words, 
+            stringsAsFactors = FALSE)
+        prot.scriber.performance <- bestProtScriberPhrases(query.id, 
+            query.ps.tbl, 2, query.ref, univ.words)
+        #' Correct problem arising from legacy code which causes prot-scriber
+        #' to appear as '2' in column 'Method' of data.frame
+        #' 'prot.scriber.performance':
+        prot.scriber.performance$Method <- "prot-scriber"
+        
+        #' Result:
+        rbind(best.blast.performance, prot.scriber.performance)
+    } else {
+        message("WARNING: Could not find query.id '", query.id, 
+            "' in references.")
+        NULL
+    }
+}

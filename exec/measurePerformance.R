@@ -120,6 +120,33 @@ write.table(queries.performance, script.args$`result-table`,
     sep = "\t", row.names = FALSE, quote = TRUE)
 
 
+#' Test significance of differences in performance score distributions:
+compared.methods <- paste0("BB.", names(queries.sssr))
+perf.diff.sign.df <- do.call(rbind, lapply(c("F.Score", "F.Score.relative", 
+    "MCC", "MCC.relative"), function(p.measr) {
+    do.call(rbind, lapply(compared.methods, function(c.meth) {
+        ps.t.test <- t.test(queries.performance[which(queries.performance$Method == 
+            c.meth), p.measr], queries.performance[which(queries.performance$Method == 
+            "prot-scriber"), p.measr], alternative = "less")$p.value
+        ps.wilcox.test <- wilcox.test(queries.performance[which(queries.performance$Method == 
+            c.meth), p.measr], queries.performance[which(queries.performance$Method == 
+            "prot-scriber"), p.measr], alternative = "less")$p.value
+        data.frame(Null.Hypothesis = paste(c.meth, "has better", 
+            p.measr, "than prot-scriber"), t.test.p.value = ps.t.test, 
+            wilcox.test.p.value = ps.wilcox.test, stringsAsFactors = FALSE)
+    }))
+}))
+#' Correct for multiple hypothesis testing:
+perf.diff.sign.df$t.test.p.adj <- p.adjust(perf.diff.sign.df$t.test.p.value, 
+    method = "BH")
+perf.diff.sign.df$wilcox.test.p.adj <- p.adjust(perf.diff.sign.df$t.test.p.value, 
+    method = "BH")
+#' Save hypothesis test results:
+hyp.test.res.file <- sub("\\..+$", "_hypothesis_tests.txt", script.args$`result-table`)
+write.table(perf.diff.sign.df, hyp.test.res.file, sep = "\t", 
+    quote = TRUE, row.names = FALSE)
+
+
 #' Generate plots:
 plot.filename <- sub("\\.\\S+$", "", script.args$`result-table`)
 competitors <- unique(queries.performance$Method)

@@ -200,7 +200,14 @@ fScore <- function(pred, ref, univ.words, prot.id, beta = getOption("fScore.beta
         f.score.best <- fScoreCalculator(intersect(ref, univ.words), 
             ref, beta = beta)$F.Score
         #' How much of the best possible was achieved?
-        f.score.rel <- f.score.df$F.Score/f.score.best
+        f.score.rel <- if (f.score.best == 0) {
+            #' Any prediction made, cannot be correct, because the
+            #' intersection between all words used in predictions and the
+            #' reference is empty:
+            0
+        } else {
+            f.score.df$F.Score/f.score.best
+        }
         #' Return results:
         f.score.df$Protein.ID <- prot.id
         f.score.df$HRD <- hrd
@@ -608,8 +615,13 @@ measurePredictionsPerformance <- function(query.id, sssr, ps.res,
         #' 'generate_hrd_associated_funcs.rs' function 'split_descriptions' for
         #' details. Thus, we need to add words from the prot-scriber annotation to
         #' the word universe:
-        univ.words <- union(wordSet(ps.res[[query.id, "Human.Readable.Description"]], 
-            blacklist.regexs = NULL), wordUniverse(query.id, 
+        ps.words <- if (query.id %in% ps.res$Annotee.Identifier) {
+            wordSet(ps.res[[query.id, "Human.Readable.Description"]], 
+                blacklist.regexs = NULL)
+        } else {
+            c()
+        }
+        univ.words <- union(ps.words, wordUniverse(query.id, 
             sssr))
         best.blast.performance <- bestBlastHrds(query.id, sssr, 
             query.ref, univ.words)

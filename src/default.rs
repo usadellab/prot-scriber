@@ -16,7 +16,7 @@ lazy_static! {
         Regex::new(r"(?i)\bfrom\b").unwrap(),
         Regex::new(r"(?i)\bto\b").unwrap(),
         Regex::new(r"(?i)\bmember\b").unwrap(),
-        Regex::new(r"(?i)\bprotein\b").unwrap(),
+        //Regex::new(r"(?i)\bprotein\b").unwrap(),
         Regex::new(r"(?i)\bisoform\b").unwrap(),
         Regex::new(r"(?i)\bgene\b").unwrap(),
         Regex::new(r"(?i)\btair\b").unwrap(),
@@ -50,7 +50,7 @@ lazy_static! {
         Regex::new(r"(?i)^H0.*protein").unwrap(),
         Regex::new(r"(?i)contains.*").unwrap(),
         Regex::new(r"IPR.*").unwrap(),
-        Regex::new(r"\w{2,}\d{1,2}(g|G)\d+(\.\d)*\s+").unwrap(),
+        Regex::new(r"\w{2,}\d{1,2}[gGmMcC]\d+(\.\d+)*").unwrap(),
         Regex::new(r"\b\[.*").unwrap(),
         Regex::new(r"\b\S+\|\S+\|\S+").unwrap(),
         Regex::new(r"^(\s|/|\(|\)|-|\+|\*|,|;|\.|:|\||\d)+$").unwrap(),
@@ -64,6 +64,7 @@ lazy_static! {
         Regex::new(r"(?i)\bcontig\b").unwrap(),
         Regex::new(r"(?i)\brelated\b").unwrap(),
         Regex::new(r"(?i)\bremark\b").unwrap(),
+        Regex::new(r"(?i)\bprotein\b").unwrap(),
         Regex::new(r"(?i)\b\w?orf(\w?|\d+)\b").unwrap(),
         ];
 

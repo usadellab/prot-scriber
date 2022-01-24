@@ -7,87 +7,135 @@ on:
 name: compile
 
 jobs:
-  windows:
-    name: Windows 7+
-    runs-on: ubuntu-20.04
+  build:
+    name: Build artifacts
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-gnu
+            os: windows-latest
+
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: x86_64-pc-windows-gnu
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target x86_64-pc-windows-gnu
-      - name: Name release binary
-        run: "mv ./target/x86_64-pc-windows-gnu/release/prot-scriber.exe ./windows_prot-scriber.exe"
-      - name: Release
+
+      - name: Add rustup target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Move binaries (Linux/MacOS)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        run: mv ./target/${{ matrix.target }}/release/prot-scriber ./${{ matrix.target }}_prot-scriber
+
+      - name: Move binaries (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: mv ./target/${{ matrix.target }}/release/prot-scriber.exe ./${{ matrix.target }}_prot-scriber.exe
+
+      - name: Relase (Linux/MaxOS)
         uses: softprops/action-gh-release@v1
         with:
-          files: windows_prot-scriber.exe
-  x86_64-unknown-linux-gnu:
-    name: x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-unknown-linux-gnu
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target x86_64-unknown-linux-gnu
-      - name: Name release binary
-        run: "mv ./target/x86_64-unknown-linux-gnu/release/prot-scriber ./x86_64-unknown-linux-gnu_prot-scriber"
-      - name: Release
+          files: ${{ matrix.target }}_prot-scriber
+      
+      - name: Relase (Windows)
         uses: softprops/action-gh-release@v1
         with:
-          files: x86_64-unknown-linux-gnu_prot-scriber
-  aarch64-unknown-linux-gnu:
-    name: aarch64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: aarch64-unknown-linux-gnu
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target aarch64-unknown-linux-gnu
-      - name: Name release binary
-        run: "mv ./target/aarch64-unknown-linux-gnu/release/prot-scriber ./aarch64-unknown-linux-gnu_prot-scriber"
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: aarch64-unknown-linux-gnu_prot-scriber
-  x86_64-apple-darwin:
-    name: x86_64-apple-darwin
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-apple-darwin
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --target x86_64-apple-darwin
-      - name: Name release binary
-        run: "mv ./target/x86_64-apple-darwin/release/prot-scriber ./x86_64-apple-darwin_prot-scriber"
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: x86_64-apple-darwin_prot-scriber
+          files: ${{ matrix.target }}_prot-scriber.exe
+
+# jobs:
+#   windows:
+#     name: Windows 7+
+#     runs-on: ubuntu-20.04
+#     steps:
+#       - uses: actions/checkout@v2
+#       - uses: actions-rs/toolchain@v1
+#         with:
+#           toolchain: stable
+#           target: x86_64-pc-windows-gnu
+#           override: true
+#       - uses: actions-rs/cargo@v1
+#         with:
+#           use-cross: true
+#           command: build
+#           args: --release --target x86_64-pc-windows-gnu
+#       - name: Name release binary
+#         run: "mv ./target/x86_64-pc-windows-gnu/release/prot-scriber.exe ./windows_prot-scriber.exe"
+#       - name: Release
+#         uses: softprops/action-gh-release@v1
+#         with:
+#           files: windows_prot-scriber.exe
+#   x86_64-unknown-linux-gnu:
+#     name: x86_64-unknown-linux-gnu
+#     runs-on: ubuntu-20.04
+#     steps:
+#       - uses: actions/checkout@v2
+#       - uses: actions-rs/toolchain@v1
+#         with:
+#           toolchain: stable
+#           target: x86_64-unknown-linux-gnu
+#           override: true
+#       - uses: actions-rs/cargo@v1
+#         with:
+#           use-cross: true
+#           command: build
+#           args: --release --target x86_64-unknown-linux-gnu
+#       - name: Name release binary
+#         run: "mv ./target/x86_64-unknown-linux-gnu/release/prot-scriber ./x86_64-unknown-linux-gnu_prot-scriber"
+#       - name: Release
+#         uses: softprops/action-gh-release@v1
+#         with:
+#           files: x86_64-unknown-linux-gnu_prot-scriber
+#   aarch64-unknown-linux-gnu:
+#     name: aarch64-unknown-linux-gnu
+#     runs-on: ubuntu-20.04
+#     steps:
+#       - uses: actions/checkout@v2
+#       - uses: actions-rs/toolchain@v1
+#         with:
+#           toolchain: stable
+#           target: aarch64-unknown-linux-gnu
+#           override: true
+#       - uses: actions-rs/cargo@v1
+#         with:
+#           use-cross: true
+#           command: build
+#           args: --release --target aarch64-unknown-linux-gnu
+#       - name: Name release binary
+#         run: "mv ./target/aarch64-unknown-linux-gnu/release/prot-scriber ./aarch64-unknown-linux-gnu_prot-scriber"
+#       - name: Release
+#         uses: softprops/action-gh-release@v1
+#         with:
+#           files: aarch64-unknown-linux-gnu_prot-scriber
+#   x86_64-apple-darwin:
+#     name: x86_64-apple-darwin
+#     runs-on: ubuntu-20.04
+#     steps:
+#       - uses: actions/checkout@v2
+#       - uses: actions-rs/toolchain@v1
+#         with:
+#           toolchain: stable
+#           target: x86_64-apple-darwin
+#           override: true
+#       - uses: actions-rs/cargo@v1
+#         with:
+#           use-cross: true
+#           command: build
+#           args: --release --target x86_64-apple-darwin
+#       - name: Name release binary
+#         run: "mv ./target/x86_64-apple-darwin/release/prot-scriber ./x86_64-apple-darwin_prot-scriber"
+#       - name: Release
+#         uses: softprops/action-gh-release@v1
+#         with:
+#           files: x86_64-apple-darwin_prot-scriber

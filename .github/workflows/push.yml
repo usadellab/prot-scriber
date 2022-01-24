@@ -21,11 +21,9 @@ jobs:
         with:
           use-cross: true
           command: build
-          args: --target x86_64-pc-windows-gnu
+          args: --release --target x86_64-pc-windows-gnu
       - name: Find binary
         run: "find . -type f -executable"
-      - name: List files
-        run: "find . -type d -exec ls -lah \\{\\} +"
       - name: Release
         uses: softprops/action-gh-release@v1
         with:

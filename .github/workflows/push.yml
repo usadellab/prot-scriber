@@ -25,7 +25,7 @@ jobs:
       - name: Find binary
         run: "find . -type f -executable"
       - name: List files
-        run: "find . -type d -exec ls -lah \{\} +"
+        run: "find . -type d -exec ls -lah \\{\\} +"
       - name: Release
         uses: softprops/action-gh-release@v1
         with:

@@ -6,6 +6,10 @@ Assigns short human readable descriptions (HRD) to query biological sequences us
 
 ## Installation
 
+### Pre built binaries
+
+You can choose to download a pre-built binary ready to be executed on your platform and operating system [here]().
+
 ### Prerequisites 
 
 `prot-scriber` is written in Rust. That makes it extremely performant and, once compiled for your operating system (OS), can be used on any machine with that particular OS environment. To compile it for your platform you first need have Rust and cargo installed. Follow [the official instructions](https://www.rust-lang.org/tools/install).

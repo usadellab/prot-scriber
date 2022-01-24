@@ -15,7 +15,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: armv7-unknown-linux-gnueabihf
+          target: x86_64-pc-windows-gnu
           override: true
       - uses: actions-rs/cargo@v1
         with:
@@ -23,8 +23,10 @@ jobs:
           command: build
           args: --target x86_64-pc-windows-gnu
       - name: Find binary
-        run: "echo $(find . -type f -executable | grep -P 'prot-scriber$')"
+        run: "find . -type f -executable"
+      - name: List files
+        run: "find . -type d -exec ls -lah \{\} +"
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ./target/x86_64-unknown-linux-gnu/release/prot-scriber
+          files: ./target/x86_64-pc-windows-gnu/release/prot-scriber.exe

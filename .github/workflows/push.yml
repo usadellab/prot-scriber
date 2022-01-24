@@ -8,7 +8,7 @@ name: compile
 
 jobs:
   linux_arm7:
-    name: Linux ARMv7
+    name: Windows 7+
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -21,8 +21,10 @@ jobs:
         with:
           use-cross: true
           command: build
-          args: --target armv7-unknown-linux-gnueabihf
+          args: --target x86_64-pc-windows-gnu
+      - name: Find binary
+        run: "echo $(find . -type f -executable | grep -P 'prot-scriber$')"
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: **/*prot-scriber*
+          files: ./target/x86_64-unknown-linux-gnu/release/prot-scriber

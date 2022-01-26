@@ -15,6 +15,10 @@ use std::thread;
 pub struct AnnotationProcess {
     /// The valid file paths to tabular sequence similarity search results, the input.
     pub seq_sim_search_tables: Vec<String>,
+    /// The order of columns (`qacc`, `sacc`, and `stitle`) in the above `seq_sim_search_tables`:
+    pub ssst_columns: Vec<HashMap<String, usize>>,
+    /// The field-separators used in the above `seq_sim_search_tables`:
+    pub ssst_field_separators: Vec<char>,
     /// The in memory database of parsed sequence similarity search results in terms of Queries
     /// with their respective Hits.
     pub queries: HashMap<String, Query>,
@@ -33,6 +37,8 @@ pub struct AnnotationProcess {
     /// In mode FamilyAnnotation also annotate lonely queries, i.e. queries not comprised in a
     /// sequence family?
     pub annotate_lonely_queries: bool,
+    /// Does the user want informative messages about the annotation process printed out?
+    pub verbose: bool,
 }
 
 /// Representation of the mode an instance of AnnotationProcess runs in. Can be either (i)
@@ -51,43 +57,65 @@ impl AnnotationProcess {
     pub fn new() -> AnnotationProcess {
         AnnotationProcess {
             seq_sim_search_tables: vec![],
+            ssst_columns: vec![],
+            ssst_field_separators: vec![],
             queries: HashMap::new(),
             seq_families: HashMap::new(),
             query_id_to_seq_family_id_index: HashMap::new(),
             human_readable_descriptions: HashMap::new(),
             n_threads: num_cpus::get(),
             annotate_lonely_queries: false,
+            verbose: false,
         }
     }
 
-    /// The central function that runs an annotation process. Note that this is implemented as a
-    /// "static" function (in Java terminology - apologies offered), because using a reference to an
-    /// instance of `AnnotationProcess` would cause lifetime issues. This is, because a
-    /// Arc<Mutex<AnnotationProcess>> is constructed and shared between threads. Thus this function
-    /// that actually executes an instance of `AnnotationProcess` takes ownership of an argument
-    /// `annotation_process`. Returns the results of running the Annotation-Process in the form of a
-    /// `HashMap<String, String>`.
+    /// The central function that runs an annotation process.
     ///
     /// # Arguments
     ///
     /// * `&mut self` - The instance of `AnnotationProcess` to run.
     pub fn run(&mut self) {
+        // Are we printing information verbosely? (Note that by copying this boolean, we avoid
+        // running into problems with the borrow-checker in the threads' println! statement:
+        let verbose = self.verbose;
+
+        // Validate input; if invalid panic! with a comprehensive error message:
+        self.validate_fields();
+
         // Setup communication between threads:
         let (tx, rx) = mpsc::channel();
 
         // Field-Separator in Sequence Similarity Search (Blast) Result rows (lines):
-        let field_separator = *SSSR_TABLE_FIELD_SEPARATOR;
+        let mut field_separator = *SSSR_TABLE_FIELD_SEPARATOR;
         // Sequence Similarity Search (Blast) Result column indices:
-        let qacc_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap();
-        let sacc_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap();
-        let stitle_col: &usize = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap();
+        let mut qacc_col: usize = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap().clone();
+        let mut sacc_col: usize = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap().clone();
+        let mut stitle_col: usize = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap().clone();
 
         // Parse and process each sequence similarity search result table in a dedicated
         // thread:
         // TODO: If there are more input tables than the self.n_threads, only use n_threads
         // parallel processes.
-        for sss_tbl in self.seq_sim_search_tables.iter().map(|x| x.clone()) {
+        for (i, sss_tbl) in self
+            .seq_sim_search_tables
+            .iter()
+            .map(|x| x.clone())
+            .enumerate()
+        {
             let tx_i = tx.clone();
+
+            // Did the user provide values for the column positions in the argument `sss_tbl`?
+            if !self.ssst_columns.is_empty() {
+                let ssst_i_columns = &self.ssst_columns[i];
+                qacc_col = ssst_i_columns.get("qacc").unwrap().clone();
+                sacc_col = ssst_i_columns.get("sacc").unwrap().clone();
+                stitle_col = ssst_i_columns.get("stitle").unwrap().clone();
+            }
+
+            // Did the user provide a custom field-separator for the argument `sss_tbl`?
+            if !self.ssst_field_separators.is_empty() {
+                field_separator = self.ssst_field_separators[i];
+            }
 
             // Start this sss_tbl's dedicated threat:
             thread::spawn(move || {
@@ -99,8 +127,10 @@ impl AnnotationProcess {
                     &stitle_col,
                     tx_i,
                 );
-                // Log:
-                println!("Finished parsing '{}'", &sss_tbl);
+                // Inform user, if requested:
+                if verbose {
+                    println!("Finished parsing {:?}", &sss_tbl);
+                }
             });
         }
         // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
@@ -349,6 +379,71 @@ impl AnnotationProcess {
         // Set the human readable descriptions generated in parallel:
         for i_tpl in hrd_tuples {
             self.human_readable_descriptions.insert(i_tpl.0, i_tpl.1);
+        }
+    }
+
+    /// Parses the command line argument `header` into a HashMap<String, usize> in which the
+    /// sequence similarity search result (Blast) table (SSST) column names are mapped to their
+    /// respective position in the to be parsed SSST. Inserts the parsed HashMap into
+    /// `self.ssst_columns`, and uses the `default::SEQ_SIM_TABLE_COLUMNS` HashMap if the argument
+    /// `header_arg` equals `"default"` (case insensitive).
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A reference to a mutable instance of AnnotationProcess.
+    /// * `header_arg: &str` - The passed header argument
+    pub fn add_ssst_columns(&mut self, header_arg: &str) {
+        let mut seq_sim_table_cols: HashMap<String, usize>;
+        if header_arg.trim().to_lowercase() == "default" {
+            seq_sim_table_cols = (*SEQ_SIM_TABLE_COLUMNS).clone();
+        } else {
+            seq_sim_table_cols = HashMap::new();
+            for (i, col_name) in header_arg
+                .trim()
+                .split(" ")
+                .filter(|x| !x.is_empty())
+                .enumerate()
+            {
+                seq_sim_table_cols.insert(col_name.to_string(), i as usize);
+            }
+        }
+        self.ssst_columns.push(seq_sim_table_cols);
+    }
+
+    /// Parses the command line argument `field-separator` into a `char` used to split a line (row)
+    /// in a sequence similarity search result table into fields, i.e. a Blast Hit record. If the
+    /// argument `field_separator_arg` equals `"default"` (case insensitive) the value of
+    /// `default::SSSR_TABLE_FIELD_SEPARATOR` is used.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A reference to a mutable instance of AnnotationProcess.
+    /// * `field_separator_arg: &str` - The passed field_separator argument
+    pub fn add_ssst_field_separator(&mut self, field_separator_arg: &str) {
+        let mut seq_sim_table_field_separator = *SSSR_TABLE_FIELD_SEPARATOR;
+        if field_separator_arg.trim().to_lowercase() != "default" {
+            seq_sim_table_field_separator = field_separator_arg.trim().chars().next().unwrap();
+        }
+        self.ssst_field_separators
+            .push(seq_sim_table_field_separator);
+    }
+
+    /// Function validates the AnnotationProcess's fields and checks whether they are valid and
+    /// complete to start `run`. If invalid the function panics! with a comprehensive error
+    /// message.
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A reference to a mutable instance of AnnotationProcess.
+    pub fn validate_fields(&mut self) {
+        let n_ssst = self.seq_sim_search_tables.len();
+        if !self.ssst_columns.is_empty() && self.ssst_columns.len() != n_ssst {
+            let n_ssst_cols = self.ssst_columns.len();
+            panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but only {} column mappings. Please provide either no column mappings, causing the default to be used for all SSSTs, or provide one --field_separator (-e) argument for each of your input SSSTs. See --help for more details.", n_ssst_cols, n_ssst);
+        }
+        if !self.ssst_field_separators.is_empty() && self.ssst_field_separators.len() != n_ssst {
+            let n_ssst_field_seps = self.ssst_field_separators.len();
+            panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but only {} field-separators. Please provide either no field-separators, causing the default to be used for all SSSTs, or provide one --field-separator (-p) argument for each of your input SSSTs. See --help for more details.", n_ssst_field_seps, n_ssst);
         }
     }
 }

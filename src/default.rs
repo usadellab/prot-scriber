@@ -75,7 +75,7 @@ lazy_static! {
         // Default header is 'qacc sacc bitscore stitle'
         h.insert("qacc".to_string(), 0);
         h.insert("sacc".to_string(), 1);
-        h.insert("stitle".to_string(), 9);
+        h.insert("stitle".to_string(), 2);
         h
     };
 

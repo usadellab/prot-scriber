@@ -5,7 +5,7 @@ use super::seq_sim_table_reader::parse_table;
 use num_cpus;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
@@ -52,9 +52,144 @@ pub enum AnnotationProcessMode {
     FamilyAnnotation,
 }
 
+/// The central function that runs an annotation process. Note that because this function uses an
+/// `Arc` `Mutex` reference to the argument `annotation_process`, this could not be implemented as
+/// an instance function, i.e. using the argument `&mut self`, because then the Rust compiler
+/// required the reference to have the `static` lifetime. So, this functions takes ownership of the
+/// argument `annotation_process` and returns it in a modified form.
+///
+/// # Arguments
+///
+/// * `annotation_process` - The instance of `AnnotationProcess` to run.
+pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
+    // Are we printing information verbosely? (Note that by copying this boolean, we avoid
+    // running into problems with the borrow-checker in the threads' println! statement:
+    let verbose = annotation_process.verbose;
+
+    // Validate input; if invalid panic! with a comprehensive error message:
+    annotation_process.validate_fields();
+
+    // If there are more input tables than the annotation_process.n_threads, only use n_threads
+    // parallel processes.
+    let n = if annotation_process.seq_sim_search_tables.len() <= annotation_process.n_threads {
+        annotation_process.seq_sim_search_tables.len()
+    } else {
+        annotation_process.n_threads
+    };
+
+    // Setup communication between threads:
+    let (tx, rx) = mpsc::channel();
+
+    // Enable the threads to access the input sequence similarity search result tables, including
+    // their index (position) in the original command line argument call:
+    let sssts_mutex = Arc::new(Mutex::new(
+        annotation_process
+            .seq_sim_search_tables
+            .iter()
+            .map(|x| x.clone())
+            .enumerate()
+            .collect::<Vec<(usize, String)>>(),
+    ));
+    // Enable the threads to access the input column order in each input sequence similarity search
+    // result table:
+    let ssst_cols_mutex = Arc::new(Mutex::new(annotation_process.ssst_columns.clone()));
+    // Enable the threads to access the input field separator used in the respective input
+    // sequence similarity search result tables:
+    let ssst_field_seps_mutex =
+        Arc::new(Mutex::new(annotation_process.ssst_field_separators.clone()));
+
+    // Prepare `n` threads for sequence similarity search parsing, each thread will parse a table
+    // not yet processed until no tables are left to be processed:
+    for _ in 0..n {
+        let tx_i = tx.clone();
+
+        // Start this sss_tbl's dedicated threat:
+        let sssts_mutex_clone = sssts_mutex.clone();
+        let ssst_cols_mutex_clone = ssst_cols_mutex.clone();
+        let ssst_field_seps_mutex_clone = ssst_field_seps_mutex.clone();
+        thread::spawn(move || {
+            // Field-Separator in Sequence Similarity Search (Blast) Result rows (lines):
+            let mut field_separator = *SSSR_TABLE_FIELD_SEPARATOR;
+            // Sequence Similarity Search (Blast) Result column indices:
+            let mut qacc_col: usize = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap().clone();
+            let mut sacc_col: usize = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap().clone();
+            let mut stitle_col: usize = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap().clone();
+
+            loop {
+                let mut ssst = sssts_mutex_clone.lock().unwrap();
+
+                // Stop, if all input sequence similarity search tables have been parsed
+                // already:
+                if ssst.is_empty() {
+                    break;
+                }
+
+                // Get the current input sequence similarity search table and its index:
+                let (i, sss_tbl) = ssst.pop().unwrap();
+                // Free the lock, so other threads may access `ssst_arc_mutex`:
+                drop(ssst);
+
+                // Did the user provide values for the column positions in the argument `sss_tbl`?
+                let ssst_columns = ssst_cols_mutex_clone.lock().unwrap();
+                if !ssst_columns.is_empty() {
+                    let ssst_cols_i = &ssst_columns[i];
+                    qacc_col = ssst_cols_i.get("qacc").unwrap().clone();
+                    sacc_col = ssst_cols_i.get("sacc").unwrap().clone();
+                    stitle_col = ssst_cols_i.get("stitle").unwrap().clone();
+                }
+                // Enable other threads to access `annotation_process.ssst_columns`:
+                drop(ssst_columns);
+
+                // Did the user provide a custom field-separator for the argument `sss_tbl`?
+                let ssst_field_separators = ssst_field_seps_mutex_clone.lock().unwrap();
+                if !ssst_field_separators.is_empty() {
+                    field_separator = ssst_field_separators[i];
+                }
+                // Enable other threads to access `annotation_process.ssst_field_separators`:
+                drop(ssst_field_separators);
+
+                parse_table(
+                    &sss_tbl,
+                    &field_separator,
+                    &qacc_col,
+                    &sacc_col,
+                    &stitle_col,
+                    // Because we are in a `loop` we need to clone the cloned sender:
+                    tx_i.clone(),
+                );
+
+                // Inform user, if requested:
+                if verbose {
+                    println!("Finished parsing {:?}", &sss_tbl);
+                }
+            }
+        });
+    }
+    // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
+    // otherwise the below receiver loop will wait forever for tx to send some messages.
+    drop(tx);
+
+    // Process messages sent by the above threads. Note that this might trigger the annotation of
+    // some queries or sequence families, if their data has been parsed completely:
+    for (qacc, query) in rx {
+        annotation_process.insert_query(qacc, query);
+    }
+
+    // Make sure all queries or sequence families are annotated:
+    annotation_process.process_rest_data();
+
+    // Return the modified `annotation_process`:
+    annotation_process
+}
+
 impl AnnotationProcess {
     /// Creates an empty (`Default`) instance of struct AnnotationProcess.
     pub fn new() -> AnnotationProcess {
+        let nt = if num_cpus::get() < 2 {
+            2
+        } else {
+            num_cpus::get()
+        };
         AnnotationProcess {
             seq_sim_search_tables: vec![],
             ssst_columns: vec![],
@@ -63,88 +198,10 @@ impl AnnotationProcess {
             seq_families: HashMap::new(),
             query_id_to_seq_family_id_index: HashMap::new(),
             human_readable_descriptions: HashMap::new(),
-            n_threads: num_cpus::get(),
+            n_threads: nt,
             annotate_lonely_queries: false,
             verbose: false,
         }
-    }
-
-    /// The central function that runs an annotation process.
-    ///
-    /// # Arguments
-    ///
-    /// * `&mut self` - The instance of `AnnotationProcess` to run.
-    pub fn run(&mut self) {
-        // Are we printing information verbosely? (Note that by copying this boolean, we avoid
-        // running into problems with the borrow-checker in the threads' println! statement:
-        let verbose = self.verbose;
-
-        // Validate input; if invalid panic! with a comprehensive error message:
-        self.validate_fields();
-
-        // Setup communication between threads:
-        let (tx, rx) = mpsc::channel();
-
-        // Field-Separator in Sequence Similarity Search (Blast) Result rows (lines):
-        let mut field_separator = *SSSR_TABLE_FIELD_SEPARATOR;
-        // Sequence Similarity Search (Blast) Result column indices:
-        let mut qacc_col: usize = (*SEQ_SIM_TABLE_COLUMNS).get("qacc").unwrap().clone();
-        let mut sacc_col: usize = (*SEQ_SIM_TABLE_COLUMNS).get("sacc").unwrap().clone();
-        let mut stitle_col: usize = (*SEQ_SIM_TABLE_COLUMNS).get("stitle").unwrap().clone();
-
-        // Parse and process each sequence similarity search result table in a dedicated
-        // thread:
-        // TODO: If there are more input tables than the self.n_threads, only use n_threads
-        // parallel processes.
-        for (i, sss_tbl) in self
-            .seq_sim_search_tables
-            .iter()
-            .map(|x| x.clone())
-            .enumerate()
-        {
-            let tx_i = tx.clone();
-
-            // Did the user provide values for the column positions in the argument `sss_tbl`?
-            if !self.ssst_columns.is_empty() {
-                let ssst_i_columns = &self.ssst_columns[i];
-                qacc_col = ssst_i_columns.get("qacc").unwrap().clone();
-                sacc_col = ssst_i_columns.get("sacc").unwrap().clone();
-                stitle_col = ssst_i_columns.get("stitle").unwrap().clone();
-            }
-
-            // Did the user provide a custom field-separator for the argument `sss_tbl`?
-            if !self.ssst_field_separators.is_empty() {
-                field_separator = self.ssst_field_separators[i];
-            }
-
-            // Start this sss_tbl's dedicated threat:
-            thread::spawn(move || {
-                parse_table(
-                    &sss_tbl,
-                    &field_separator,
-                    &qacc_col,
-                    &sacc_col,
-                    &stitle_col,
-                    tx_i,
-                );
-                // Inform user, if requested:
-                if verbose {
-                    println!("Finished parsing {:?}", &sss_tbl);
-                }
-            });
-        }
-        // Because of the above for loop tx needs to be cloned into tx_i's. tx needs to be dropped,
-        // otherwise the below receiver loop will wait forever for tx to send some messages.
-        drop(tx);
-
-        // Process messages sent by the above threads. Note that this might trigger the annotation of
-        // some queries or sequence families, if their data has been parsed completely:
-        for (qacc, query) in rx {
-            self.insert_query(qacc, query);
-        }
-
-        // Make sure all queries or sequence families are annotated:
-        self.process_rest_data();
     }
 
     /// Processes the sequence similarity search result (SSSR) data parsed for the argument
@@ -445,6 +502,9 @@ impl AnnotationProcess {
             let n_ssst_field_seps = self.ssst_field_separators.len();
             panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but only {} field-separators. Please provide either no field-separators, causing the default to be used for all SSSTs, or provide one --field-separator (-p) argument for each of your input SSSTs. See --help for more details.", n_ssst_field_seps, n_ssst);
         }
+        if self.n_threads < 2 {
+            panic!("Cannot run Annotation-Process, because option '--n-threads' ('-n') must at least be minimum of two (2)!");
+        }
     }
 }
 
@@ -664,7 +724,7 @@ mod tests {
                 .unwrap()
                 .to_string(),
         );
-        ap.run();
+        ap = run(ap);
         let hrds = ap.human_readable_descriptions;
         assert!(hrds.len() > 0);
         let queries_with_expected_result = vec![
@@ -727,7 +787,7 @@ mod tests {
         ];
         ap.insert_seq_family(sf1_id.clone(), sf1);
         ap.insert_seq_family(sf2_id.clone(), sf2);
-        ap.run();
+        ap = run(ap);
         let hrds = ap.human_readable_descriptions;
         assert_eq!(hrds.len(), 2);
         let queries_with_expected_result = vec![sf1_id, sf2_id];

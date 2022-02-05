@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use annotation_process::AnnotationProcess;
+use annotation_process::{run, AnnotationProcess};
 use clap::{App, Arg};
 use seq_family_reader::parse_seq_families_file;
 
@@ -78,7 +78,7 @@ fn main() {
             .short('n')
             .takes_value(true)
             .long("n-threads")
-            .help("The maximum number of parallel threads to use. Default is the number of logical cores. Note that at most one thread is used per input sequence similarity search result (Blast table) file. After parsing these annotation may use up to this number of threads to generate human readable descriptions."),
+            .help("The maximum number of parallel threads to use. Default is the number of logical cores. Required minimum is two (2). Note that at most one thread is used per input sequence similarity search result (Blast table) file. After parsing these annotation may use up to this number of threads to generate human readable descriptions."),
         ).get_matches();
 
     // Create a new AnnotationProcess instance and provide it with the necessary input data:
@@ -141,7 +141,7 @@ fn main() {
     }
 
     // Execute the Annotation-Process:
-    annotation_process.run();
+    annotation_process = run(annotation_process);
 
     // Save output:
     if let Some(o) = matches.value_of("output") {

@@ -129,5 +129,9 @@ lazy_static! {
     pub static ref UNKNOWN_FAMILY_DESCRIPTION: &'static str = "unknown sequence family";
 
     /// The default regular expression to split gene family genes
-    pub static ref SPLIT_GENE_FAMILY_GENES_REGEX: Regex = Regex::new(r"(\s*,\s*|\s+)").unwrap();
+    pub static ref SPLIT_GENE_FAMILY_GENES_REGEX: &'static str = r"(\s*,\s*|\s+)";
+
+    /// The default character used to split gene-family-identifiers from the set of genes the
+    /// respective family is comprised of:
+    pub static ref SPLIT_GENE_FAMILY_ID_FROM_GENE_SET: &'static str = "\t";
 }

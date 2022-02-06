@@ -1,4 +1,7 @@
-use super::default::{SEQ_SIM_TABLE_COLUMNS, SSSR_TABLE_FIELD_SEPARATOR};
+use super::default::{
+    SEQ_SIM_TABLE_COLUMNS, SPLIT_GENE_FAMILY_GENES_REGEX, SPLIT_GENE_FAMILY_ID_FROM_GENE_SET,
+    SSSR_TABLE_FIELD_SEPARATOR,
+};
 use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
@@ -26,6 +29,12 @@ pub struct AnnotationProcess {
     /// be annotated with human readable descriptions. Keys are the families identifier and values
     /// are the SeqFamily instances.
     pub seq_families: HashMap<String, SeqFamily>,
+    /// This string separates the gene-family-identifier (name) from the gene-identifier list
+    /// that family comprises.
+    pub seq_family_id_genes_separator: String,
+    /// A regular expression (Rust syntax) represented as String to satisfy the `Default` trait.
+    /// This regex is used to split the list of gene-identifiers in the gene families file.
+    pub seq_family_gene_ids_separator: String,
     /// An in memory index from Query identifier to SeqFamily identifier:
     pub query_id_to_seq_family_id_index: HashMap<String, String>,
     /// The human readable descriptions (HRDs) generated for the queries, i.e. either single query
@@ -196,6 +205,8 @@ impl AnnotationProcess {
             ssst_field_separators: vec![],
             queries: HashMap::new(),
             seq_families: HashMap::new(),
+            seq_family_id_genes_separator: (*SPLIT_GENE_FAMILY_ID_FROM_GENE_SET).to_string(),
+            seq_family_gene_ids_separator: (*SPLIT_GENE_FAMILY_GENES_REGEX).to_string(),
             query_id_to_seq_family_id_index: HashMap::new(),
             human_readable_descriptions: HashMap::new(),
             n_threads: nt,

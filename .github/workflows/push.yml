@@ -41,17 +41,17 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Move binaries and echo manual (Linux/MacOS)
+      - name: Move binaries (Linux/MacOS)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
-        run: |
-          mv ./target/${{ matrix.target }}/release/prot-scriber ./${{ matrix.target }}_prot-scriber
-          chmod a+x ./${{ matrix.target }}_prot-scriber
-          ./${{ matrix.target }}_prot-scriber --help > prot-scriber-manual.txt
+        run: mv ./target/${{ matrix.target }}/release/prot-scriber ./${{ matrix.target }}_prot-scriber
 
-      - name: Move binaries (Windows)
+      - name: Move binaries and echo manual (Windows)
         if: matrix.os == 'windows-latest'
         shell: bash
-        run: mv ./target/${{ matrix.target }}/release/prot-scriber.exe ./${{ matrix.target }}_prot-scriber.exe
+        run: |
+          mv ./target/${{ matrix.target }}/release/prot-scriber.exe ./${{ matrix.target }}_prot-scriber.exe
+          chmod a+x ./${{ matrix.target }}_prot-scriber
+          ./${{ matrix.target }}_prot-scriber --help > prot-scriber-manual.txt
 
       - name: Binary relase (Linux/MaxOS)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
@@ -59,8 +59,8 @@ jobs:
         with:
           files: ${{ matrix.target }}_prot-scriber
 
-      - name: Relase help-text / manual (Linux/MaxOS)
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+      - name: Relase help-text / manual (Windows)
+        if: matrix.os == 'windows-latest'
         uses: softprops/action-gh-release@v1
         with:
           files: prot-scriber-manual.txt

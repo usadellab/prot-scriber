@@ -498,6 +498,19 @@ impl AnnotationProcess {
             let n_ssst_cols = self.ssst_columns.len();
             panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but only {} column mappings. Please provide either no column mappings, causing the default to be used for all SSSTs, or provide one --field_separator (-e) argument for each of your input SSSTs. See --help for more details.", n_ssst_cols, n_ssst);
         }
+        if !self.ssst_columns.is_empty() {
+            let required_cols = vec!["qacc", "sacc", "stitle"];
+            for (i, ssst_cols_i) in self.ssst_columns.iter().enumerate() {
+                for col_i in &required_cols {
+                    if !ssst_cols_i.contains_key(&col_i.to_string()) {
+                        panic!(
+                            "Cannot run Annotation-Process, because --header (-e) argument number {} does not contain required column {:?}!",
+                            i + 1, col_i
+                        );
+                    }
+                }
+            }
+        }
         if !self.ssst_field_separators.is_empty() && self.ssst_field_separators.len() != n_ssst {
             let n_ssst_field_seps = self.ssst_field_separators.len();
             panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but only {} field-separators. Please provide either no field-separators, causing the default to be used for all SSSTs, or provide one --field-separator (-p) argument for each of your input SSSTs. See --help for more details.", n_ssst_field_seps, n_ssst);

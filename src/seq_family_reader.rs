@@ -5,6 +5,14 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+/// Parses line by line of the argument file `path` in which sets of biological sequence
+/// identifiers (a.k.a. gene families) are stored; one family per line. Each parsed family is
+/// stored in the argument `annotation_process`.
+///
+/// # Arguments
+///
+/// * `path` - The valid path to the file holding the to be parsed gene families.
+/// * `annotation_process` - The AnnotationProcess to be provided with the parsed gene families.
 pub fn parse_seq_families_file(path: &str, annotation_process: &mut AnnotationProcess) {
     // Open stream to the gene families input file
     let file_path = path.to_string();
@@ -24,6 +32,15 @@ pub fn parse_seq_families_file(path: &str, annotation_process: &mut AnnotationPr
     }
 }
 
+/// Parses a single line read from a respective "gene family input file" (see
+/// `parse_seq_families_file`). The argument `family: String` is split into a family identifier
+/// (name) and the set of sequence identifiers the family comprises, is made of. Returns a
+/// `Result<(String, SeqFamily), Box<dyn Error>>` holding either the parsed gene family or an
+/// error.
+///
+/// # Arguments
+///
+/// * `family` - The single line (`String`) holding the gene family information
 fn parse_seq_family(family: String) -> Result<(String, SeqFamily), Box<dyn Error>> {
     // split the line by "\t". There should be more than 1 element (>=2), panic if not
     let family_cols: Vec<&str> = family

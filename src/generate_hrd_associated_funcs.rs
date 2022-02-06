@@ -83,6 +83,19 @@ pub fn generate_human_readable_description(
     human_readable_rescription_result
 }
 
+/// Find the highest scoring "phrase" in argument `description`. A phrase is a subset of the
+/// argument vector maintaining the order of elements. The highest scoring phrase is found using
+/// the linear solution to the longest, or highest scoring, path problem in directed acyclic
+/// graphs. The argument `description` is converted into a graph, in which each word has edges to
+/// all words appearing after it in the `description`. An `Option<(Vec<String>, f32)>` is returned
+/// holding the highest scoring phrase and that phrase's score.
+///
+/// # Arguments
+///
+/// * `description` - A vector of words representing the description for which to find the best
+/// scoring phrase.
+/// * `ciic` - A reference to a HashMap holding the centered inverse information content scores for
+/// the informative words appearing in the argument `description`.
 pub fn highest_scoring_phrase(
     description: &Vec<String>,
     ciic: &HashMap<String, f32>,

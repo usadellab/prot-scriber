@@ -45,7 +45,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         run: |
           mv ./target/${{ matrix.target }}/release/prot-scriber ./${{ matrix.target }}_prot-scriber
-          prot-scriber --help > prot-scriber-manual.txt
+          ./${{ matrix.target }}_prot-scriber --help > prot-scriber-manual.txt
 
       - name: Move binaries (Windows)
         if: matrix.os == 'windows-latest'

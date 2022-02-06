@@ -41,9 +41,11 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Move binaries (Linux/MacOS)
+      - name: Move binaries and echo manual (Linux/MacOS)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
-        run: mv ./target/${{ matrix.target }}/release/prot-scriber ./${{ matrix.target }}_prot-scriber
+        run: |
+          mv ./target/${{ matrix.target }}/release/prot-scriber ./${{ matrix.target }}_prot-scriber
+          prot-scriber --help > prot-scriber-manual.txt
 
       - name: Move binaries (Windows)
         if: matrix.os == 'windows-latest'
@@ -54,7 +56,9 @@ jobs:
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ matrix.target }}_prot-scriber
+          files: 
+            - ${{ matrix.target }}_prot-scriber
+            - prot-scriber-manual.txt
       
       - name: Relase (Windows)
         if: matrix.os == 'windows-latest'

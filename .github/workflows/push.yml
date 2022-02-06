@@ -52,13 +52,17 @@ jobs:
         shell: bash
         run: mv ./target/${{ matrix.target }}/release/prot-scriber.exe ./${{ matrix.target }}_prot-scriber.exe
 
-      - name: Relase (Linux/MaxOS)
+      - name: Binary relase (Linux/MaxOS)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         uses: softprops/action-gh-release@v1
         with:
-          files: 
-            - ${{ matrix.target }}_prot-scriber
-            - prot-scriber-manual.txt
+          files: ${{ matrix.target }}_prot-scriber
+
+      - name: Relase help-text / manual (Linux/MaxOS)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: prot-scriber-manual.txt
       
       - name: Relase (Windows)
         if: matrix.os == 'windows-latest'

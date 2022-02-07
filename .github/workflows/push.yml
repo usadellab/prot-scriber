@@ -45,16 +45,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         run: mv ./target/${{ matrix.target }}/release/prot-scriber ./${{ matrix.target }}_prot-scriber
 
-      - name: Move binaries, generate manual, and include it in the README.md (Windows)
+      - name: Move binaries and generate manual (Windows)
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
           mv ./target/${{ matrix.target }}/release/prot-scriber.exe ./${{ matrix.target }}_prot-scriber.exe
           chmod a+x ./${{ matrix.target }}_prot-scriber
-          echo '<summary>click to read the `prot-scriber` manual</summary>' > prot-scriber-manual.txt
           ./${{ matrix.target }}_prot-scriber --help >> prot-scriber-manual.txt
-          echo '</details>' >> prot-scriber-manual.txt
-          sed -e '/summary/,/\/details/!b' -e '/\/details/!d;r prot-scriber-manual.txt' -e 'd' README.md
 
       - name: Binary relase (Linux/MaxOS)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'

@@ -56,13 +56,17 @@ If you are familiar with installing self compiled tools on a system wide level, 
 
 `prot-scriber` is a command line tool and _must_ be used in a terminal application. On Windows that will be `cmd` or PowerShell, on Mac OS X or any Linux / Unix system that will be a standard terminal shell.
 
-To use `prot-scriber` please read the [**manual** (click here for the latest stable version)](https://github.com/usadellab/prot-scriber/releases/download/latest-stable/prot-scriber-manual.txt). All your questions will be answered there. 
+Please read the manual of the latest stable version (below).
 
-In the command prompt (`cmd` or PowerShell on Windows) or the Terminal (Mac OS, Linux, or Unix) use  
+<details>
+<summary>MANUAL</summary>
+</details>
+
+Note, that you can get the manual directly from `prot-scriber`. In the command prompt (`cmd` or PowerShell on Windows) or the Terminal (Mac OS, Linux, or Unix) use  
 ```sh
 prot-scriber --help
 ```
-to get the manual.
+to get it printed.
 
 _Happy `prot-scribing`!_
 

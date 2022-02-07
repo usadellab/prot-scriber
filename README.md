@@ -6,7 +6,7 @@ Assigns short human readable descriptions (HRD) to query biological sequences us
 
 ## Installation
 
-### Pre built binaries
+### Download ready to use executables
 
 You can choose to download a pre-built binary ready to be executed from the table below, if you want the latest stable version. Other versions can be downloaded from the [Releases page](https://github.com/usadellab/prot-scriber/releases). Have a look at the below table to know which is the version you need for your operating system and platform. 
 

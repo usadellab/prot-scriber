@@ -268,6 +268,18 @@ prot-scriber --help
 to get it printed.
 
 _Happy `prot-scribing`!_
+    
+## Speed and memory requirements
+    
+`prot-scriber` is **blazingly fast** and has **low memory requirements**. Consider the following two standard use cases, in which `prot-scriber` generated Human readable descriptions (HRDs) for (i) a single species and (ii) gene families.
+
+### single species 
+
+On a standard Laptop with 4 cores `prot-scriber` took approx. **6.5 seconds** and used a little under **42 MB RAM** to generate human readable descriptions for a complete plant proteome with Blast search Hits for 32,567 distinct query proteins (input: Blast result table from searches in UniProt Swissprot 66 MB, Blast result table from searches in UniProt trEMBL 144 MB)
+
+### gene families 
+
+On a standard Laptop with 4 cores `prot-scriber` took approx. **13.19 seconds** and used a little under **112 MB RAM** to generate human readable descriptions for 24,072 gene families with Blast search Hits for 71,610 distinct query proteins (input: Blast result table from searches in UniProt Swissprot 126 MB, Blast result table from searches in UniProt trEMBL 273 MB)
 
 ## Development / Contribute
 

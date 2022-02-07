@@ -56,8 +56,10 @@ If you are familiar with installing self compiled tools on a system wide level, 
 
 `prot-scriber` is a command line tool and _must_ be used in a terminal application. On Windows that will be `cmd` or PowerShell, on Mac OS X or any Linux / Unix system that will be a standard terminal shell.
 
+### Manual
+
 <details>
-<summary>Please read the manual of the latest stable version (click to expand).</summary>
+    <summary><b>Please read the manual of the latest stable version (<i>click to expand</i>).</b></summary>
 
 ```
 prot-scriber version 0.1.0

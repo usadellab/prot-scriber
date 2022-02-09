@@ -6,9 +6,9 @@ Assigns short human readable descriptions (HRD) to query biological sequences us
 
 ## Installation
 
-### Pre built binaries
+### Download ready to use executables
 
-You can choose to download a pre-built binary ready to be executed from the table below, if you want the latest stable version. Other versions can be downloaded from the [Releases page](https://github.com/usadellab/prot-scriber/releases). Have a look at the below table to know which is the version you need for your operating system and platform. 
+You can choose to download a pre-built binary, ready to be executed, from the table below, if you want the latest stable version. Other versions can be downloaded from the [Releases page](https://github.com/usadellab/prot-scriber/releases). Have a look at the below table to know which is the version you need for your operating system and platform. 
 
 We strongly recommend to _rename_ the downloaded release file to a simple `prot-scriber` (or `prot-scriber.exe` on Windows).
 
@@ -56,8 +56,10 @@ If you are familiar with installing self compiled tools on a system wide level, 
 
 `prot-scriber` is a command line tool and _must_ be used in a terminal application. On Windows that will be `cmd` or PowerShell, on Mac OS X or any Linux / Unix system that will be a standard terminal shell.
 
+### Manual
+
 <details>
-<summary>Please read the manual of the latest stable version (click to expand).</summary>
+    <summary><b>Please read the manual of the latest stable version (<i>click to expand</i>).</b></summary>
 
 ```
 prot-scriber version 0.1.0
@@ -266,6 +268,18 @@ prot-scriber --help
 to get it printed.
 
 _Happy `prot-scribing`!_
+    
+## Speed and memory requirements
+    
+`prot-scriber` is **blazingly fast** and has **low memory requirements**. Consider the following two standard use cases, in which `prot-scriber` generated Human readable descriptions (HRDs) for (i) a single species and (ii) gene families.
+
+### single species 
+
+On a standard Laptop with 4 cores `prot-scriber` took approx. **6.5 seconds** and used a little under **42 MB RAM** to generate human readable descriptions for a complete plant proteome with Blast search Hits for 32,567 distinct query proteins (input: Blast result table from searches in UniProt Swissprot 66 MB, Blast result table from searches in UniProt trEMBL 144 MB)
+
+### gene families 
+
+On a standard Laptop with 4 cores `prot-scriber` took approx. **13.19 seconds** and used a little under **112 MB RAM** to generate human readable descriptions for 24,072 gene families with Blast search Hits for 71,610 distinct query proteins (input: Blast result table from searches in UniProt Swissprot 126 MB, Blast result table from searches in UniProt trEMBL 273 MB)
 
 ## Development / Contribute
 

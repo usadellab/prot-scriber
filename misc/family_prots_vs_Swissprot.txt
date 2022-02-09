@@ -1,0 +1,26 @@
+VFABAHed000019	sp|A3LN86|PAN1_PICST	sp|A3LN86|PAN1_PICST Actin cytoskeleton-regulatory complex protein PAN1 OS=Scheffersomyces stipitis (strain ATCC 58785 / CBS 6054 / NBRC 10063 / NRRL Y-11545) OX=322104 GN=PAN1 PE=3 SV=2
+VFABAHed000019	sp|P02726|GLPA_HORSE	sp|P02726|GLPA_HORSE Glycophorin-A OS=Equus caballus OX=9796 PE=1 SV=1
+VFABAHed000019	sp|Q86DA5|SARM1_CAEEL	sp|Q86DA5|SARM1_CAEEL NAD(+) hydrolase tir-1 OS=Caenorhabditis elegans OX=6239 GN=tir-1 PE=1 SV=2
+VFABAHed000019	sp|Q01207|POL2_BAYMJ	sp|Q01207|POL2_BAYMJ Genome polyprotein 2 OS=Barley yellow mosaic virus (strain Japanese II-1) OX=31729 GN=RNA2 PE=3 SV=1
+VFABAHed000019	sp|Q9ENL1|VP5_CTFVL	sp|Q9ENL1|VP5_CTFVL Uncharacterized protein VP5 OS=Colorado tick fever virus (strain USA/Florio N-7180) OX=648168 PE=4 SV=1
+VFABAHed000019	sp|P23445|FLII_BACSU	sp|P23445|FLII_BACSU Flagellum-specific ATP synthase OS=Bacillus subtilis (strain 168) OX=224308 GN=fliI PE=3 SV=2
+VFABAHed000019	sp|Q8BVF9|AMZ1_MOUSE	sp|Q8BVF9|AMZ1_MOUSE Archaemetzincin-1 OS=Mus musculus OX=10090 GN=Amz1 PE=2 SV=1
+VFABAHed000020	sp|Q01365|POL2_BAYMG	sp|Q01365|POL2_BAYMG Genome polyprotein 2 OS=Barley yellow mosaic virus (isolate Germany) OX=31728 GN=RNA2 PE=3 SV=1
+VFABAHed000020	sp|Q9YJW2|POL2_BAYMY	sp|Q9YJW2|POL2_BAYMY Genome polyprotein 2 OS=Barley yellow mosaic virus (isolate China/Yancheng/1998) OX=652104 PE=3 SV=1
+VFABAHed000020	sp|P24872|GD_EHV1A	sp|P24872|GD_EHV1A Envelope glycoprotein D OS=Equine herpesvirus 1 (strain AB1) OX=10328 GN=gD PE=3 SV=2
+VFABAHed000020	sp|P68327|GD_EHV1D	sp|P68327|GD_EHV1D Envelope glycoprotein D OS=Equine herpesvirus 1 (strain Kentucky D) OX=10330 GN=gD PE=3 SV=1
+VFABAHed000020	sp|Q6DLD9|GD_EHV1B	sp|Q6DLD9|GD_EHV1B Envelope glycoprotein D OS=Equine herpesvirus 1 (strain Ab4p) OX=31520 GN=gD PE=3 SV=1
+VFABAHed000020	sp|Q5B9N7|EIF3A_EMENI	sp|Q5B9N7|EIF3A_EMENI Eukaryotic translation initiation factor 3 subunit A OS=Emericella nidulans (strain FGSC A4 / ATCC 38163 / CBS 112.46 / NRRL 194 / M139) OX=227321 GN=tif32 PE=3 SV=2
+VFABAHed000020	sp|Q5BMR2|PLD_PHYIN	sp|Q5BMR2|PLD_PHYIN Phospholipase D OS=Phytophthora infestans OX=4787 GN=PLD PE=3 SV=1
+VFABAHed000020	sp|P22484|GD_EHV1K	sp|P22484|GD_EHV1K Envelope glycoprotein D OS=Equine herpesvirus 1 (strain Kentucky A) OX=10329 GN=gD PE=3 SV=1
+VFABAHed000013	sp|C0ZPK5|FTSH_RHOE4	sp|C0ZPK5|FTSH_RHOE4 ATP-dependent zinc metalloprotease FtsH OS=Rhodococcus erythropolis (strain PR4 / NBRC 100887) OX=234621 GN=ftsH PE=3 SV=1
+VFABAHed000013	sp|P11710|FUS1_YEAST	sp|P11710|FUS1_YEAST Nuclear fusion protein FUS1 OS=Saccharomyces cerevisiae (strain ATCC 204508 / S288c) OX=559292 GN=FUS1 PE=1 SV=3
+VFABAHed000013	sp|A0A3G1DJH6|MFR4_PHOSM	sp|A0A3G1DJH6|MFR4_PHOSM Acyltransferase R4 OS=Phoma sp. (strain ATCC 20986 / MF5453) OX=1828523 GN=R4 PE=2 SV=1
+VFABAHed000013	sp|Q99089|CPRF1_PETCR	sp|Q99089|CPRF1_PETCR Common plant regulatory factor 1 OS=Petroselinum crispum OX=4043 GN=CPRF1 PE=2 SV=1
+VFABAHed000013	sp|Q16655|MAR1_HUMAN	sp|Q16655|MAR1_HUMAN Melanoma antigen recognized by T-cells 1 OS=Homo sapiens OX=9606 GN=MLANA PE=1 SV=1
+VFABAHed000013	sp|Q28141|DHX9_BOVIN	sp|Q28141|DHX9_BOVIN ATP-dependent RNA helicase A OS=Bos taurus OX=9913 GN=DHX9 PE=1 SV=1
+VFABAHed000013	sp|Q3B820|F161A_HUMAN	sp|Q3B820|F161A_HUMAN Protein FAM161A OS=Homo sapiens OX=9606 GN=FAM161A PE=1 SV=2
+VFABAHed000013	sp|Q61616|DRD1_MOUSE	sp|Q61616|DRD1_MOUSE D(1A) dopamine receptor OS=Mus musculus OX=10090 GN=Drd1 PE=1 SV=2
+VFABAHed000013	sp|A9IJI3|SERC_BORPD	sp|A9IJI3|SERC_BORPD Phosphoserine aminotransferase OS=Bordetella petrii (strain ATCC BAA-461 / DSM 12804 / CCUG 43448) OX=340100 GN=serC PE=3 SV=1
+VFABAHed000013	sp|F4KFS5|GMI1_ARATH	sp|F4KFS5|GMI1_ARATH Structural maintenance of chromosomes flexible hinge domain-containing protein GMI1 OS=Arabidopsis thaliana OX=3702 GN=GMI1 PE=2 SV=1
+VFABAHed000013	sp|A7EQA8|INO80_SCLS1	sp|A7EQA8|INO80_SCLS1 Chromatin-remodeling ATPase INO80 OS=Sclerotinia sclerotiorum (strain ATCC 18683 / 1980 / Ss-1) OX=665079 GN=INO80 PE=3 SV=1

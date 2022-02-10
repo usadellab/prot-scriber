@@ -4,6 +4,58 @@ Assigns short human readable descriptions (HRD) to query biological sequences us
 
 `prot-scriber` can also apply the same methodology to produce HRDs for sets of biological sequences, i.e. gene families. 
 
+## Quick Start
+
+(This section is for the lazy :wink: [TL;DR](https://en.wikipedia.org/wiki/Wikipedia:Too_long;_didn%27t_read))
+
+`prot-scriber` can be used to generate human readable descriptions (HRDs) for _either_ query biological _sequences_ (proteins) or for _gene-families_. We will walk you through both use cases below with ready to use example input files.
+
+### Step 1 - Get `prot-scriber`
+
+Depending on your operating system, download the ready to use executable from the table in section [\"Installation\"](#download-ready-to-use-executables).
+
+### Step 2 - Sequence similarity searches with Blast or Diamond
+
+Independent of your use-case, sequence or gene-family annotation, you need to run a sequence similarity search of your query biological sequences against reference databases. We recommend searching [UniProt](https://www.uniprot.org/downloads) Swissprot ([uniprot_sprot.fasta.gz](https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz)) and trEMBL ([uniprot_trembl.fasta.gz](https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_trembl.fasta.gz)). You will need to format (Blast `makeblastdb`, Diamond `diamond makedb`) these UniProt reference databases and search them with either Blast 
+```sh
+blastp -db uniprot_sprot.fasta -query my_prots.fasta -num_threads 10 -out my_prots_vs_sprot.txt -outfmt \"6 delim=<TAB> qacc sacc stitle\"
+```
+(Note that the above `<TAB>` actually needs to be a tab character. Typically you type that in with \"Ctrl+v\" followed by \"Tab\".)
+
+or Diamond 
+```sh
+diamond blastp -p 10 --quiet -d uniprot_sprot.fasta.dmnd -q my_prots.fasta -o my_prots_vs_sprot.txt -f 6 qseqid sseqid stitle
+```
+(See [the manual](#manual) section \"2.2 Example Blast or Diamond commands\" for details). For a quick test run you can assume to have carried out the searches and use the example output tables below (all files are taken from this repository's [`misc`](https://github.com/usadellab/prot-scriber/tree/master/misc) directory):
+
+**To generate HRDs for twelve example biological sequences (proteins) use:**
+* [`Twelve_Proteins_vs_Swissprot_blastp.txt`](https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/Twelve_Proteins_vs_Swissprot_blastp.txt)
+* [`Twelve_Proteins_vs_trembl_blastp.txt`](https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/Twelve_Proteins_vs_trembl_blastp.txt)
+
+**To generate HRDs for two gene-families, comprising four and three proteins, respectively, use:**
+* [`families.txt`](https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/families.txt)
+* [`family_prots_vs_Swissprot.txt`](https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/family_prots_vs_Swissprot.txt)
+* [`family_prots_vs_trEMBL.txt`](https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/family_prots_vs_trEMBL.txt)
+
+Please read section \"2.3 Gene Family preparation and analysis\" of [the manual](#manual) for a recipy on how to cluster biological sequences into gene-families.
+
+### Step 3 - Assign human readable descriptions (HRDs)
+
+Note that on Windows the below would be \"`prot-scriber.exe`\" instead of just \"`prot-scriber`\".
+
+**To annotate biological sequences, e.g. proteins, with HRDs, use:**
+
+```sh
+prot-scriber -s Twelve_Proteins_vs_Swissprot_blastp.txt -s Twelve_Proteins_vs_trembl_blastp.txt -o Twelve_Proteins_HRDs.txt
+```
+Find `prot-scriber`'s output in file `Twelve_Proteins_HRDs.txt`.
+
+**To annotate gene-families with HRDs, use:**
+```sh
+prot-scriber -f families.txt -s family_prots_vs_Swissprot.txt -s family_prots_vs_trEMBL.txt -o families_HRDs.txt
+```
+Find `prot-scriber`'s output in file `families_HRDs.txt`.
+
 ## Installation
 
 ### Download ready to use executables

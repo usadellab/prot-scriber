@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::mpsc::Sender;
 
 /// Finds a tabular file (`path`) and parses it in a stream approach, i.e. line by line. Every time
-/// an instance of Query is successfully and completely pares it is send using the argument
+/// an instance of Query is successfully and completely parsed it is send using the argument
 /// `transmitter` to the respective registered receiver.
 ///
 /// # Arguments

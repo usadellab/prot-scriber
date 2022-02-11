@@ -1,4 +1,6 @@
 use regex::Regex;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 /// Applies a list of regular expressions to a string. If any of them match returns true,
 /// otherwise returns false.
@@ -33,6 +35,34 @@ pub fn filter_stitle(stitle: &str, regexs: &Vec<Regex>) -> String {
             .trim()
             .to_lowercase(),
     )
+}
+
+/// Reads in and parses a file specified by argument `path` and converts each line into an instance
+/// of `Regex`. Returns a vector of the so instantiated regular expressions.
+///
+/// # Arguments
+///
+/// * `path` - A `&str` representing the path to the file containing on regular expression per
+/// line.
+pub fn parse_regex_file(path: &str) -> Vec<Regex> {
+    // Open stream to the gene families input file
+    let file_path = path.to_string();
+    let file = File::open(path).unwrap();
+    let reader = BufReader::new(file);
+
+    // read file line by line
+    let mut parsed_regexs = vec![];
+    for (i, line) in reader.lines().enumerate() {
+        let regex_line = line.unwrap();
+
+        match Regex::new(&regex_line) {
+            Ok(regex) => {
+                parsed_regexs.push(regex);
+            }
+            Err(e) => panic!("{:?} in file {:?} line <{:?}>. Could not parse the line into a Rust regular expression", e, file_path, i),
+        }
+    }
+    parsed_regexs
 }
 
 #[cfg(test)]

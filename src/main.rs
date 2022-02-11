@@ -3,6 +3,8 @@ extern crate lazy_static;
 
 use annotation_process::{run, AnnotationProcess};
 use clap::{App, Arg};
+use model_funcs::parse_regex_file;
+use regex::Regex;
 use seq_family_reader::parse_seq_families_file;
 
 mod annotation_process;
@@ -80,6 +82,33 @@ fn main() {
             .takes_value(false)
             .long("annotate-non-family-queries")
             .help("Use this option only in combination with --seq-families (-f), i.e. when prot-scriber is used to generate human readable descriptions for gene families. If in that context this flag is given, queries for which there are sequence similarity search (Blast) results but that are NOT member of a sequence family will receive an annotation (human readable description) in the output file, too. Default value of this setting is 'OFF' (false)."),
+        )
+        .arg(
+            Arg::new("description-split-regex")
+            .short('r')
+            .takes_value(true)
+            .long("description-split-regex")
+            .help("A regular expression in Rust syntax to be used to split descriptions (`stitle` in Blast terminology) into words. Default is '([~_\\-/|\\;,':.\\s]+)'. Note that this is an expert option."),
+        )
+        .arg(
+            Arg::new("verbose")
+            .short('v')
+            .long("verbose")
+            .help("Print informative messages about the annotation process."),
+        )
+        .arg(
+            Arg::new("n-threads")
+            .short('n')
+            .takes_value(true)
+            .long("n-threads")
+            .help("The maximum number of parallel threads to use. "),
+        )
+        .arg(
+            Arg::new("non-informative-words-regexs")
+            .short('w')
+            .takes_value(true)
+            .long("non-informative-words-regexs")
+            .help("The path to a file in which regular expressions (regexs) are stored, one per line. These regexs are used to recognize non-informative words, which will only receive a minimun score in the prot-scriber process that generates human readable description. There is a default list hard-coded into prot-scriber. Note that this is an expert option."),
         )
         .arg(
             Arg::new("verbose")
@@ -170,6 +199,25 @@ fn main() {
         for field_separator in matches.values_of("field-separator").unwrap() {
             annotation_process.add_ssst_field_separator(field_separator);
         }
+    }
+
+    // Did the user supply a custom regular expression to split descriptions (`stitle` in Blast
+    // terminology) into words?
+    if matches.is_present("description-split-regex") {
+        annotation_process.description_split_regex =
+            Regex::new(matches.value_of("description-split-regex").unwrap()).expect(
+                format!(
+                    "Could not parse --description-split-regex (-r) argument {:?} into a Rust regular expression. Please check the syntax or use the default (see --help for details).",
+                    matches.value_of("description-split-regex").unwrap()
+                ).as_str()
+            );
+    }
+
+    // Did the user provide an optional file containing regular expressions, one per line, to be
+    // used to recognize non-informative words?
+    if matches.is_present("non-informative-words-regexs") {
+        annotation_process.non_informative_words_regexs =
+            parse_regex_file(matches.value_of("non-informative-words-regexs").unwrap());
     }
 
     // Execute the Annotation-Process:

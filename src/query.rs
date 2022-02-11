@@ -1,7 +1,6 @@
-use super::default::{
-    REPLACE_REGEXS_DESCRIPTION, SPLIT_DESCRIPTION_REGEX, UNKNOWN_PROTEIN_DESCRIPTION,
-};
+use super::default::{REPLACE_REGEXS_DESCRIPTION, UNKNOWN_PROTEIN_DESCRIPTION};
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
+use regex::Regex;
 use std::collections::HashMap;
 
 /// A sequence similarity search is executed for a query sequence, which is represented by `Query`.
@@ -29,7 +28,15 @@ impl Query {
     /// # Arguments
     ///
     /// * `&self` - A mutable reference to self, this instance of Query
-    pub fn annotate(&self) -> String {
+    /// * `split_regex` - A reference to a regular expression used to split descriptions (`stitle`
+    /// in Blast terminology) into words.
+    /// * `non_informative_words_regexs` - A reference to a vector holding regular expressions used
+    /// to identify non informative words, that receive only a minimum score.
+    pub fn annotate(
+        &self,
+        split_regex: &Regex,
+        non_informative_words_regexs: &Vec<Regex>,
+    ) -> String {
         let mut hrd: String = (*UNKNOWN_PROTEIN_DESCRIPTION).to_string();
         if self.hits.len() > 0 {
             let hit_descriptions = self
@@ -39,8 +46,9 @@ impl Query {
                 .collect();
             let hrd_option = generate_human_readable_description(
                 &hit_descriptions,
-                &(*SPLIT_DESCRIPTION_REGEX),
+                split_regex,
                 Some(&(*REPLACE_REGEXS_DESCRIPTION)),
+                non_informative_words_regexs,
             );
             match hrd_option {
                 Some(hum_read_desc) => {

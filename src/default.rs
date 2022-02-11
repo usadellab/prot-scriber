@@ -10,7 +10,7 @@ lazy_static! {
     /// The default Blacklist of regular expressions used to check for non-informative words
     /// in the description to be excluded from scoring. If ANY of these expression matches
     /// the word is considered as non-informative
-    pub static ref BLACKLIST_DESCRIPTION_WORDS_REGEXS: Vec<Regex> = vec![
+    pub static ref NON_INFORMATIVE_WORDS_REGEXS: Vec<Regex> = vec![
         Regex::new(r"(?i)\band\b").unwrap(),
         Regex::new(r"(?i)\bor\b").unwrap(),
         Regex::new(r"(?i)\bfrom\b").unwrap(),

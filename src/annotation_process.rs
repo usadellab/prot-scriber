@@ -1,12 +1,13 @@
 use super::default::{
-    SEQ_SIM_TABLE_COLUMNS, SPLIT_GENE_FAMILY_GENES_REGEX, SPLIT_GENE_FAMILY_ID_FROM_GENE_SET,
-    SSSR_TABLE_FIELD_SEPARATOR,
+    NON_INFORMATIVE_WORDS_REGEXS, SEQ_SIM_TABLE_COLUMNS, SPLIT_DESCRIPTION_REGEX,
+    SPLIT_GENE_FAMILY_GENES_REGEX, SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR,
 };
 use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
 use num_cpus;
 use rayon::prelude::*;
+use regex::Regex;
 use std::collections::HashMap;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -14,7 +15,7 @@ use std::thread;
 /// An instance of AnnotationProcess represents exactly what its name suggest, the assignment of
 /// human readable descriptions, i.e. the annotation of queries or sets of these (biological
 /// sequence families) with short and concise textual descriptions.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct AnnotationProcess {
     /// The valid file paths to tabular sequence similarity search results, the input.
     pub seq_sim_search_tables: Vec<String>,
@@ -37,6 +38,12 @@ pub struct AnnotationProcess {
     pub seq_family_gene_ids_separator: String,
     /// An in memory index from Query identifier to SeqFamily identifier:
     pub query_id_to_seq_family_id_index: HashMap<String, String>,
+    /// A regular expression used to split descriptions (`stitle` in Blast terminology) into words.
+    pub description_split_regex: Regex,
+    /// The path to the optional argument file holding regular expression, one per line, used to
+    /// recognize non informative words. If not given, the
+    /// `default::BLACKLIST_DESCRIPTION_WORDS_REGEXS` is used.
+    pub non_informative_words_regexs: Vec<Regex>,
     /// The human readable descriptions (HRDs) generated for the queries, i.e. either single query
     /// sequences or families (sets of query sequences). Stored here using the query identifier as
     /// key and the generated HRD as values.
@@ -192,7 +199,7 @@ pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
 }
 
 impl AnnotationProcess {
-    /// Creates an empty (`Default`) instance of struct AnnotationProcess.
+    /// Creates a default instance of struct AnnotationProcess and returns it.
     pub fn new() -> AnnotationProcess {
         let nt = if num_cpus::get() < 2 {
             2
@@ -207,6 +214,8 @@ impl AnnotationProcess {
             seq_families: HashMap::new(),
             seq_family_id_genes_separator: (*SPLIT_GENE_FAMILY_ID_FROM_GENE_SET).to_string(),
             seq_family_gene_ids_separator: (*SPLIT_GENE_FAMILY_GENES_REGEX).to_string(),
+            description_split_regex: (*SPLIT_DESCRIPTION_REGEX).clone(),
+            non_informative_words_regexs: (*NON_INFORMATIVE_WORDS_REGEXS).clone(),
             query_id_to_seq_family_id_index: HashMap::new(),
             human_readable_descriptions: HashMap::new(),
             n_threads: nt,
@@ -300,7 +309,10 @@ impl AnnotationProcess {
     /// * `query_id: String` - An instance of `String` representing the query identifier
     pub fn annotate_query(&mut self, query_id: String) {
         // Generate the desired result, i.e. a human readable description for the Query:
-        let hrd = self.queries.get(&query_id).unwrap().annotate();
+        let hrd = self.queries.get(&query_id).unwrap().annotate(
+            &self.description_split_regex,
+            &self.non_informative_words_regexs,
+        );
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
         self.human_readable_descriptions
@@ -323,7 +335,11 @@ impl AnnotationProcess {
     pub fn annotate_seq_family(&mut self, seq_family_id: &String) {
         // Generate the desired result, i.e. a human readable description for the SeqFamily:
         let seq_family = self.seq_families.get(seq_family_id).unwrap();
-        let hrd = seq_family.annotate(&self.queries);
+        let hrd = seq_family.annotate(
+            &self.queries,
+            &self.description_split_regex,
+            &self.non_informative_words_regexs,
+        );
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
         self.human_readable_descriptions
@@ -415,7 +431,10 @@ impl AnnotationProcess {
                     .par_iter()
                     .map(|query_id| {
                         let query = self.queries.get(query_id).unwrap();
-                        let hrd = query.annotate();
+                        let hrd = query.annotate(
+                            &self.description_split_regex,
+                            &self.non_informative_words_regexs,
+                        );
                         ((*query_id).to_string(), hrd)
                     })
                     .collect();
@@ -432,7 +451,11 @@ impl AnnotationProcess {
                     .par_iter()
                     .map(|seq_fam_id| {
                         let seq_fam = self.seq_families.get(seq_fam_id).unwrap();
-                        let hrd = seq_fam.annotate(&self.queries);
+                        let hrd = seq_fam.annotate(
+                            &self.queries,
+                            &self.description_split_regex,
+                            &self.non_informative_words_regexs,
+                        );
                         ((*seq_fam_id).to_string(), hrd)
                     })
                     .collect();

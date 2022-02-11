@@ -1,6 +1,4 @@
-use super::default::{
-    BLACKLIST_DESCRIPTION_WORDS_REGEXS, MAX_MATCH_REPLACE_ITERATIONS, NON_INFORMATIVE_WORD_SCORE,
-};
+use super::default::{MAX_MATCH_REPLACE_ITERATIONS, NON_INFORMATIVE_WORD_SCORE};
 use super::model_funcs::matches_blacklist;
 use regex::Regex;
 use std::collections::HashMap;
@@ -22,10 +20,13 @@ use std::collections::HashMap;
 /// * `replace_regexs` - An `Option` of a vector of tuples, pairing a regular expression and the
 /// capture-group replacement string. These are iteratively applied an the argument descriptions to
 /// prepare it for final splitting into words (see `split_descriptions` for details).
+/// * `non_informative_words_regexs` - A reference to a vector holding regular expressions used to
+/// identify non informative words, that receive only a minimum score.
 pub fn generate_human_readable_description(
     descriptions: &Vec<String>,
     split_regex: &Regex,
     replace_regexs: Option<&Vec<(Regex, String)>>,
+    non_informative_words_regexs: &Vec<Regex>,
 ) -> Option<String> {
     // Initialize default result:
     let mut human_readable_rescription_result: Option<String> = None;
@@ -46,7 +47,7 @@ pub fn generate_human_readable_description(
                 // contained in the universe, it has passed the blacklist in a past iteration, so we
                 // don't need to check again:
                 if informative_words_universe.contains(&word)
-                    || !matches_blacklist(&word, &(*BLACKLIST_DESCRIPTION_WORDS_REGEXS))
+                    || !matches_blacklist(&word, non_informative_words_regexs)
                 {
                     informative_words_universe.push(word.clone());
                 }
@@ -295,7 +296,9 @@ pub fn centered_inverse_information_content(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::default::{REPLACE_REGEXS_DESCRIPTION, SPLIT_DESCRIPTION_REGEX};
+    use crate::default::{
+        NON_INFORMATIVE_WORDS_REGEXS, REPLACE_REGEXS_DESCRIPTION, SPLIT_DESCRIPTION_REGEX,
+    };
     use assert_approx_eq::assert_approx_eq;
     use std::vec;
 
@@ -610,9 +613,13 @@ mod tests {
             "alcohol dehydrogenase c-terminal".to_string(),
         ];
         let mut expected = "manitol dehydrogenase".to_string();
-        let mut result =
-            generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX), None)
-                .unwrap();
+        let mut result = generate_human_readable_description(
+            &hit_hrds,
+            &(*SPLIT_DESCRIPTION_REGEX),
+            None,
+            &(*NON_INFORMATIVE_WORDS_REGEXS),
+        )
+        .unwrap();
         assert_eq!(expected, result);
 
         // Test 2:
@@ -626,8 +633,13 @@ mod tests {
             "importin subunit beta-3".to_string(),
         ];
         expected = "importin 5".to_string();
-        result = generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX), None)
-            .unwrap();
+        result = generate_human_readable_description(
+            &hit_hrds,
+            &(*SPLIT_DESCRIPTION_REGEX),
+            None,
+            &(*NON_INFORMATIVE_WORDS_REGEXS),
+        )
+        .unwrap();
         assert_eq!(expected, result);
 
         // Test 3:
@@ -636,8 +648,13 @@ mod tests {
             "receptor protein eix2".to_string(),
         ];
         expected = "receptor protein".to_string();
-        result = generate_human_readable_description(&hit_hrds, &(*SPLIT_DESCRIPTION_REGEX), None)
-            .unwrap();
+        result = generate_human_readable_description(
+            &hit_hrds,
+            &(*SPLIT_DESCRIPTION_REGEX),
+            None,
+            &(*NON_INFORMATIVE_WORDS_REGEXS),
+        )
+        .unwrap();
         assert_eq!(expected, result);
     }
 }

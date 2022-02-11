@@ -1,0 +1,13 @@
+(?i)\band\b
+(?i)\bor\b
+(?i)\bfrom\b
+(?i)\bto\b
+(?i)\bmember\b
+(?i)\bprotein\b
+(?i)\bisoform\b
+(?i)\bgene\b
+(?i)\btair\b
+(?i)\bfragment\b
+(?i)\bhomolog\b
+(?i)\bcontig\b
+\b\d+\b

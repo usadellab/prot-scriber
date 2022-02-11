@@ -291,6 +291,11 @@ OPTIONS:
             first -p arg will be used for the first -s arg, the second -p will be used for the
             second -s and so on. You can provide '-p default' to use the hard coded default (TAB).
 
+    -r, --description-split-regex <description-split-regex>
+            A regular expression in Rust syntax to be used to split descriptions (`stitle` in Blast
+            terminology) into words. Default is '([~_\-/|\;,':.\s]+)'. Note that this is an expert
+            option.
+
     -s, --seq-sim-table <seq-sim-table>
             File in which to find sequence similarity search results in tabular format (SSST). Use
             e.g. Blast or Diamond to produce them. Required columns are: 'qacc sacc stitle' (Blast)
@@ -309,6 +314,12 @@ OPTIONS:
 
     -V, --version
             Print version information
+
+    -w, --non-informative-words-regexs <non-informative-words-regexs>
+            The path to a file in which regular expressions (regexs) are stored, one per line. These
+            regexs are used to recognize non-informative words, which will only receive a minimun
+            score in the prot-scriber process that generates human readable description. There is a
+            default list hard-coded into prot-scriber. Note that this is an expert option.
 ```
 
 </details>

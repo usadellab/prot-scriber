@@ -1,7 +1,9 @@
 use super::default::{
-    NON_INFORMATIVE_WORDS_REGEXS, SEQ_SIM_TABLE_COLUMNS, SPLIT_DESCRIPTION_REGEX,
-    SPLIT_GENE_FAMILY_GENES_REGEX, SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR,
+    BLACKLIST_STITLE_REGEXS, NON_INFORMATIVE_WORDS_REGEXS, SEQ_SIM_TABLE_COLUMNS,
+    SPLIT_DESCRIPTION_REGEX, SPLIT_GENE_FAMILY_GENES_REGEX, SPLIT_GENE_FAMILY_ID_FROM_GENE_SET,
+    SSSR_TABLE_FIELD_SEPARATOR,
 };
+use super::model_funcs::parse_regex_file;
 use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
@@ -23,6 +25,10 @@ pub struct AnnotationProcess {
     pub ssst_columns: Vec<HashMap<String, usize>>,
     /// The field-separators used in the above `seq_sim_search_tables`:
     pub ssst_field_separators: Vec<char>,
+    /// For each sequence similarity search result table (ssst) the list of regular expressions
+    /// used to identify to be discarded descriptions (`stitle`) - note that the vector-index is
+    /// used to pair input ssst with its blacklist regexs.
+    pub ssst_blacklist_regexs: Vec<Vec<Regex>>,
     /// The in memory database of parsed sequence similarity search results in terms of Queries
     /// with their respective Hits.
     pub queries: HashMap<String, Query>,
@@ -109,6 +115,10 @@ pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
     // Enable the threads to access the input column order in each input sequence similarity search
     // result table:
     let ssst_cols_mutex = Arc::new(Mutex::new(annotation_process.ssst_columns.clone()));
+    // Enable the threads to access the input blacklist-regex-lists used to identify to be
+    // discarded descriptions (`stitle`) in each input sequence similarity search result table:
+    let ssst_blacklist_regexs_mutex =
+        Arc::new(Mutex::new(annotation_process.ssst_blacklist_regexs.clone()));
     // Enable the threads to access the input field separator used in the respective input
     // sequence similarity search result tables:
     let ssst_field_seps_mutex =
@@ -122,7 +132,9 @@ pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
         // Start this sss_tbl's dedicated threat:
         let sssts_mutex_clone = sssts_mutex.clone();
         let ssst_cols_mutex_clone = ssst_cols_mutex.clone();
+        let ssst_blacklist_regexs_mutex_clone = ssst_blacklist_regexs_mutex.clone();
         let ssst_field_seps_mutex_clone = ssst_field_seps_mutex.clone();
+
         thread::spawn(move || {
             // Field-Separator in Sequence Similarity Search (Blast) Result rows (lines):
             let mut field_separator = *SSSR_TABLE_FIELD_SEPARATOR;
@@ -156,6 +168,16 @@ pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
                 // Enable other threads to access `annotation_process.ssst_columns`:
                 drop(ssst_columns);
 
+                // Did the user provide values for the blacklist regex list to be used to identify
+                // to be discarded descriptions (`stitle`) in the argument `sss_tbl`?
+                let ssst_blacklist_regexs = ssst_blacklist_regexs_mutex_clone.lock().unwrap();
+                let mut blacklist_regexs_i = (*BLACKLIST_STITLE_REGEXS).clone();
+                if !ssst_blacklist_regexs.is_empty() {
+                    blacklist_regexs_i = ssst_blacklist_regexs[i].clone();
+                }
+                // Enable other threads to access `annotation_process.ssst_blacklist_regexs`:
+                drop(ssst_blacklist_regexs);
+
                 // Did the user provide a custom field-separator for the argument `sss_tbl`?
                 let ssst_field_separators = ssst_field_seps_mutex_clone.lock().unwrap();
                 if !ssst_field_separators.is_empty() {
@@ -170,6 +192,7 @@ pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
                     &qacc_col,
                     &sacc_col,
                     &stitle_col,
+                    &blacklist_regexs_i,
                     // Because we are in a `loop` we need to clone the cloned sender:
                     tx_i.clone(),
                 );
@@ -209,6 +232,7 @@ impl AnnotationProcess {
         AnnotationProcess {
             seq_sim_search_tables: vec![],
             ssst_columns: vec![],
+            ssst_blacklist_regexs: vec![],
             ssst_field_separators: vec![],
             queries: HashMap::new(),
             seq_families: HashMap::new(),
@@ -499,6 +523,27 @@ impl AnnotationProcess {
             }
         }
         self.ssst_columns.push(seq_sim_table_cols);
+    }
+
+    /// Parses one (of potentially many) command line argument `blacklist-regexs` into a
+    /// `Vec<Regex>` in which the regular expressions are stored used to identify to be discarded
+    /// `stitle`. These `stitle` strings are parsed from the input sequence similarity search
+    /// result (Blast) table (SSST). Inserts the parsed `Vec<Regex>` into
+    /// `self.ssst_blacklist_regexs`, and uses the `default::BLACKLIST_STITLE_REGEXS` `Vec<Regex>`
+    /// if the argument `blacklist_regexs_arg` equals `"default"` (case insensitive).
+    ///
+    /// # Arguments
+    ///
+    /// * `&mut self` - A reference to a mutable instance of AnnotationProcess.
+    /// * `blacklist_regexs_arg: &str` - The passed header argument
+    pub fn add_ssst_blacklist_regexs(&mut self, blacklist_regexs_arg: &str) {
+        let blacklist_regexs: Vec<Regex> =
+            if blacklist_regexs_arg.trim().to_lowercase() == "default" {
+                (*BLACKLIST_STITLE_REGEXS).clone()
+            } else {
+                parse_regex_file(blacklist_regexs_arg)
+            };
+        self.ssst_blacklist_regexs.push(blacklist_regexs);
     }
 
     /// Parses the command line argument `field-separator` into a `char` used to split a line (row)

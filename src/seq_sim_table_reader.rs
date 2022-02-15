@@ -1,7 +1,8 @@
 //! Code used to parse sequence similarity search result tables is implemented in this module.
-use super::default::{BLACKLIST_STITLE_REGEXS, FILTER_REGEXS};
+use super::default::FILTER_REGEXS;
 use super::model_funcs::{filter_stitle, matches_blacklist};
 use super::query::*;
+use regex::Regex;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -18,6 +19,9 @@ use std::sync::mpsc::Sender;
 /// * `qacc_col: &usize` - The column index in which to find the `qacc`
 /// * `sacc_col: &usize` - The column index in which to find the `sacc`
 /// * `stitle_col: &usize` - The column index in which to find the `stitle`
+/// * `blacklist_regexs: &Vec<Regex>` - The list of regular expressions used to identify to be
+/// discarded descriptions (`stitle`) parsed from the argument `path` sequence similarity search
+/// result table.
 /// * `transmitter: Sender<Query>` - Used to send instances of `Query` to any receiver.
 pub fn parse_table(
     path: &String,
@@ -25,10 +29,11 @@ pub fn parse_table(
     qacc_col: &usize,
     sacc_col: &usize,
     stitle_col: &usize,
+    blacklist_regexs: &Vec<Regex>,
     transmitter: Sender<(String, Query)>,
 ) {
     let lines =
-        read_lines(&path).expect(format!("An error occurred reading file '{}'", &path).as_str());
+        read_lines(&path).expect(format!("An error occurred reading file {:?}", &path).as_str());
     let mut last_qacc = String::new();
     let mut curr_query = Query::new();
     for line_rslt in lines {
@@ -45,7 +50,7 @@ pub fn parse_table(
                 }
 
                 if !curr_query.hits.contains_key(&sacc.to_string())
-                    && !matches_blacklist(stitle, &(*BLACKLIST_STITLE_REGEXS))
+                    && !matches_blacklist(stitle, blacklist_regexs)
                 {
                     let desc = filter_stitle(stitle, &(*FILTER_REGEXS))
                         .trim()

@@ -48,6 +48,14 @@ fn main() {
             .help("Header of the --seq-sim-table (-s) arg. Separated by space (' ') the names of the columns in order of appearance in the respective table. Required and default columns are 'qacc sacc stitle'. Note that this option only understands Blast terminology, i.e. even if you ran Diamond, please provide 'qacc' instead of 'qseqid' and 'sacc' instead of 'sseqid'. Luckily 'stitle' is 'stitle' in Diamond, too. You can have additional columns that will be ignored, as long as the required columns appear in the correct order. Consider this example: 'qacc sacc evalue bitscore stitle'. If multiple --seq-sim-table (-s) args are provided make sure the --header (-e) args appear in the correct order, e.g. the first -e arg will be used for the first -s arg, the second -e will be used for the second -s and so on. Set to 'default' to use the hard coded default."),
         )
         .arg(
+            Arg::new("blacklist-regexs")
+            .short('b')
+            .takes_value(true)
+            .long("blacklist-regexs")
+            .multiple_occurrences(true)
+            .help("A file with regular expressions (Rust syntax), one per line. Any match to any of these regular expressions causes sequence similarity search result descriptions ('stitle' in Blast terminology) to be discarded from the prot-scriber annotation process. If multiple --seq-sim-table (-s) args are provided make sure the --header (-e) args appear in the correct order, e.g. the first -e arg will be used for the first -s arg, the second -e will be used for the second -s and so on. Set to 'default' to use the hard coded default. Note that this is an expert option."),
+        )
+        .arg(
             Arg::new("field-separator")
             .short('p')
             .takes_value(true)
@@ -198,6 +206,13 @@ fn main() {
     if matches.is_present("field-separator") {
         for field_separator in matches.values_of("field-separator").unwrap() {
             annotation_process.add_ssst_field_separator(field_separator);
+        }
+    }
+    // For each of the above to be parsed SSSR tables set the blacklist filter, i.e. vectors of
+    // regular expressions:
+    if matches.is_present("blacklist-regexs") {
+        for blacklist_arg in matches.values_of("blacklist-regexs").unwrap() {
+            annotation_process.add_ssst_blacklist_regexs(blacklist_arg);
         }
     }
 

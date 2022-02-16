@@ -1,5 +1,4 @@
 //! Code used to parse sequence similarity search result tables is implemented in this module.
-use super::default::FILTER_REGEXS;
 use super::model_funcs::{filter_stitle, matches_blacklist};
 use super::query::*;
 use regex::Regex;
@@ -22,6 +21,13 @@ use std::sync::mpsc::Sender;
 /// * `blacklist_regexs: &Vec<Regex>` - The list of regular expressions used to identify to be
 /// discarded descriptions (`stitle`) parsed from the argument `path` sequence similarity search
 /// result table.
+/// * `filter_regexs: &Vec<Regex>` - The list of regular expressions used to identify to be deleted
+/// matching sub-strings in the descriptions (`stitle`) parsed from the argument `path` sequence
+/// similarity search result table.
+/// * `capture_replace_pairs` - An `Option` of a vector of tuples, pairing a regular expression
+/// and the capture-group replacement string. These are iteratively applied and the argument
+/// descriptions to prepare it for final splitting into words (see `split_descriptions` for
+/// details).
 /// * `transmitter: Sender<Query>` - Used to send instances of `Query` to any receiver.
 pub fn parse_table(
     path: &String,
@@ -30,6 +36,8 @@ pub fn parse_table(
     sacc_col: &usize,
     stitle_col: &usize,
     blacklist_regexs: &Vec<Regex>,
+    filter_regexs: &Vec<Regex>,
+    capture_replace_pairs: Option<&Vec<(Regex, String)>>,
     transmitter: Sender<(String, Query)>,
 ) {
     let lines =
@@ -52,7 +60,7 @@ pub fn parse_table(
                 if !curr_query.hits.contains_key(&sacc.to_string())
                     && !matches_blacklist(stitle, blacklist_regexs)
                 {
-                    let desc = filter_stitle(stitle, &(*FILTER_REGEXS))
+                    let desc = filter_stitle(stitle, filter_regexs, capture_replace_pairs)
                         .trim()
                         .to_lowercase();
                     if !desc.is_empty() {
@@ -63,7 +71,10 @@ pub fn parse_table(
                 last_qacc = qacc.to_string();
             }
             Err(e) => {
-                eprintln!("An error occurred while parsing '{}':\n{:?}", path, e);
+                eprintln!(
+                    "\nAn error occurred while parsing {:?}:\n{:?}\nContinuing anyway!\n",
+                    path, e
+                );
             }
         }
     }

@@ -85,7 +85,7 @@ lazy_static! {
     /// The default vector of regular expressions _with_ match-groups to be used to split
     /// descriptions (parsed `stitle`) into separate words by replacing the matched region with
     /// the first and second captures:
-    pub static ref REPLACE_REGEXS_DESCRIPTION: Vec<(Regex, String)> = {
+    pub static ref CAPTURE_REPLACE_DESCRIPTION_PAIRS: Vec<(Regex, String)> = {
         let mut rrd : Vec<(Regex, String)> = vec![];
         rrd.push(
             (

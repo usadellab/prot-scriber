@@ -1,0 +1,6 @@
+(?i)\b(?P<first>duf|pf|ipr|pthr|go|kegg|ec)(?P<second>[0-9:]+)\b
+$first~$second
+(?i)\b(?P<first>[a-z]{2,})[-.,\d]+\b
+$first 
+\s+[.\d]+(\s+|$)
+ 

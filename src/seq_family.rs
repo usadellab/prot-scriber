@@ -1,4 +1,4 @@
-use super::default::{REPLACE_REGEXS_DESCRIPTION, UNKNOWN_FAMILY_DESCRIPTION};
+use super::default::UNKNOWN_FAMILY_DESCRIPTION;
 use super::query::Query;
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
 use regex::Regex;
@@ -89,7 +89,6 @@ impl SeqFamily {
             let hrd_option = generate_human_readable_description(
                 &hit_descriptions,
                 split_regex,
-                Some(&(*REPLACE_REGEXS_DESCRIPTION)),
                 non_informative_words_regexs,
             );
             match hrd_option {

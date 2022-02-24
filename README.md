@@ -70,8 +70,8 @@ Note that on Mac OS and Unix / Linux operating systems you need to make the down
 |Operating System|CPU-Architecture|Release-Name (click to download)|Comment|
 |---|---|---|---|
 |Windows 7 or higher|any|[windows_prot-scriber.exe](https://github.com/usadellab/prot-scriber/releases/download/latest-stable/x86_64-pc-windows-gnu_prot-scriber.exe)|to be used in a terminal (`cmd` or Power-Shell)|
-|any GNU-Linux|any Intel x86, 64 bits|[x86_64-unknown-linux-gnu_prot-scriber](https://github.com/usadellab/prot-scriber/releases/download/latest-stable/x86_64-unknown-linux-gnu_prot-scriber)|requires glibc versions 2.27 and 2.18 installed as is the case e.g. in Ubuntu >= 22.04|
-|any GNU-Linux|any aarch, 64 bits|[aarch64-unknown-linux-gnu_prot-scriber](https://github.com/usadellab/prot-scriber/releases/download/latest-stable/aarch64-unknown-linux-gnu_prot-scriber)|e.g. for Raspberry Pi; requires glibc versions 2.27 and 2.18 installed as is the case e.g. in Ubuntu >= 22.04|
+|any GNU-Linux|any Intel x86, 64 bits|[x86_64-unknown-linux-gnu_prot-scriber](https://github.com/usadellab/prot-scriber/releases/download/latest-stable/x86_64-unknown-linux-gnu_prot-scriber)|requires libm.so.6 (compiled with glibc version 2.27) and libc.so.6 (compiled with glibc 2.18) installed as is the case e.g. in Ubuntu >= 22.04|
+|any GNU-Linux|any aarch, 64 bits|[aarch64-unknown-linux-gnu_prot-scriber](https://github.com/usadellab/prot-scriber/releases/download/latest-stable/aarch64-unknown-linux-gnu_prot-scriber)|e.g. for Raspberry Pi; requires libm.so.6 (compiled with glibc version 2.27) and libc.so.6 (compiled with glibc 2.18) installed as is the case e.g. in Ubuntu >= 22.04|
 |Apple / Mac OS|any Mac Computer with Mac OS 10|[x86_64-apple-darwin_prot-scriber](https://github.com/usadellab/prot-scriber/releases/download/latest-stable/x86_64-apple-darwin_prot-scriber)||
 
 ### Compilation from source code

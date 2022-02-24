@@ -284,7 +284,9 @@ OPTIONS:
             --seq-sim-table (-s) args are provided make sure the --blacklist-regexs (-b) args appear
             in the correct order, e.g. the first -b arg will be used for the first -s arg, the
             second -b will be used for the second -s and so on. Set to 'default' to use the hard
-            coded default. Note that this is an expert option.
+            coded default. An example file can be downloaded here:
+            https://raw.githubusercontent.com/usadellab/prot-
+            scriber/master/misc/blacklist_stitle_regexs.txt - Note that this is an expert option.
 
     -c, --capture-replace-pairs <capture-replace-pairs>
             A file with pairs of lines. Within each pair the first line is a regular expressions
@@ -298,7 +300,9 @@ OPTIONS:
             multiple --seq-sim-table (-s) args are provided make sure the --capture-replace-pairs
             (-c) args appear in the correct order, e.g. the first -c arg will be used for the first
             -s arg, the second -c will be used for the second -s and so on. Set to 'default' to use
-            the hard coded default. Note that this is an expert option.
+            the hard coded default. An example file can be downloaded here:
+            https://raw.githubusercontent.com/usadellab/prot-
+            scriber/master/misc/capture_replace_pairs.txt - Note that this is an expert option.
 
     -e, --header <header>
             Header of the --seq-sim-table (-s) arg. Separated by space (' ') the names of the
@@ -339,8 +343,9 @@ OPTIONS:
             starting with e.g. 'OS=' at the end of the `stitle` strings. If multiple --seq-sim-table
             (-s) args are provided make sure the --filter-regexs (-l) args appear in the correct
             order, e.g. the first -l arg will be used for the first -s arg, the second -l will be
-            used for the second -s and so on. Set to 'default' to use the hard coded default. Note
-            that this is an expert option.
+            used for the second -s and so on. Set to 'default' to use the hard coded default. An
+            example file can be downloaded here: https://raw.githubusercontent.com/usadellab/prot-
+            scriber/master/misc/filter_stitle_regexs.txt - Note that this is an expert option.
 
     -n, --n-threads <n-threads>
             The maximum number of parallel threads to use. Default is the number of logical cores.
@@ -386,7 +391,10 @@ OPTIONS:
             The path to a file in which regular expressions (regexs) are stored, one per line. These
             regexs are used to recognize non-informative words, which will only receive a minimun
             score in the prot-scriber process that generates human readable description. There is a
-            default list hard-coded into prot-scriber. Note that this is an expert option.
+            default list hard-coded into prot-scriber. An example file can be downloaded here:
+            https://raw.githubusercontent.com/usadellab/prot-
+            scriber/master/misc/non_informative_words_regexs.txt - Note that this is an expert
+            option.
 ```
 
 </details>

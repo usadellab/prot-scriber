@@ -118,6 +118,8 @@ queries.performance <- do.call(rbind, mclapply(query.ids, function(q.id) {
 #' Save result table:
 write.table(queries.performance, script.args$`result-table`, 
     sep = "\t", row.names = FALSE, quote = TRUE)
+message("Written performance scores into '", script.args$`result-table`, 
+    "'.")
 
 
 #' Test significance of differences in performance score distributions:
@@ -142,13 +144,15 @@ perf.diff.sign.df$t.test.p.adj <- p.adjust(perf.diff.sign.df$t.test.p.value,
 perf.diff.sign.df$wilcox.test.p.adj <- p.adjust(perf.diff.sign.df$t.test.p.value, 
     method = "BH")
 #' Save hypothesis test results:
-hyp.test.res.file <- sub("\\..+$", "_hypothesis_tests.txt", script.args$`result-table`)
+hyp.test.res.file <- sub("\\.[^.]+$", "_hypothesis_tests.txt", script.args$`result-table`)
 write.table(perf.diff.sign.df, hyp.test.res.file, sep = "\t", 
     quote = TRUE, row.names = FALSE)
+message("Written significance tests of differences in performance scores between compared annotators into '", 
+    hyp.test.res.file, "'.")
 
 
 #' Generate plots:
-plot.filename <- sub("\\.\\S+$", "", script.args$`result-table`)
+plot.filename <- sub("\\.[^.]+$", "", script.args$`result-table`)
 competitors <- unique(queries.performance$Method)
 plot.scores <- c("F.Score", "F.Score.relative", "MCC", "MCC.relative")
 clrs <- brewer.pal(length(competitors), "Set1")
@@ -163,6 +167,8 @@ for (scr in plot.scores) {
         col = clrs, horizontal = TRUE, ylab = scr)
     dev.off()
 }
+message("Generated boxplots of the score distributions in files '", 
+    plot.filename, "_*.pdf'.")
 
 
 #' DONE

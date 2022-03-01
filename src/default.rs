@@ -5,7 +5,7 @@ use std::collections::HashMap;
 lazy_static! {
 
     /// The score assigned to non informative words:
-    pub static ref NON_INFORMATIVE_WORD_SCORE : f32 = 0.000001;
+    pub static ref NON_INFORMATIVE_WORD_SCORE : f64 = 0.000001;
 
     /// The default Blacklist of regular expressions used to check for non-informative words
     /// in the description to be excluded from scoring. If ANY of these expression matches

@@ -65,11 +65,14 @@ impl SeqFamily {
     /// in Blast terminology) into words.
     /// * `non_informative_words_regexs` - A reference to a vector holding regular expressions used
     /// to identify non informative words, that receive only a minimum score.
+    /// * `center_at_quantile` - A real value between zero and one used to center the inverse
+    /// information content scores.
     pub fn annotate(
         &self,
         queries: &HashMap<String, Query>,
         split_regex: &Regex,
         non_informative_words_regexs: &Vec<Regex>,
+        center_at_quantile: &f64,
     ) -> String {
         let mut hit_descriptions: Vec<String> = vec![];
         // Gather all Hit descriptions of all queries belonging to this sequence family. This
@@ -90,6 +93,7 @@ impl SeqFamily {
                 &hit_descriptions,
                 split_regex,
                 non_informative_words_regexs,
+                center_at_quantile,
             );
             match hrd_option {
                 Some(hum_read_desc) => {

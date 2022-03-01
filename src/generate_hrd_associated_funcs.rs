@@ -1,7 +1,7 @@
 use super::default::NON_INFORMATIVE_WORD_SCORE;
 use super::model_funcs::matches_blacklist;
 use regex::Regex;
-use statrs::statistics::{Data, OrderStatistics};
+use statrs::statistics::{Data, Distribution, OrderStatistics};
 use std::collections::HashMap;
 
 /// Main function for generating human-readable descriptions (hrds).
@@ -20,10 +20,13 @@ use std::collections::HashMap;
 /// vectors of words (`String`).
 /// * `non_informative_words_regexs` - A reference to a vector holding regular expressions used to
 /// identify non informative words, that receive only a minimum score.
+/// * `center_at_quantile` - A real value between zero and one used to center the inverse
+/// information content scores.
 pub fn generate_human_readable_description(
     descriptions: &Vec<String>,
     split_regex: &Regex,
     non_informative_words_regexs: &Vec<Regex>,
+    center_at_quantile: &f64,
 ) -> Option<String> {
     // Initialize default result:
     let mut human_readable_rescription_result: Option<String> = None;
@@ -53,9 +56,8 @@ pub fn generate_human_readable_description(
 
         // Calculate the frequency of the informative universe words:
         let word_frequencies = frequencies(&informative_words_universe);
-        let ciic: HashMap<String, f64> = centered_inverse_information_content(&word_frequencies);
-
-        println!("\n\nciic\n{:?}\n\n", ciic);
+        let ciic: HashMap<String, f64> =
+            centered_inverse_information_content(&word_frequencies, center_at_quantile);
 
         // Find highest scoring phrase
         let mut phrases: Vec<(Vec<String>, f64)> = vec![];
@@ -211,13 +213,19 @@ pub fn frequencies(universe_words: &Vec<String>) -> HashMap<String, f64> {
 /// information content' calculated as `-1 * log(1 - probability(word))`, where 'probability' =
 /// frequency tanges between zero and one. In order to avoid infinite values for a word that is the
 /// single element of the word-set, i.e. it has a frequency of one, the score of one is used.
-/// Returns a HashMap of word centered IIC key-value-pairs (`HashMap<String, f64>`).
+/// Returns a HashMap of word centered IIC key-value-pairs (`HashMap<String, f64>`). Note that
+/// providing argument `center_at_quantile` as a literal 50.0 yields centering at the mean instead
+/// of a quantile.
 ///
 /// # Arguments
 ///
-/// * `wrd.frequencies` - An instance of dictionary of all words with their frequencies.
+/// * `wrd_frequencies` - An instance of dictionary of all words with their frequencies.
+/// * `center_at_quantile` - A real value between zero and one used to center the inverse
+/// information content scores or a literal 50.0 indicating to center at the mean instead of a
+/// quantile.
 pub fn centered_inverse_information_content(
     wrd_frequencies: &HashMap<String, f64>,
+    center_at_quantile: &f64,
 ) -> HashMap<String, f64> {
     // Initialize default result:
     let mut ciic_result: HashMap<String, f64> = HashMap::new();
@@ -257,7 +265,7 @@ pub fn centered_inverse_information_content(
         // quantile IIC to be subtracted from the actual IIC for centering. Otherwise the above
         // default zero will be subtracted:
         if !iic_values_all_identical.0 {
-            subtract_4_centering = word_scores_quantile(&inv_inf_cntnt, 0.5);
+            subtract_4_centering = word_scores_quantile(&inv_inf_cntnt, *center_at_quantile);
         }
         // Center inverse information content:
         for word_iic_tuple in inv_inf_cntnt {
@@ -274,23 +282,31 @@ pub fn centered_inverse_information_content(
 /// # Arguments
 ///
 /// * `values` - A reference to a word-score vector
-/// * `tau` - A value between 0.0 and 1.0 indicating the quantile to calculate
+/// * `tau` - A value between 0.0 and 1.0 indicating the quantile to calculate, or a literal 50.0
+/// indicating to use the mean instead of a quantile.
 pub fn word_scores_quantile(values: &Vec<(String, f64)>, tau: f64) -> f64 {
-    if tau < 0.0 || tau > 1.0 {
+    if tau != 50.0 && (tau < 0.0 || tau > 1.0) {
         panic!(
-            "Cannot compute quantile {:?} because it is not a valid value between zero and one (inclusive).",
+            "Cannot compute quantile {:?} because it is not a valid value between zero and one (inclusive) or a literal 50.0.",
             &tau
         );
     }
     let scores: Vec<f64> = values.iter().map(|(_, s)| (*s)).collect();
     let mut scores_data = Data::new(scores);
-    scores_data.quantile(tau)
+    if tau == 50.0 {
+        scores_data.mean().unwrap()
+    } else {
+        scores_data.quantile(tau)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::default::{NON_INFORMATIVE_WORDS_REGEXS, SPLIT_DESCRIPTION_REGEX};
+    use crate::default::{
+        CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE, NON_INFORMATIVE_WORDS_REGEXS,
+        SPLIT_DESCRIPTION_REGEX,
+    };
     use assert_approx_eq::assert_approx_eq;
     use std::vec;
 
@@ -424,7 +440,7 @@ mod tests {
         }
 
         // test iteratively:
-        let result: HashMap<String, f64> = centered_inverse_information_content(&freq_map);
+        let result: HashMap<String, f64> = centered_inverse_information_content(&freq_map, &0.5);
         for (word, _) in &centered_expected {
             assert_approx_eq!(
                 centered_expected.get(word).unwrap(),
@@ -481,7 +497,7 @@ mod tests {
             centered_expected.insert((*word).clone(), iic - mean_ciic);
         }
         // test iteratively:
-        let result: HashMap<String, f64> = centered_inverse_information_content(&freq_map);
+        let result: HashMap<String, f64> = centered_inverse_information_content(&freq_map, &0.5);
         for (word, _) in &centered_expected {
             assert_approx_eq!(
                 centered_expected.get(word).unwrap(),
@@ -503,7 +519,7 @@ mod tests {
         centered_expected.insert("baz".to_string(), iic);
         assert_eq!(
             centered_expected,
-            centered_inverse_information_content(&freq_map)
+            centered_inverse_information_content(&freq_map, &0.5)
         );
     }
 
@@ -534,7 +550,7 @@ mod tests {
         word_freqs.insert("5".to_string(), 3.0);
         word_freqs.insert("binding".to_string(), 2.0);
 
-        let mut ciic = centered_inverse_information_content(&word_freqs);
+        let mut ciic = centered_inverse_information_content(&word_freqs, &0.5);
 
         let phrase1 = highest_scoring_phrase(&desc1, &ciic).unwrap();
         let expected1 = vec!["importin".to_string(), "5".to_string()];
@@ -555,7 +571,7 @@ mod tests {
         for word in &desc4 {
             word_freqs.insert(word.clone(), 1.0);
         }
-        ciic = centered_inverse_information_content(&word_freqs);
+        ciic = centered_inverse_information_content(&word_freqs, &0.5);
         let phrase4 = highest_scoring_phrase(&desc4, &ciic).unwrap();
         // Expect the full input description to be replicated:
         assert_eq!(desc4, phrase4.0);
@@ -569,7 +585,7 @@ mod tests {
         word_freqs.insert("receptor".to_string(), 2.0);
         word_freqs.insert("eix1".to_string(), 1.0);
         word_freqs.insert("eix2".to_string(), 1.0);
-        ciic = centered_inverse_information_content(&word_freqs);
+        ciic = centered_inverse_information_content(&word_freqs, &0.5);
         let phrase5 = highest_scoring_phrase(&desc5, &ciic).unwrap();
         assert_eq!(
             vec!["receptor".to_string(), "protein".to_string()],
@@ -598,6 +614,7 @@ mod tests {
             &hit_hrds,
             &(*SPLIT_DESCRIPTION_REGEX),
             &(*NON_INFORMATIVE_WORDS_REGEXS),
+            &(*CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE),
         )
         .unwrap();
         assert_eq!(expected, result);
@@ -617,6 +634,7 @@ mod tests {
             &hit_hrds,
             &(*SPLIT_DESCRIPTION_REGEX),
             &(*NON_INFORMATIVE_WORDS_REGEXS),
+            &(*CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE),
         )
         .unwrap();
         assert_eq!(expected, result);
@@ -631,6 +649,7 @@ mod tests {
             &hit_hrds,
             &(*SPLIT_DESCRIPTION_REGEX),
             &(*NON_INFORMATIVE_WORDS_REGEXS),
+            &(*CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE),
         )
         .unwrap();
         assert_eq!(expected, result);

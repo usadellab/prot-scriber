@@ -117,6 +117,13 @@ fn main() {
             .help("A regular expression in Rust syntax to be used to split descriptions (`stitle` in Blast terminology) into words. Default is '([~_\\-/|\\;,':.\\s]+)'. Note that this is an expert option."),
         )
         .arg(
+            Arg::new("center-inverse-word-information-content-at-quantile")
+            .short('q')
+            .takes_value(true)
+            .long("center-inverse-word-information-content-at-quantile")
+            .help("The quantile (percentile) to be subtracted from calculated inverse word information content to center these values. Consequently, this must be a value between zero and one or literal 50, which is interpreted as mean instead of a quantile. Default is 5o, implying centering at the mean. Note that this is an expert option."),
+        )
+        .arg(
             Arg::new("verbose")
             .short('v')
             .long("verbose")
@@ -269,6 +276,17 @@ fn main() {
                     matches.value_of("description-split-regex").unwrap()
                 ).as_str()
             );
+    }
+
+    // Did the user supply a custom quantile (percentile) value to be used to center inverse word
+    // information content scores?
+    if matches.is_present("center-inverse-word-information-content-at-quantile") {
+        annotation_process.center_iic_at_quantile = matches
+            .value_of("center-inverse-word-information-content-at-quantile")
+            .unwrap()
+            .trim()
+            .parse()
+            .expect("Could not parse provided --center-inverse-word-information-content-at-quantile (-q) argument into a real value");
     }
 
     // Did the user provide an optional file containing regular expressions, one per line, to be

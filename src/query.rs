@@ -32,10 +32,13 @@ impl Query {
     /// in Blast terminology) into words.
     /// * `non_informative_words_regexs` - A reference to a vector holding regular expressions used
     /// to identify non informative words, that receive only a minimum score.
+    /// * `center_at_quantile` - A real value between zero and one used to center the inverse
+    /// information content scores.
     pub fn annotate(
         &self,
         split_regex: &Regex,
         non_informative_words_regexs: &Vec<Regex>,
+        center_at_quantile: &f64,
     ) -> String {
         let mut hrd: String = (*UNKNOWN_PROTEIN_DESCRIPTION).to_string();
         if self.hits.len() > 0 {
@@ -48,6 +51,7 @@ impl Query {
                 &hit_descriptions,
                 split_regex,
                 non_informative_words_regexs,
+                center_at_quantile,
             );
             match hrd_option {
                 Some(hum_read_desc) => {

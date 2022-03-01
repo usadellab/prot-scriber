@@ -1,7 +1,8 @@
 use super::default::{
-    BLACKLIST_STITLE_REGEXS, CAPTURE_REPLACE_DESCRIPTION_PAIRS, FILTER_REGEXS,
-    NON_INFORMATIVE_WORDS_REGEXS, SEQ_SIM_TABLE_COLUMNS, SPLIT_DESCRIPTION_REGEX,
-    SPLIT_GENE_FAMILY_GENES_REGEX, SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR,
+    BLACKLIST_STITLE_REGEXS, CAPTURE_REPLACE_DESCRIPTION_PAIRS,
+    CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE, FILTER_REGEXS, NON_INFORMATIVE_WORDS_REGEXS,
+    SEQ_SIM_TABLE_COLUMNS, SPLIT_DESCRIPTION_REGEX, SPLIT_GENE_FAMILY_GENES_REGEX,
+    SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR,
 };
 use super::model_funcs::{parse_regex_file, parse_regex_replace_tuple_file};
 use super::query::Query;
@@ -63,6 +64,8 @@ pub struct AnnotationProcess {
     /// sequences or families (sets of query sequences). Stored here using the query identifier as
     /// key and the generated HRD as values.
     pub human_readable_descriptions: HashMap<String, String>,
+    /// A real value between zero and one used to center the inverse information content scores.
+    pub center_iic_at_quantile: f64,
     /// The number of parallel threads to use.
     pub n_threads: usize,
     /// In mode FamilyAnnotation also annotate lonely queries, i.e. queries not comprised in a
@@ -299,6 +302,7 @@ impl AnnotationProcess {
             non_informative_words_regexs: (*NON_INFORMATIVE_WORDS_REGEXS).clone(),
             query_id_to_seq_family_id_index: HashMap::new(),
             human_readable_descriptions: HashMap::new(),
+            center_iic_at_quantile: *CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE,
             n_threads: nt,
             annotate_lonely_queries: false,
             verbose: false,
@@ -393,6 +397,7 @@ impl AnnotationProcess {
         let hrd = self.queries.get(&query_id).unwrap().annotate(
             &self.description_split_regex,
             &self.non_informative_words_regexs,
+            &self.center_iic_at_quantile,
         );
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
@@ -420,6 +425,7 @@ impl AnnotationProcess {
             &self.queries,
             &self.description_split_regex,
             &self.non_informative_words_regexs,
+            &self.center_iic_at_quantile,
         );
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
@@ -515,6 +521,7 @@ impl AnnotationProcess {
                         let hrd = query.annotate(
                             &self.description_split_regex,
                             &self.non_informative_words_regexs,
+                            &self.center_iic_at_quantile,
                         );
                         ((*query_id).to_string(), hrd)
                     })
@@ -536,6 +543,7 @@ impl AnnotationProcess {
                             &self.queries,
                             &self.description_split_regex,
                             &self.non_informative_words_regexs,
+                            &self.center_iic_at_quantile,
                         );
                         ((*seq_fam_id).to_string(), hrd)
                     })
@@ -723,6 +731,13 @@ impl AnnotationProcess {
         // --n-threads
         if self.n_threads < 2 {
             panic!("Cannot run Annotation-Process, because option '--n-threads' ('-n') must at least be minimum of two (2)!");
+        }
+
+        // --center-inverse-word-information-content-at-quantile
+        if self.center_iic_at_quantile != 50.0
+            && (self.center_iic_at_quantile < 0.0 || self.center_iic_at_quantile > 1.0)
+        {
+            panic!("Cannot run Annotation-Process, because option '--center-inverse-word-information-content-at-quantile' ('-q') is not a real value between zero and one (both inclusive) or literal 50 (indicating centering at the mean and not a quantile). Please provide a correct value. See --help for more details.");
         }
     }
 }

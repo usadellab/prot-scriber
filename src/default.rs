@@ -7,6 +7,11 @@ lazy_static! {
     /// The score assigned to non informative words:
     pub static ref NON_INFORMATIVE_WORD_SCORE : f64 = 0.000001;
 
+    /// The default argument `AnnotationProcess.center_iic_at_quantile` to be used for centering
+    /// the inverse information content values of words. The literal 50.0 indicates centering at
+    /// the mean and not actually a quantile:
+    pub static ref CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE : f64 = 50.0;
+
     /// The default Blacklist of regular expressions used to check for non-informative words
     /// in the description to be excluded from scoring. If ANY of these expression matches
     /// the word is considered as non-informative

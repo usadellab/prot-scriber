@@ -116,6 +116,150 @@ If you are familiar with installing self compiled tools on a system wide level, 
 ```
 prot-scriber version 0.1.0
 
+prot-scriber assigns human readable descriptions (HRD) to query biological sequences or sets of them
+(a.k.a gene-families).
+
+USAGE:
+    prot-scriber [OPTIONS] --output <output> --seq-sim-table <seq-sim-table>
+
+OPTIONS:
+    -a, --annotate-non-family-queries
+            Use this option only in combination with --seq-families (-f), i.e. when prot-scriber is
+            used to generate human readable descriptions for gene families. If in that context this
+            flag is given, queries for which there are sequence similarity search (Blast) results
+            but that are NOT member of a sequence family will receive an annotation (human readable
+            description) in the output file, too. Default value of this setting is 'OFF' (false).
+
+    -b, --blacklist-regexs <blacklist-regexs>
+            A file with regular expressions (Rust syntax), one per line. Any match to any of these
+            regular expressions causes sequence similarity search result descriptions ('stitle' in
+            Blast terminology) to be discarded from the prot-scriber annotation process. If multiple
+            --seq-sim-table (-s) args are provided make sure the --blacklist-regexs (-b) args appear
+            in the correct order, e.g. the first -b arg will be used for the first -s arg, the
+            second -b will be used for the second -s and so on. Set to 'default' to use the hard
+            coded default. An example file can be downloaded here:
+            https://raw.githubusercontent.com/usadellab/prot-
+            scriber/master/misc/blacklist_stitle_regexs.txt - Note that this is an expert option.
+
+    -c, --capture-replace-pairs <capture-replace-pairs>
+            A file with pairs of lines. Within each pair the first line is a regular expressions
+            (Rust syntax) defining one or more capture groups. The second line of a pair is the
+            string used to replace the match in the regular expression with. This means the second
+            line contains the capture groups (Rust syntax). These pairs are used to further filter
+            the sequence similarity search result descriptions ('stitle' in Blast terminology). In
+            contrast to the --filter-regex (-l) matches are not deleted, but replaced with the
+            second line of the pair. Filtering is used to process descriptions ('stitle' in Blast
+            terminology) and prepare the descriptions for the prot-scriber annotation process. If
+            multiple --seq-sim-table (-s) args are provided make sure the --capture-replace-pairs
+            (-c) args appear in the correct order, e.g. the first -c arg will be used for the first
+            -s arg, the second -c will be used for the second -s and so on. Set to 'default' to use
+            the hard coded default. An example file can be downloaded here:
+            https://raw.githubusercontent.com/usadellab/prot-
+            scriber/master/misc/capture_replace_pairs.txt - Note that this is an expert option.
+
+    -e, --header <header>
+            Header of the --seq-sim-table (-s) arg. Separated by space (' ') the names of the
+            columns in order of appearance in the respective table. Required and default columns are
+            'qacc sacc stitle'. Note that this option only understands Blast terminology, i.e. even
+            if you ran Diamond, please provide 'qacc' instead of 'qseqid' and 'sacc' instead of
+            'sseqid'. Luckily 'stitle' is 'stitle' in Diamond, too. You can have additional columns
+            that will be ignored, as long as the required columns appear in the correct order.
+            Consider this example: 'qacc sacc evalue bitscore stitle'. If multiple --seq-sim-table
+            (-s) args are provided make sure the --header (-e) args appear in the correct order,
+            e.g. the first -e arg will be used for the first -s arg, the second -e will be used for
+            the second -s and so on. Set to 'default' to use the hard coded default.
+
+    -f, --seq-families <seq-families>
+            A file in which families of biological sequences are stored, one family per line. Each
+            line must have format 'fam-name TAB gene1,gene2,gene3'. Make sure no gene appears in
+            more than one family.
+
+    -g, --seq-family-gene-ids-separator <seq-family-gene-ids-separator>
+            A regular expression (Rust syntax) used to split the list of gene-identifiers in the
+            argument --seq-families (-f) gene families file. Default is '(\s*,\s*|\s+)'.
+
+    -h, --help
+            Print help information
+
+    -i, --seq-family-id-genes-separator <seq-family-id-genes-separator>
+            A string used as separator in the argument --seq-families (-f) gene families file. This
+            string separates the gene-family-identifier (name) from the gene-identifier list that
+            family comprises. Default is '<TAB>' ("\t").
+
+    -l, --filter-regexs <filter-regexs>
+            A file with regular expressions (Rust syntax), one per line. Any match to any of these
+            regular expressions causes the matched sub-string to be deleted, i.e. filtered out.
+            Filtering is used to process descriptions ('stitle' in Blast terminology) and prepare
+            the descriptions for the prot-scriber annotation process. In case of UniProt sequence
+            similarity search results (Blast result tables), this removes the Blast Hit identifier
+            (`sacc`) from the description (`stitle`) and also removes the taxonomic information
+            starting with e.g. 'OS=' at the end of the `stitle` strings. If multiple --seq-sim-table
+            (-s) args are provided make sure the --filter-regexs (-l) args appear in the correct
+            order, e.g. the first -l arg will be used for the first -s arg, the second -l will be
+            used for the second -s and so on. Set to 'default' to use the hard coded default. An
+            example file can be downloaded here: https://raw.githubusercontent.com/usadellab/prot-
+            scriber/master/misc/filter_stitle_regexs.txt - Note that this is an expert option.
+
+    -n, --n-threads <n-threads>
+            The maximum number of parallel threads to use. Default is the number of logical cores.
+            Required minimum is two (2). Note that at most one thread is used per input sequence
+            similarity search result (Blast table) file. After parsing these annotation may use up
+            to this number of threads to generate human readable descriptions.
+
+    -o, --output <output>
+            Filename in which the tabular output will be stored.
+
+    -p, --field-separator <field-separator>
+            Field-Separator of the --seq-sim-table (-s) arg. The default value is the '<TAB>'
+            character. Consider this example: '-p @'. If multiple --seq-sim-table (-s) args are
+            provided make sure the --field-separator (-p) args appear in the correct order, e.g. the
+            first -p arg will be used for the first -s arg, the second -p will be used for the
+            second -s and so on. You can provide '-p default' to use the hard coded default (TAB).
+
+    -q, --center-inverse-word-information-content-at-quantile <center-inverse-word-information-content-at-quantile>
+            The quantile (percentile) to be subtracted from calculated inverse word information
+            content to center these values. Consequently, this must be a value between zero and one
+            or literal 50, which is interpreted as mean instead of a quantile. Default is 5o,
+            implying centering at the mean. Note that this is an expert option.
+
+    -r, --description-split-regex <description-split-regex>
+            A regular expression in Rust syntax to be used to split descriptions (`stitle` in Blast
+            terminology) into words. Default is '([~_\-/|\;,':.\s]+)'. Note that this is an expert
+            option.
+
+    -s, --seq-sim-table <seq-sim-table>
+            File in which to find sequence similarity search results in tabular format (SSST). Use
+            e.g. Blast or Diamond to produce them. Required columns are: 'qacc sacc stitle' (Blast)
+            or 'qseqid sseqid stitle' (Diamond). (See section '2. prot-scriber input preparation'
+            for more details.) If the required columns, or more, appear in different order than
+            shown here you must use the --header (-e) argument. If any of the input SSSTs uses a
+            different field-separator than the '<TAB>' character, you must provide the --field-
+            separator (-p) argument. You can provide multiple SSSTs, simply by repeating the -s
+            argument, e.g. '-s queries_vs_swissprot_diamond_out.txt -s
+            queries_vs_trembl_diamond_out.txt'. Providing multiple --seq-sim-table (-s) arguments
+            might imply the order in which you give other arguments like --header (-e) and --field-
+            separator (-p). See there for more details.
+
+    -v, --verbose
+            Print informative messages about the annotation process.
+
+    -V, --version
+            Print version information
+
+    -w, --non-informative-words-regexs <non-informative-words-regexs>
+            The path to a file in which regular expressions (regexs) are stored, one per line. These
+            regexs are used to recognize non-informative words, which will only receive a minimun
+            score in the prot-scriber process that generates human readable description. There is a
+            default list hard-coded into prot-scriber. An example file can be downloaded here:
+            https://raw.githubusercontent.com/usadellab/prot-
+            scriber/master/misc/non_informative_words_regexs.txt - Note that this is an expert
+            option.
+
+
+
+MANUAL
+======
+
 1. Summary
 ----------
 'prot-scriber' uses reference descriptions ('stitle' in Blast terminology) from sequence similarity
@@ -261,140 +405,6 @@ searched UniProt's Swissprot and trEMBL databases.
 
 prot-scriber -f all_proteins_gene_families.txt -s all_proteins_vs_Swissprot_blastout.txt -s
 all_proteins_vs_trEMBL_blastout.txt -o all_proteins_gene_families_HRDs.txt
-
-
-3. Technical manual
--------------------
-
-USAGE:
-    prot-scriber [OPTIONS] --output <output> --seq-sim-table <seq-sim-table>
-
-OPTIONS:
-    -a, --annotate-non-family-queries
-            Use this option only in combination with --seq-families (-f), i.e. when prot-scriber is
-            used to generate human readable descriptions for gene families. If in that context this
-            flag is given, queries for which there are sequence similarity search (Blast) results
-            but that are NOT member of a sequence family will receive an annotation (human readable
-            description) in the output file, too. Default value of this setting is 'OFF' (false).
-
-    -b, --blacklist-regexs <blacklist-regexs>
-            A file with regular expressions (Rust syntax), one per line. Any match to any of these
-            regular expressions causes sequence similarity search result descriptions ('stitle' in
-            Blast terminology) to be discarded from the prot-scriber annotation process. If multiple
-            --seq-sim-table (-s) args are provided make sure the --blacklist-regexs (-b) args appear
-            in the correct order, e.g. the first -b arg will be used for the first -s arg, the
-            second -b will be used for the second -s and so on. Set to 'default' to use the hard
-            coded default. An example file can be downloaded here:
-            https://raw.githubusercontent.com/usadellab/prot-
-            scriber/master/misc/blacklist_stitle_regexs.txt - Note that this is an expert option.
-
-    -c, --capture-replace-pairs <capture-replace-pairs>
-            A file with pairs of lines. Within each pair the first line is a regular expressions
-            (Rust syntax) defining one or more capture groups. The second line of a pair is the
-            string used to replace the match in the regular expression with. This means the second
-            line contains the capture groups (Rust syntax). These pairs are used to further filter
-            the sequence similarity search result descriptions ('stitle' in Blast terminology). In
-            contrast to the --filter-regex (-l) matches are not deleted, but replaced with the
-            second line of the pair. Filtering is used to process descriptions ('stitle' in Blast
-            terminology) and prepare the descriptions for the prot-scriber annotation process. If
-            multiple --seq-sim-table (-s) args are provided make sure the --capture-replace-pairs
-            (-c) args appear in the correct order, e.g. the first -c arg will be used for the first
-            -s arg, the second -c will be used for the second -s and so on. Set to 'default' to use
-            the hard coded default. An example file can be downloaded here:
-            https://raw.githubusercontent.com/usadellab/prot-
-            scriber/master/misc/capture_replace_pairs.txt - Note that this is an expert option.
-
-    -e, --header <header>
-            Header of the --seq-sim-table (-s) arg. Separated by space (' ') the names of the
-            columns in order of appearance in the respective table. Required and default columns are
-            'qacc sacc stitle'. Note that this option only understands Blast terminology, i.e. even
-            if you ran Diamond, please provide 'qacc' instead of 'qseqid' and 'sacc' instead of
-            'sseqid'. Luckily 'stitle' is 'stitle' in Diamond, too. You can have additional columns
-            that will be ignored, as long as the required columns appear in the correct order.
-            Consider this example: 'qacc sacc evalue bitscore stitle'. If multiple --seq-sim-table
-            (-s) args are provided make sure the --header (-e) args appear in the correct order,
-            e.g. the first -e arg will be used for the first -s arg, the second -e will be used for
-            the second -s and so on. Set to 'default' to use the hard coded default.
-
-    -f, --seq-families <seq-families>
-            A file in which families of biological sequences are stored, one family per line. Each
-            line must have format 'fam-name TAB gene1,gene2,gene3'. Make sure no gene appears in
-            more than one family.
-
-    -g, --seq-family-gene-ids-separator <seq-family-gene-ids-separator>
-            A regular expression (Rust syntax) used to split the list of gene-identifiers in the
-            argument --seq-families (-f) gene families file. Default is '(\s*,\s*|\s+)'.
-
-    -h, --help
-            Print help information
-
-    -i, --seq-family-id-genes-separator <seq-family-id-genes-separator>
-            A string used as separator in the argument --seq-families (-f) gene families file. This
-            string separates the gene-family-identifier (name) from the gene-identifier list that
-            family comprises. Default is '<TAB>' ("\t").
-
-    -l, --filter-regexs <filter-regexs>
-            A file with regular expressions (Rust syntax), one per line. Any match to any of these
-            regular expressions causes the matched sub-string to be deleted, i.e. filtered out.
-            Filtering is used to process descriptions ('stitle' in Blast terminology) and prepare
-            the descriptions for the prot-scriber annotation process. In case of UniProt sequence
-            similarity search results (Blast result tables), this removes the Blast Hit identifier
-            (`sacc`) from the description (`stitle`) and also removes the taxonomic information
-            starting with e.g. 'OS=' at the end of the `stitle` strings. If multiple --seq-sim-table
-            (-s) args are provided make sure the --filter-regexs (-l) args appear in the correct
-            order, e.g. the first -l arg will be used for the first -s arg, the second -l will be
-            used for the second -s and so on. Set to 'default' to use the hard coded default. An
-            example file can be downloaded here: https://raw.githubusercontent.com/usadellab/prot-
-            scriber/master/misc/filter_stitle_regexs.txt - Note that this is an expert option.
-
-    -n, --n-threads <n-threads>
-            The maximum number of parallel threads to use. Default is the number of logical cores.
-            Required minimum is two (2). Note that at most one thread is used per input sequence
-            similarity search result (Blast table) file. After parsing these annotation may use up
-            to this number of threads to generate human readable descriptions.
-
-    -o, --output <output>
-            Filename in which the tabular output will be stored.
-
-    -p, --field-separator <field-separator>
-            Field-Separator of the --seq-sim-table (-s) arg. The default value is the '<TAB>'
-            character. Consider this example: '-p @'. If multiple --seq-sim-table (-s) args are
-            provided make sure the --field-separator (-p) args appear in the correct order, e.g. the
-            first -p arg will be used for the first -s arg, the second -p will be used for the
-            second -s and so on. You can provide '-p default' to use the hard coded default (TAB).
-
-    -r, --description-split-regex <description-split-regex>
-            A regular expression in Rust syntax to be used to split descriptions (`stitle` in Blast
-            terminology) into words. Default is '([~_\-/|\;,':.\s]+)'. Note that this is an expert
-            option.
-
-    -s, --seq-sim-table <seq-sim-table>
-            File in which to find sequence similarity search results in tabular format (SSST). Use
-            e.g. Blast or Diamond to produce them. Required columns are: 'qacc sacc stitle' (Blast)
-            or 'qseqid sseqid stitle' (Diamond). (See section '2. prot-scriber input preparation'
-            for more details.) If the required columns, or more, appear in different order than
-            shown here you must use the --header (-e) argument. If any of the input SSSTs uses a
-            different field-separator than the '<TAB>' character, you must provide the --field-
-            separator (-p) argument. You can provide multiple SSSTs, simply by repeating the -s
-            argument, e.g. '-s queries_vs_swissprot_diamond_out.txt -s
-            queries_vs_trembl_diamond_out.txt'. Providing multiple --seq-sim-table (-s) arguments
-            might imply the order in which you give other arguments like --header (-e) and --field-
-            separator (-p). See there for more details.
-
-    -v, --verbose
-            Print informative messages about the annotation process.
-
-    -V, --version
-            Print version information
-
-    -w, --non-informative-words-regexs <non-informative-words-regexs>
-            The path to a file in which regular expressions (regexs) are stored, one per line. These
-            regexs are used to recognize non-informative words, which will only receive a minimun
-            score in the prot-scriber process that generates human readable description. There is a
-            default list hard-coded into prot-scriber. An example file can be downloaded here:
-            https://raw.githubusercontent.com/usadellab/prot-
-            scriber/master/misc/non_informative_words_regexs.txt - Note that this is an expert
-            option.
 ```
 
 </details>

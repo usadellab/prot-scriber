@@ -10,7 +10,8 @@
 #' `pattern` have been replaced by an empty string.
 #' @export
 subWithEmptyString <- function(pattern, subject) {
-    gsub(pattern = pattern, replacement = "", x = subject)
+    gsub(pattern = pattern, replacement = "", 
+        x = subject)
 }
 
 #' Recursively applies a vector of regular expressions upon the argument
@@ -32,7 +33,8 @@ subWithEmptyString <- function(pattern, subject) {
 applyRegexList <- function(subject, regexs = getOption("applyRegexList.regexs", 
     filter.descline.regexs), regex.executor.funk = subWithEmptyString) {
     for (regex.i in regexs) {
-        subject <- regex.executor.funk(regex.i, subject)
+        subject <- regex.executor.funk(regex.i, 
+            subject)
     }
     trimws(subject, which = "both")
 }
@@ -45,19 +47,23 @@ applyRegexList <- function(subject, regexs = getOption("applyRegexList.regexs",
 #' @param path.to.table - A valid path to a seq-sim-search result table.
 #' Separator MUST be TAB.
 #' @param col.names - A character vector with column names. Default is
-#' `c('qseqid', 'sseqid', 'qlen', 'qstart', 'qend', 'slen', 'sstart', 'send',
-#' 'bitscore', 'stitle', 'evalue')`
+#' getOption("parseSeqSimSearchTable.col.names", c("qseqid", "sseqid", "qlen",
+#' "qstart", "qend", "slen", "sstart", "send", "bitscore", "stitle", "evalue"))
 #' @param parse.hrd - A boolean flagging whether to add a column `HRD` holding
 #' the parsed out human readable descriptions extracted from each Hit's
 #' `stitle` field.
 #'
 #' @return An instance of `data.table::data.table`
 #' @export
-parseSeqSimSearchTable <- function(path.to.table, col.names = c("qseqid", 
-    "sseqid", "qlen", "qstart", "qend", "slen", "sstart", "send", 
-    "bitscore", "stitle", "evalue"), parse.hrd = TRUE) {
-    sss.tbl <- fread(path.to.table, sep = "\t", quote = "", header = TRUE, 
-        na.strings = "", stringsAsFactors = FALSE, col.names = col.names, 
+parseSeqSimSearchTable <- function(path.to.table, 
+    col.names = getOption("parseSeqSimSearchTable.col.names", 
+        c("qseqid", "sseqid", "qlen", "qstart", 
+            "qend", "slen", "sstart", "send", 
+            "bitscore", "stitle", "evalue")), 
+    parse.hrd = TRUE) {
+    sss.tbl <- fread(path.to.table, sep = "\t", 
+        quote = "", header = TRUE, na.strings = "", 
+        stringsAsFactors = FALSE, col.names = col.names, 
         blank.lines.skip = TRUE, data.table = TRUE)
     if (parse.hrd) {
         sss.tbl$HRD <- as.character(unlist(mclapply(sss.tbl$stitle, 
@@ -65,7 +71,8 @@ parseSeqSimSearchTable <- function(path.to.table, col.names = c("qseqid",
                 tryCatch({
                   applyRegexList(stitle)
                 }, error = function(e) {
-                  message("stitle '", stitle, "' caused an error in function 'applyRegexList':\n", 
+                  message("stitle '", stitle, 
+                    "' caused an error in function 'applyRegexList':\n", 
                     e)
                   #' leave the stitle unchanged:
                   stitle
@@ -85,9 +92,11 @@ parseSeqSimSearchTable <- function(path.to.table, col.names = c("qseqid",
 #' @return An instance of `data.table::data.table` containing the Mercator4
 #' tabular output.
 #' @export
-parseMercator4Tblout <- function(path.to.table, col.names = c("BINCODE", 
-    "NAME", "IDENTIFIER", "DESCRIPTION", "TYPE")) {
-    m.dt <- fread(path.to.table, sep = "\t", header = TRUE, stringsAsFactors = FALSE, 
+parseMercator4Tblout <- function(path.to.table, 
+    col.names = c("BINCODE", "NAME", "IDENTIFIER", 
+        "DESCRIPTION", "TYPE")) {
+    m.dt <- fread(path.to.table, sep = "\t", 
+        header = TRUE, stringsAsFactors = FALSE, 
         na.strings = "", quote = "")
     m.dt$TYPE <- !is.na(m.dt$TYPE)
     #' Remove leading and trailing single quotes from the respective columns.
@@ -95,8 +104,10 @@ parseMercator4Tblout <- function(path.to.table, col.names = c("BINCODE",
     #' will actually not solve this issue, because some of the Map Man Bin
     #' DESCRIPTIONS actually _conatain_ a single quote. Hence, the manual
     #' removal of leading and trailing single quotes.
-    for (col.i in c("BINCODE", "NAME", "IDENTIFIER", "DESCRIPTION")) {
-        m.dt[[col.i]] <- sub("^'", "", sub("'$", "", m.dt[[col.i]]))
+    for (col.i in c("BINCODE", "NAME", "IDENTIFIER", 
+        "DESCRIPTION")) {
+        m.dt[[col.i]] <- sub("^'", "", sub("'$", 
+            "", m.dt[[col.i]]))
     }
     m.dt
 }
@@ -117,14 +128,17 @@ parseMercator4Tblout <- function(path.to.table, col.names = c("BINCODE",
 #' @return An instance of `data.table::data.table` containing the HMMER3
 #' `--tblout` content.
 #' @export
-parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d' @FILE@ | awk -F \"\" 'match($0,/^(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(.+)$/,a){print a[1] \"\\t\" a[2] \"\\t\" a[3] \"\\t\" a[4] \"\\t\" a[5] \"\\t\" a[6] \"\\t\" a[7] \"\\t\" a[8] \"\\t\" a[9] \"\\t\" a[10] \"\\t\" a[11] \"\\t\" a[12] \"\\t\" a[13] \"\\t\" a[14] \"\\t\" a[15] \"\\t\" a[16] \"\\t\" a[17] \"\\t\" a[18] \"\\t\" a[19]}'", 
-    col.names = c("target.name", "accession", "query.name", "accession.2", 
-        "E-value", "score", "bias", "E-value", "score", "bias", 
-        "exp", "reg", "clu", "ov", "env", "dom", "rep", "inc", 
-        "description.of.target")) {
-    fread(cmd = sub("@FILE@", path.to.hmmr3.tblout, read.syscmd, 
-        fixed = TRUE), sep = "\t", header = FALSE, quote = "", 
-        na.strings = "", stringsAsFactors = FALSE, strip.white = TRUE, 
+parseHmmer3Tblout <- function(path.to.hmmr3.tblout, 
+    read.syscmd = "sed -e '1,3d' @FILE@ | awk -F \"\" 'match($0,/^(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(.+)$/,a){print a[1] \"\\t\" a[2] \"\\t\" a[3] \"\\t\" a[4] \"\\t\" a[5] \"\\t\" a[6] \"\\t\" a[7] \"\\t\" a[8] \"\\t\" a[9] \"\\t\" a[10] \"\\t\" a[11] \"\\t\" a[12] \"\\t\" a[13] \"\\t\" a[14] \"\\t\" a[15] \"\\t\" a[16] \"\\t\" a[17] \"\\t\" a[18] \"\\t\" a[19]}'", 
+    col.names = c("target.name", "accession", 
+        "query.name", "accession.2", "E-value", 
+        "score", "bias", "E-value", "score", 
+        "bias", "exp", "reg", "clu", "ov", 
+        "env", "dom", "rep", "inc", "description.of.target")) {
+    fread(cmd = sub("@FILE@", path.to.hmmr3.tblout, 
+        read.syscmd, fixed = TRUE), sep = "\t", 
+        header = FALSE, quote = "", na.strings = "", 
+        stringsAsFactors = FALSE, strip.white = TRUE, 
         blank.lines.skip = TRUE, col.names = col.names)
 }
 
@@ -153,19 +167,22 @@ parseHmmer3Tblout <- function(path.to.hmmr3.tblout, read.syscmd = "sed -e '1,3d'
 #' nchar(in.desc) == 0.
 #' @export
 wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSet.split.regex", 
-    "-|/|;|\\\\|,|:|\"|'|\\.|\\s+|\\||\\(|\\)"), blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
-    blacklist.word.regexs), lowercase.words = getOption("splitDescriptionIntoWordSet.lowercase.words", 
-    TRUE)) {
-    if (identical(character(0), in.desc) || is.null(in.desc) || 
-        is.na(in.desc) || !is.character(in.desc) || nchar(in.desc) == 
+    "-|/|;|\\\\|,|:|\"|'|\\.|\\s+|\\||\\(|\\)"), 
+    blacklist.regexs = getOption("splitDescriptionIntoWordSet.blacklist.regexs", 
+        blacklist.word.regexs), lowercase.words = getOption("splitDescriptionIntoWordSet.lowercase.words", 
+        TRUE)) {
+    if (identical(character(0), in.desc) || 
+        is.null(in.desc) || is.na(in.desc) || 
+        !is.character(in.desc) || nchar(in.desc) == 
         0) {
         character(0)
     } else {
         desc.words <- strsplit(in.desc, split = split.regex, 
             perl = TRUE)[[1]]
-        dw.retain.bool <- if (length(blacklist.regexs) > 0 && 
-            !is.na(blacklist.regexs)) {
-            "" != lapply(desc.words, applyRegexList, regexs = blacklist.regexs)
+        dw.retain.bool <- if (length(blacklist.regexs) > 
+            0 && !is.na(blacklist.regexs)) {
+            "" != lapply(desc.words, applyRegexList, 
+                regexs = blacklist.regexs)
         } else {
             rep(TRUE, length(desc.words))
         }
@@ -182,12 +199,17 @@ wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSe
 #' @return TRUE if and only if all tests pass.
 #' @export
 testWordSet <- function() {
-    x.test <- c("World Hello", "Phototransferase", "Alien contig similar product subfamily predicted")
-    t1 <- identical(wordSet(x.test[[1]], lowercase.words = FALSE), 
-        c("World", "Hello"))
-    t2 <- identical(wordSet(x.test[[2]]), "phototransferase")
-    t3 <- identical(wordSet(x.test[[3]]), "alien")
-    t4 <- identical(wordSet("Protein REDOX 1"), "redox")
+    x.test <- c("World Hello", "Phototransferase", 
+        "Alien contig similar product subfamily predicted")
+    t1 <- identical(wordSet(x.test[[1]], 
+        lowercase.words = FALSE), c("World", 
+        "Hello"))
+    t2 <- identical(wordSet(x.test[[2]]), 
+        "phototransferase")
+    t3 <- identical(wordSet(x.test[[3]]), 
+        "alien")
+    t4 <- identical(wordSet("Protein REDOX 1"), 
+        "redox")
     t5 <- identical(wordSet("Probable mannitol dehydrogenase"), 
         c("mannitol", "dehydrogenase"))
     all(t1, t2, t3, t4, t5)
@@ -208,7 +230,8 @@ testWordSet <- function() {
 #' have been removed from the respective MapMan4 Bins' DESCRIPTION fields.
 #' @export
 curateMercator4Annos <- function(mm4.anno.tbl) {
-    bin.50.annos <- grepl("^50", mm4.anno.tbl$BINCODE) & mm4.anno.tbl$TYPE
+    bin.50.annos <- grepl("^50", mm4.anno.tbl$BINCODE) & 
+        mm4.anno.tbl$TYPE
     #' The DESCRIPTIONs contain also those of the Best Blast Hit, but the NAMEs do
     #' not:
     mm4.anno.tbl$DESCRIPTION[bin.50.annos] <- mm4.anno.tbl$NAME[bin.50.annos]
@@ -243,13 +266,17 @@ referenceWordListFromMercator4Annos <- function(mm4.anno.tbl,
         c("35")), curate.annos.funk = getOption("referenceWordListFromMercator4Annos.curate.annos.funk", 
         curateMercator4Annos)) {
     mm4.curated.tbl <- curate.annos.funk(mm4.anno.tbl)
-    filter.i <- mm4.curated.tbl$TYPE & !grepl(paste0("^", paste(exclude.mm4.root.bins, 
-        collapse = "|")), mm4.anno.tbl$BINCODE)
-    mm4.fltrd.tbl <- mm4.curated.tbl[filter.i, ]
+    filter.i <- mm4.curated.tbl$TYPE & !grepl(paste0("^", 
+        paste(exclude.mm4.root.bins, collapse = "|")), 
+        mm4.anno.tbl$BINCODE)
+    mm4.fltrd.tbl <- mm4.curated.tbl[filter.i, 
+        ]
     uniq.prot.ids <- unique(mm4.fltrd.tbl$IDENTIFIER)
     setNames(mclapply(uniq.prot.ids, function(prot.id) {
-        i <- which(mm4.fltrd.tbl$IDENTIFIER == prot.id)
-        mm4.descs <- unlist(mm4.fltrd.tbl[i, c("NAME", "DESCRIPTION")])
+        i <- which(mm4.fltrd.tbl$IDENTIFIER == 
+            prot.id)
+        mm4.descs <- unlist(mm4.fltrd.tbl[i, 
+            c("NAME", "DESCRIPTION")])
         unique(unlist(lapply(mm4.descs, wordSet)))
     }), uniq.prot.ids)
 }
@@ -270,8 +297,10 @@ referenceWordListFromMercator4Annos <- function(mm4.anno.tbl,
 referenceWordListFromPfamAAnnos <- function(pfamA.tbl) {
     uniq.prot.ids <- unique(pfamA.tbl$query.name)
     setNames(mclapply(uniq.prot.ids, function(prot.id) {
-        i <- which(pfamA.tbl$query.name == prot.id)
-        mm4.descs <- unlist(pfamA.tbl[i, "description.of.target"])
+        i <- which(pfamA.tbl$query.name == 
+            prot.id)
+        mm4.descs <- unlist(pfamA.tbl[i, 
+            "description.of.target"])
         unique(unlist(lapply(mm4.descs, wordSet)))
     }), uniq.prot.ids)
 }
@@ -290,9 +319,11 @@ referenceWordListFromPfamAAnnos <- function(pfamA.tbl) {
 #' for protein identifiers in both argument references. Note that protein IDs
 #' will be always in lowercase (see above for the reason).
 #' @export
-mergeMercatorAndPfamAReferences <- function(ref.mercator, ref.pfamA) {
+mergeMercatorAndPfamAReferences <- function(ref.mercator, 
+    ref.pfamA) {
     names(ref.pfamA) <- tolower(names(ref.pfamA))
-    prot.ids <- union(names(ref.mercator), names(ref.pfamA))
+    prot.ids <- union(names(ref.mercator), 
+        names(ref.pfamA))
     setNames(mclapply(prot.ids, function(prot.id) {
         union(ref.mercator[[prot.id]], ref.pfamA[[prot.id]])
     }), prot.ids)
@@ -312,21 +343,23 @@ mergeMercatorAndPfamAReferences <- function(ref.mercator, ref.pfamA) {
 #' Protein.ID, start.pos, end.pos. One row for each local alignment region
 #' covered by at least a single hit.
 #' @export
-findAlignmentRegions <- function(prot.id, sssr.tbl) {
-    if (!is.null(sssr.tbl) && !is.na(sssr.tbl) && nrow(sssr.tbl) > 
-        0) {
-        p.tbl <- sssr.tbl[which(sssr.tbl$qseqid == prot.id), 
-            ]
+findAlignmentRegions <- function(prot.id, 
+    sssr.tbl) {
+    if (!is.null(sssr.tbl) && !is.na(sssr.tbl) && 
+        nrow(sssr.tbl) > 0) {
+        p.tbl <- sssr.tbl[which(sssr.tbl$qseqid == 
+            prot.id), ]
         hit.ids <- unique(p.tbl$sseqid)
         p.seq <- rep(0, p.tbl$qlen[[1]])
         for (h.i in hit.ids) {
-            hit.tbl <- p.tbl[which(p.tbl$sseqid == h.i), ]
+            hit.tbl <- p.tbl[which(p.tbl$sseqid == 
+                h.i), ]
             if (nrow(hit.tbl) > 1) {
-                hit.tbl <- hit.tbl[order(hit.tbl$bitscore, decreasing = TRUE), 
-                  ]
+                hit.tbl <- hit.tbl[order(hit.tbl$bitscore, 
+                  decreasing = TRUE), ]
             }
-            hit.algn.region <- hit.tbl[[1, "qstart"]]:hit.tbl[[1, 
-                "qend"]]
+            hit.algn.region <- hit.tbl[[1, 
+                "qstart"]]:hit.tbl[[1, "qend"]]
             p.seq[hit.algn.region] <- p.seq[hit.algn.region] + 
                 1
         }
@@ -335,13 +368,17 @@ findAlignmentRegions <- function(prot.id, sssr.tbl) {
         prot.regions <- list()
         for (pos.i in 1:length(p.seq)) {
             n.hits.at.pos <- p.seq[[pos.i]]
-            if (in.gap && n.hits.at.pos > 0) {
+            if (in.gap && n.hits.at.pos > 
+                0) {
                 reg.start <- pos.i
             }
-            if (n.hits.at.pos == 0 || pos.i == length(p.seq)) {
+            if (n.hits.at.pos == 0 || pos.i == 
+                length(p.seq)) {
                 if (!in.gap) {
-                  prot.regions[[length(prot.regions) + 1]] <- data.frame(Protein.ID = prot.id, 
-                    start.pos = reg.start, end.pos = pos.i, stringsAsFactors = FALSE)
+                  prot.regions[[length(prot.regions) + 
+                    1]] <- data.frame(Protein.ID = prot.id, 
+                    start.pos = reg.start, 
+                    end.pos = pos.i, stringsAsFactors = FALSE)
                 }
                 in.gap <- TRUE
             } else in.gap <- FALSE
@@ -362,9 +399,10 @@ findAlignmentRegions <- function(prot.id, sssr.tbl) {
 #' region any hits aligned to.
 #' @export
 allQueriesAlignmentRegions <- function(sssr) {
-    prot.ids <- unique(unlist(lapply(sssr, function(sssr.tbl) {
-        unique(sssr.tbl$qseqid)
-    })))
+    prot.ids <- unique(unlist(lapply(sssr, 
+        function(sssr.tbl) {
+            unique(sssr.tbl$qseqid)
+        })))
     all.sssr.tbl <- do.call(rbind, sssr)
     do.call(rbind, mclapply(prot.ids, function(p.id) {
         findAlignmentRegions(p.id, all.sssr.tbl)
@@ -397,17 +435,21 @@ allQueriesAlignmentRegions <- function(sssr) {
 #' any sequence similarity search result table, instead of returning 'NULL' the
 #' table is returned unchanged; so not to brake legacy code.
 #' @export
-sssrForRegions <- function(qseqid, alignmnt.regions, sssr) {
-    q.align.regs.i <- which(alignmnt.regions$Protein.ID == qseqid)
+sssrForRegions <- function(qseqid, alignmnt.regions, 
+    sssr) {
+    q.align.regs.i <- which(alignmnt.regions$Protein.ID == 
+        qseqid)
     if (length(q.align.regs.i) < 2) {
         list(sssr)
     } else {
         lapply(q.align.regs.i, function(a.r.i) {
-            a.r <- alignmnt.regions[a.r.i, ]
+            a.r <- alignmnt.regions[a.r.i, 
+                ]
             setNames(lapply(sssr, function(sssr.table) {
                 if (qseqid %in% sssr.table$qseqid) {
-                  sssr.table[which(sssr.table$qseqid == qseqid & 
-                    sssr.table$qstart >= a.r$start.pos & sssr.table$qend <= 
+                  sssr.table[which(sssr.table$qseqid == 
+                    qseqid & sssr.table$qstart >= 
+                    a.r$start.pos & sssr.table$qend <= 
                     a.r$end.pos), ]
                 } else sssr.table
             }), names(sssr))

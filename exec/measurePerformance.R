@@ -51,16 +51,32 @@ option_list <- list(
     default = detectCores(),
     help = "The number of cores to use in parallel processes.",
     metavar = "numeric"
+  ),
+  make_option(
+    c("-k", "--seq-sim-tbl-column-names"),
+    type = "character",
+    default = NULL,
+    help = "The column names in Diamond terminology that are used in ALL input sequence similarity search result tables (-s, -t). This is optional. Default is 'qseqid sseqid qlen qstart qend slen sstart send bitscore stitle evalue'!",
+    metavar = "character"
   )
 )
 
-
+#' Read command line arguments:
 opt_parser <- OptionParser(option_list = option_list)
 script.args <- parse_args(opt_parser)
 
 
 #' Set mc.cores:
 options(mc.cores = script.args$`n-cores`)
+
+#' Non default column names?
+if (!is.null(script.args$`seq-sim-tbl-column-names`)) {
+    seq.sim.tbl.col.names <- strsplit(script.args$`seq-sim-tbl-column-names`, 
+        " ")[[1]]
+    message("ALL input sequence similarity search result table are expected to have the following columns - but no actual header:\n", 
+        paste(seq.sim.tbl.col.names, collapse = ", "))
+    options(parseSeqSimSearchTable.col.names = seq.sim.tbl.col.names)
+}
 
 #' Load Blast Search results of queries vs Swissprot:
 blast.sprot <- parseSeqSimSearchTable(script.args$`seq-sim-search-vs-swissprot-tbl`)
@@ -89,12 +105,14 @@ queries.prot.scriber <- queries.prot.scriber[which(queries.prot.scriber$Human.Re
 
 #' All query identifiers that actually have both references and at least one
 #' prediction either by Best Blast or prot-scriber:
-query.ids <- intersect(union(queries.pfamA$query.name, queries.mercator[queries.mercator$TYPE, 
-    "IDENTIFIER"]), unique(c(blast.sprot$qseqid, blast.trembl$qseqid, 
-    queries.prot.scriber$Annotee.Identifier)))
+query.ids <- intersect(union(queries.pfamA$query.name, 
+    queries.mercator[queries.mercator$TYPE, 
+        "IDENTIFIER"]), unique(c(blast.sprot$qseqid, 
+    blast.trembl$qseqid, queries.prot.scriber$Annotee.Identifier)))
 
 #' All query identifier that have data for performance evaluation:
-queries.sssr <- list(swissprot = blast.sprot, trembl = blast.trembl)
+queries.sssr <- list(swissprot = blast.sprot, 
+    trembl = blast.trembl)
 
 #' Get the gold standard (reference) prepared:
 #' - from PfamA annotations:
@@ -109,44 +127,53 @@ queries.ref <- mergeMercatorAndPfamAReferences(queries.ref.mercator,
 
 
 #' Measure performance for each query that has predictions AND references:
-queries.performance <- do.call(rbind, mclapply(query.ids, function(q.id) {
-    measurePredictionsPerformance(q.id, queries.sssr, queries.prot.scriber, 
-        queries.ref)
-}))
+queries.performance <- do.call(rbind, mclapply(query.ids, 
+    function(q.id) {
+        measurePredictionsPerformance(q.id, 
+            queries.sssr, queries.prot.scriber, 
+            queries.ref)
+    }))
 
 
 #' Save result table:
 write.table(queries.performance, script.args$`result-table`, 
     sep = "\t", row.names = FALSE, quote = TRUE)
-message("Written performance scores into '", script.args$`result-table`, 
-    "'.")
+message("Written performance scores into '", 
+    script.args$`result-table`, "'.")
 
 
 #' Test significance of differences in performance score distributions:
 compared.methods <- paste0("BB.", names(queries.sssr))
-perf.diff.sign.df <- do.call(rbind, lapply(c("F.Score", "F.Score.relative", 
-    "MCC", "MCC.relative"), function(p.measr) {
-    do.call(rbind, lapply(compared.methods, function(c.meth) {
-        ps.t.test <- t.test(queries.performance[which(queries.performance$Method == 
-            c.meth), p.measr], queries.performance[which(queries.performance$Method == 
-            "prot-scriber"), p.measr], alternative = "less")$p.value
-        ps.wilcox.test <- wilcox.test(queries.performance[which(queries.performance$Method == 
-            c.meth), p.measr], queries.performance[which(queries.performance$Method == 
-            "prot-scriber"), p.measr], alternative = "less")$p.value
-        data.frame(Null.Hypothesis = paste(c.meth, "has better", 
-            p.measr, "than prot-scriber"), t.test.p.value = ps.t.test, 
-            wilcox.test.p.value = ps.wilcox.test, stringsAsFactors = FALSE)
+perf.diff.sign.df <- do.call(rbind, lapply(c("F.Score", 
+    "F.Score.relative", "MCC", "MCC.relative"), 
+    function(p.measr) {
+        do.call(rbind, lapply(compared.methods, 
+            function(c.meth) {
+                ps.t.test <- t.test(queries.performance[which(queries.performance$Method == 
+                  c.meth), p.measr], queries.performance[which(queries.performance$Method == 
+                  "prot-scriber"), p.measr], 
+                  alternative = "less")$p.value
+                ps.wilcox.test <- wilcox.test(queries.performance[which(queries.performance$Method == 
+                  c.meth), p.measr], queries.performance[which(queries.performance$Method == 
+                  "prot-scriber"), p.measr], 
+                  alternative = "less")$p.value
+                data.frame(Null.Hypothesis = paste(c.meth, 
+                  "has better", p.measr, 
+                  "than prot-scriber"), t.test.p.value = ps.t.test, 
+                  wilcox.test.p.value = ps.wilcox.test, 
+                  stringsAsFactors = FALSE)
+            }))
     }))
-}))
 #' Correct for multiple hypothesis testing:
 perf.diff.sign.df$t.test.p.adj <- p.adjust(perf.diff.sign.df$t.test.p.value, 
     method = "BH")
 perf.diff.sign.df$wilcox.test.p.adj <- p.adjust(perf.diff.sign.df$t.test.p.value, 
     method = "BH")
 #' Save hypothesis test results:
-hyp.test.res.file <- sub("\\.[^.]+$", "_hypothesis_tests.txt", script.args$`result-table`)
-write.table(perf.diff.sign.df, hyp.test.res.file, sep = "\t", 
-    quote = TRUE, row.names = FALSE)
+hyp.test.res.file <- sub("\\.[^.]+$", "_hypothesis_tests.txt", 
+    script.args$`result-table`)
+write.table(perf.diff.sign.df, hyp.test.res.file, 
+    sep = "\t", quote = TRUE, row.names = FALSE)
 message("Written significance tests of differences in performance scores between compared annotators into '", 
     hyp.test.res.file, "'.")
 
@@ -154,17 +181,22 @@ message("Written significance tests of differences in performance scores between
 #' Generate plots:
 plot.filename <- sub("\\.[^.]+$", "", script.args$`result-table`)
 competitors <- unique(queries.performance$Method)
-plot.scores <- c("F.Score", "F.Score.relative", "MCC", "MCC.relative")
+plot.scores <- c("F.Score", "F.Score.relative", 
+    "MCC", "MCC.relative")
 clrs <- brewer.pal(length(competitors), "Set1")
 
 #' Boxplots for each score measure:
 for (scr in plot.scores) {
-    plot.file <- paste0(plot.filename, "_", scr, ".pdf")
+    plot.file <- paste0(plot.filename, "_", 
+        scr, ".pdf")
     pdf(plot.file)
-    i <- which(!is.na(queries.performance[[scr]]) & !is.infinite(queries.performance[[scr]]))
-    plot.df <- queries.performance[i, c("Method", scr)]
-    boxplot(formula(paste0(scr, " ~ Method")), data = plot.df, 
-        col = clrs, horizontal = TRUE, ylab = scr)
+    i <- which(!is.na(queries.performance[[scr]]) & 
+        !is.infinite(queries.performance[[scr]]))
+    plot.df <- queries.performance[i, c("Method", 
+        scr)]
+    boxplot(formula(paste0(scr, " ~ Method")), 
+        data = plot.df, col = clrs, horizontal = TRUE, 
+        ylab = scr)
     dev.off()
 }
 message("Generated boxplots of the score distributions in files '", 

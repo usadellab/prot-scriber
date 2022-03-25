@@ -734,7 +734,7 @@ measurePredictionsPerformance <- function(query.id,
         
         #' Result:
         rslt <- rbind(best.blast.performance, prot.scriber.performance)
-        if (exists(ahrd.performance)) {
+        if (exists("ahrd.performance")) {
             rbind(rslt, ahrd.performance)
         } else {
             rslt

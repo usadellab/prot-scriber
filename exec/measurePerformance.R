@@ -157,11 +157,9 @@ queries.ref <- mergeMercatorAndPfamAReferences(queries.ref.mercator,
 #' Measure performance for each query that has predictions AND references:
 queries.performance <- do.call(rbind, mclapply(query.ids, 
     function(q.id) {
-        tryCatch({
             measurePredictionsPerformance(q.id, queries.sssr, 
                 queries.prot.scriber, queries.ref, 
                 ahrd.res = queries.ahrd)
-        }, error = function(e) browser())
     }))
 
 

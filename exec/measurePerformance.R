@@ -127,18 +127,6 @@ rownames(queries.prot.scriber) <- queries.prot.scriber$Annotee.Identifier
 queries.prot.scriber <- queries.prot.scriber[which(queries.prot.scriber$Human.Readable.Description != 
     "unknown protein"), ]
 
-#' All query identifiers that actually have both references and at least one
-#' prediction either by Best Blast or prot-scriber:
-query.ids <- intersect(union(unlist(queries.pfamA$query.name), 
-    unlist(queries.mercator[queries.mercator$TYPE, 
-        "IDENTIFIER"])), unique(c(blast.sprot$qseqid, 
-    blast.trembl$qseqid, queries.prot.scriber$Annotee.Identifier, 
-    queries.ahrd$Annotee.Identifier)))
-#' Validate:
-if(length(query.ids) == 0) {
-  stop("Could not find any query identifiers that were present in both the references and the Blast/Diamond and prot-scriber results. Please check your input.")
-}
-
 #' All query identifier that have data for performance evaluation:
 queries.sssr <- list(swissprot = blast.sprot, trembl = blast.trembl)
 
@@ -153,6 +141,16 @@ queries.ref.mercator <- referenceWordListFromMercator4Annos(queries.mercator)
 queries.ref <- mergeMercatorAndPfamAReferences(queries.ref.mercator, 
     queries.ref.pfamA)
 
+#' All query identifiers that actually have both references and at least one
+#' prediction either by Best Blast or prot-scriber:
+query.ids <- intersect(names(queries.ref), unique(c(blast.sprot$qseqid, 
+    blast.trembl$qseqid, queries.prot.scriber$Annotee.Identifier, 
+    queries.ahrd$Annotee.Identifier)))
+
+#' Validate:
+if(length(query.ids) == 0) {
+  stop("Could not find any query identifiers that were present in both the references and the Blast/Diamond and prot-scriber results. Please check your input.")
+}
 
 #' Measure performance for each query that has predictions AND references:
 queries.performance <- do.call(rbind, mclapply(query.ids, 

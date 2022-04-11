@@ -110,7 +110,7 @@ In case you are using [conda](https://docs.conda.io/en/latest/) to manage your p
 ```
 conda install -c bioconda prot-scriber
 ```
-or create a and new conda environment via
+or create and activate a new conda environment via
 ```
 conda create -n prot-scriber -c bioconda -c conda-forge prot-scriber
 conda activate prot-scriber

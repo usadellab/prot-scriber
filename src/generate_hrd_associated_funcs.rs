@@ -75,6 +75,12 @@ pub fn generate_human_readable_description(
             for i in 0..phrases.len() {
                 if phrases[i].1 > phrases[high_score_ind].1 {
                     high_score_ind = i;
+                } else if phrases[i].1 == phrases[high_score_ind].1 {
+                    let mut sort_vec = vec![phrases[high_score_ind].0.join(" "), phrases[i].0.join(" ")];
+                    sort_vec.sort();
+                    if sort_vec[0] == phrases[i].0.join(" ") {
+                        high_score_ind = i;
+                    }
                 }
             }
 
@@ -596,10 +602,10 @@ mod tests {
     #[test]
     fn test_generate_human_readable_description() {
         // Test 1:
-        // TODO: If one of the following 'manitol dehydrogenase' is removed the phrases 'manitol
-        // dehydrogenase' *and* 'geraniol dehydrogenase' will receive identical scores. Currently,
-        // in such cases their order of appearance decides, which is chosen as a result. Meaning
-        // in these cases the result is chosen somewhat randomly. Find a solution for this!
+        // If one of the following 'manitol dehydrogenase' is removed the phrases 'manitol
+        // dehydrogenase' *and* 'geraniol dehydrogenase' will receive identical scores. In such
+        // cases the phrases are sorted using https://doc.rust-lang.org/std/vec/struct.Vec.html#method.sort
+        // and the first one is selected 
         let mut hit_hrds = vec![
             "manitol dehydrogenase".to_string(),
             "cinnamyl alcohol-dehydrogenase".to_string(),
@@ -629,7 +635,7 @@ mod tests {
             "importin subunit beta-3".to_string(),
             "importin subunit beta-3".to_string(),
         ];
-        expected = "importin 5".to_string();
+        expected = "importin 3".to_string();
         result = generate_human_readable_description(
             &hit_hrds,
             &(*SPLIT_DESCRIPTION_REGEX),

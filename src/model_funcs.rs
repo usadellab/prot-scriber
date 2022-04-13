@@ -181,6 +181,18 @@ mod tests {
                 Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
             )
         );
+
+        // Test 5 - removes "8-7" from input stitle "sp|Q6YZZ2|GL87_ORYSJ Germin-like protein 8-7 OS=Oryza sativa subsp. japonica OX=39947 GN=GER6 PE=2 SV=1":
+        hit_words = "sp|Q6YZZ2|GL87_ORYSJ Germin-like protein 8-7 OS=Oryza sativa subsp. japonica OX=39947 GN=GER6 PE=2 SV=1".to_string();
+        expected = "germin";
+        assert_eq!(
+            expected,
+            filter_stitle(
+                &hit_words,
+                &(*FILTER_REGEXS),
+                Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
+            )
+        );
     }
 
     #[test]

@@ -109,8 +109,8 @@ lazy_static! {
         );
         rrd.push(
             (
-                // Deletes numbers:
-                Regex::new(r"\s+[.\d]+(\s+|$)").unwrap(),
+                // Deletes numbers like "4", "4.12", or "12-4":
+                Regex::new(r"(^|\s+)[-.\d]+(\s+|$)").unwrap(),
                 " ".to_string()
             )
         );

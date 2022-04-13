@@ -2,6 +2,7 @@ use super::default::NON_INFORMATIVE_WORD_SCORE;
 use super::model_funcs::matches_blacklist;
 use regex::Regex;
 use statrs::statistics::{Data, Distribution, OrderStatistics};
+use std::cmp::Ordering::Less;
 use std::collections::HashMap;
 
 /// Main function for generating human-readable descriptions (hrds).
@@ -61,6 +62,7 @@ pub fn generate_human_readable_description(
 
         // Find highest scoring phrase
         let mut phrases: Vec<(Vec<String>, f64)> = vec![];
+
         for desc in &description_words {
             let hsp_option = highest_scoring_phrase(&desc, &ciic);
             match hsp_option {
@@ -75,12 +77,17 @@ pub fn generate_human_readable_description(
             for i in 0..phrases.len() {
                 if phrases[i].1 > phrases[high_score_ind].1 {
                     high_score_ind = i;
-                } else if phrases[i].1 == phrases[high_score_ind].1 {
-                    let mut sort_vec = vec![phrases[high_score_ind].0.join(" "), phrases[i].0.join(" ")];
-                    sort_vec.sort();
-                    if sort_vec[0] == phrases[i].0.join(" ") {
-                        high_score_ind = i;
-                    }
+                // In case the two phrases receive an equal score, use the
+                // phrase that alphabetically comes before the other to ensure a
+                // reproducible behavior of prot-scriber
+                } else if phrases[i].1 == phrases[high_score_ind].1
+                    && phrases[i]
+                        .0
+                        .join(" ")
+                        .cmp(&phrases[high_score_ind].0.join(" "))
+                        == Less
+                {
+                    high_score_ind = i;
                 }
             }
 
@@ -605,7 +612,7 @@ mod tests {
         // If one of the following 'manitol dehydrogenase' is removed the phrases 'manitol
         // dehydrogenase' *and* 'geraniol dehydrogenase' will receive identical scores. In such
         // cases the phrases are sorted using https://doc.rust-lang.org/std/vec/struct.Vec.html#method.sort
-        // and the first one is selected 
+        // and the first one is selected
         let mut hit_hrds = vec![
             "manitol dehydrogenase".to_string(),
             "cinnamyl alcohol-dehydrogenase".to_string(),

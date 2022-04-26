@@ -104,6 +104,18 @@ The above compilation command has generated an executable binary file in the cur
 
 If you are familiar with installing self compiled tools on a system wide level, this section will provide no news to you. It is convenient to make the compiled executable `prot-scriber` program available from anywhere on your system. To achieve this, you need to copy it to any place you typically have your programs installed, or add its directory to your, our all users' `$PATH` environment. In doing so, e.g. in case you are a system administrator, you make `prot-scriber` available for all users of your infrastructure. Make sure you and your group have executable access rights to the file. You can adjust these access right with `chmod ug+x ./target/release/prot-scriber`. You, and possibly other users of your system, are now ready to run `prot-scriber`.
 
+### Install via bioconda
+In case you are using [conda](https://docs.conda.io/en/latest/) to manage your pacakges, `prot-scriber` is available on [bioconda](https://anaconda.org/bioconda/prot-scriber). Download via
+
+```
+conda install -c bioconda prot-scriber
+```
+or create and activate a new conda environment via
+```
+conda create -n prot-scriber -c bioconda -c conda-forge prot-scriber
+conda activate prot-scriber
+```
+
 ## Usage
 
 `prot-scriber` is a command line tool and _must_ be used in a terminal application. On Windows that will be `cmd` or PowerShell, on Mac OS X or any Linux / Unix system that will be a standard terminal shell.

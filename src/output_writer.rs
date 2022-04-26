@@ -18,6 +18,8 @@ pub fn write_output_table(
         for (annotee_name, annotation) in human_readable_descriptions {
             output.push_str(&(format!("\n{}\t{}", annotee_name, annotation)));
         }
+        // add trailing newline for the last annotation
+        output.push_str("\n");
         return write(file_path, output);
     } else {
         Ok(())

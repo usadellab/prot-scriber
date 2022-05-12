@@ -331,8 +331,12 @@ impl AnnotationProcess {
         }
         if !self.queries.contains_key(&qacc) {
             self.queries.insert(qacc.clone(), query);
+        } else {
+            let already_parsed_query = self.queries.get_mut(&qacc).unwrap();
+            already_parsed_query.hits.extend(query.hits.clone());
         }
-        let mut stored_query = self.queries.get_mut(&qacc).unwrap();
+
+        let stored_query = self.queries.get_mut(&qacc).unwrap();
         stored_query.n_parsed_from_sssr_tables += 1;
         // Have all input SSSR files provided data for the argument `query`?
         if stored_query.n_parsed_from_sssr_tables == self.seq_sim_search_tables.len() as u16 {
@@ -788,6 +792,25 @@ mod tests {
         let sq = ap.queries.get(&qacc).unwrap();
         assert!(sq.hits.contains_key(h1.0));
         assert!(sq.hits.contains_key(h2.0));
+
+        // Test two databases being read in:
+        let mut nq2 = Query::new();
+        let h3 = ("hit_Three","tr|A0A2G9HZP3|A0A2G9HZP3_9LAMI Serine/threonine protein kinase OS=Handroanthus impetiginosus OX=429701 GN=CDL12_04291 PE=4 SV=1");
+        let h4 = ("hit_Four","tr|A0A0V0ITN0|A0A0V0ITN0_SOLCH Protein kinase domain-containing protein OS=Solanum chacoense OX=4108 PE=4 SV=1");
+        nq2.hits.insert(h3.0.to_string(), h3.1.to_string());
+        nq2.hits.insert(h4.0.to_string(), h4.1.to_string());
+        ap.insert_query(qacc.clone(), nq2);
+
+        // check if query 'nq2' got inserted correctly
+        assert!(ap.queries.contains_key(&qacc));
+        assert_eq!(ap.queries.get(&qacc).unwrap().hits.len(), 4);
+
+        // check if the hits for the query are present
+        let sq = ap.queries.get(&qacc).unwrap();
+        assert!(sq.hits.contains_key(h1.0));
+        assert!(sq.hits.contains_key(h2.0));
+        assert!(sq.hits.contains_key(h3.0));
+        assert!(sq.hits.contains_key(h4.0));
     }
 
     #[test]

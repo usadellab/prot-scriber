@@ -260,7 +260,7 @@ OPTIONS:
 
     -w, --non-informative-words-regexs <non-informative-words-regexs>
             The path to a file in which regular expressions (regexs) are stored, one per line. These
-            regexs are used to recognize non-informative words, which will only receive a minimun
+            regexs are used to recognize non-informative words, which will only receive a minimum
             score in the prot-scriber process that generates human readable description. There is a
             default list hard-coded into prot-scriber. An example file can be downloaded here:
             https://raw.githubusercontent.com/usadellab/prot-
@@ -338,6 +338,21 @@ file containing such a list of regular expressions specifically tailored for par
 by searching NCBI reference databases, e.g. NR, is provided with prot-scriber. You can download it,
 and edit it if neccessary, here: https://raw.githubusercontent.com/usadellab/prot-
 scriber/master/misc/filter_stitle_regexs_NCBI_NR.txt
+
+2.2.2 UniRef reference databases
+------------------------------
+
+The UniRef databases (UniProt Reference Clusters) provide clustered sets of sequences from the
+UniProt Knowledgebase and selected UniParc records to obtain complete coverage of sequence space
+at several resolutions (100%, 90% and 50% identity) while hiding redundant sequences. 
+The UniRef100 database combines identical sequences and subfragments from any source organism into
+a single UniRef entry (i.e. cluster). UniRef90 and UniRef50 are built by clustering UniRef100 sequences
+at the 90% or 50% sequence identity levels. To make sure prot-scriber parses sequence similarity search
+result (Blast or Diamond) tables (SSSTs) correctly, you should use a tailored --filter-regexs (-l)
+argument. A file containing such a list of regular expressions specifically tailored for parsing SSSTs
+produced by searching UniRef databases is provided with prot-scriber. You can download it,
+and edit it if neccessary, here:
+https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/filter_stitle_regexs_UniRef.txt
 
 2.3 Example Blast or Diamond commands
 -------------------------------------
@@ -435,11 +450,11 @@ _Happy `prot-scribing`!_
 
 ### single species 
 
-On a standard Laptop with 4 cores `prot-scriber` took approx. **6.5 seconds** and used a little under **42 MB RAM** to generate human readable descriptions for a complete plant proteome with Blast search Hits for 32,567 distinct query proteins (input: Blast result table from searches in UniProt Swissprot 66 MB, Blast result table from searches in UniProt trEMBL 144 MB)
+On a standard Laptop with 4 cores `prot-scriber` took approx. **7 seconds** and used a little under **50 MB RAM** to generate human readable descriptions for a complete plant proteome with Blast search Hits for 32,567 distinct query proteins (input: Blast result table from searches in UniProt Swissprot 66 MB, Blast result table from searches in UniProt trEMBL 144 MB)
 
 ### gene families 
 
-On a standard Laptop with 4 cores `prot-scriber` took approx. **13.19 seconds** and used a little under **112 MB RAM** to generate human readable descriptions for 24,072 gene families with Blast search Hits for 71,610 distinct query proteins (input: Blast result table from searches in UniProt Swissprot 126 MB, Blast result table from searches in UniProt trEMBL 273 MB)
+On a standard Laptop with 4 cores `prot-scriber` took approx. **15 seconds** and used a little under **180 MB RAM** to generate human readable descriptions for 24,072 gene families with Blast search Hits for 71,610 distinct query proteins (input: Blast result table from searches in UniProt Swissprot 126 MB, Blast result table from searches in UniProt trEMBL 273 MB)
 
 ## Development / Contribute
 

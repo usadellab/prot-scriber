@@ -22,12 +22,8 @@ lazy_static! {
         Regex::new(r"(?i)\bto\b").unwrap(),
         Regex::new(r"(?i)\bmember\b").unwrap(),
         //Regex::new(r"(?i)\bprotein\b").unwrap(),
-        Regex::new(r"(?i)\bisoform\b").unwrap(),
         Regex::new(r"(?i)\bgene\b").unwrap(),
         Regex::new(r"(?i)\btair\b").unwrap(),
-        Regex::new(r"(?i)\bfragment\b").unwrap(),
-        Regex::new(r"(?i)\bhomolog\b").unwrap(),
-        Regex::new(r"(?i)\bcontig\b").unwrap(),
         Regex::new(r"\b\d+\b").unwrap(),
     ];
 
@@ -71,6 +67,10 @@ lazy_static! {
         Regex::new(r"(?i)\bremark\b").unwrap(),
         Regex::new(r"(?i)\bprotein\b").unwrap(),
         Regex::new(r"(?i)\b\w?orf(\w?|\d+)\b").unwrap(),
+        Regex::new(r"(?i)\bisoform\b").unwrap(),
+        Regex::new(r"(?i)\bhomolog\b").unwrap(),
+        Regex::new(r"(?i)\bfragment\b").unwrap(),
+        Regex::new(r"(?i)\bcontig\b").unwrap(),
         ];
 
     /// The default header definition of sequence similarity search result tables, i.e. mapping

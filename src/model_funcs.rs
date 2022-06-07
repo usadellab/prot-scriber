@@ -79,7 +79,7 @@ pub fn parse_regex_file(path: &str) -> Vec<Regex> {
             Ok(regex) => {
                 parsed_regexs.push(regex);
             }
-            Err(e) => panic!("{:?} in file {:?} line <{:?}>. Could not parse the line into a Rust regular expression", e, file_path, i),
+            Err(e) => panic!("\n\n{:?} in file {:?} line <{:?}>. Could not parse the line into a Rust regular expression\n\n", e, file_path, i),
         }
     }
     parsed_regexs
@@ -124,7 +124,7 @@ pub fn parse_regex_replace_tuple_file(path: &str) -> Vec<(Regex, String)> {
     // If we have an odd number of lines, the file is malformed:
     if n_lines & 1 == 1 {
         panic!(
-            "--capture-replace-pairs (-c) argument file {:?} has {:?} lines. But to construct pairs we need an even number of lines. See --help (-h) for more details.",
+            "\n\n--capture-replace-pairs (-c) argument file {:?} has {:?} lines. But to construct pairs we need an even number of lines. See --help (-h) for more details.\n\n",
             path, n_lines
         );
     }

@@ -300,7 +300,7 @@ pub fn centered_inverse_information_content(
 pub fn word_scores_quantile(values: &Vec<(String, f64)>, tau: f64) -> f64 {
     if tau != 50.0 && (tau < 0.0 || tau > 1.0) {
         panic!(
-            "Cannot compute quantile {:?} because it is not a valid value between zero and one (inclusive) or a literal 50.0.",
+            "\n\nCannot compute quantile {:?} because it is not a valid value between zero and one (inclusive) or a literal 50.0.\n\n",
             &tau
         );
     }

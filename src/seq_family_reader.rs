@@ -27,7 +27,7 @@ pub fn parse_seq_families_file(path: &str, annotation_process: &mut AnnotationPr
             Ok((seq_fam_name, seq_fam_instance)) => {
                 annotation_process.insert_seq_family(seq_fam_name, seq_fam_instance)
             }
-            Err(e) => panic!("{:?} in file {:?} line <{:?}>. The expected format is \"<family-name>TABgene1,gene2,gene3,...\"", e, file_path, i),
+            Err(e) => panic!("\n\n{:?} in file {:?} line <{:?}>. The expected format is \"<family-name>TABgene1,gene2,gene3,...\"\n\n", e, file_path, i),
         }
     }
 }

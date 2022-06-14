@@ -143,12 +143,12 @@ mod tests {
         let t1 = "sp|C0LGP4|Y3475_ARATH Probable LRR receptor-like serine/threonine-protein kinase At3g47570 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1";
         assert_eq!(
             filter_stitle(t1, &(*FILTER_REGEXS), None),
-            "lrr receptor serine/threonine- kinase"
+            "lrr receptor serine/threonine-protein kinase"
         );
 
         // Test 2 - using `default::REPLACE_REGEXS_DESCRIPTION`:
         let mut hit_words = "sp|C0LGP4|Y3475_ARATH receptor-like protein eix2 OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1".to_string();
-        let mut expected = "receptor  eix";
+        let mut expected = "receptor protein eix";
         assert_eq!(
             expected,
             filter_stitle(
@@ -172,7 +172,7 @@ mod tests {
 
         // Test 4 - using `default::REPLACE_REGEXS_DESCRIPTION`:
         hit_words = "sp|C0LGP4|Y3475_ARATH duf4228 domain protein OS=Arabidopsis thaliana OX=3702 GN=At3g47570 PE=2 SV=1".to_string();
-        expected = "duf~4228 domain";
+        expected = "duf~4228 domain protein";
         assert_eq!(
             expected,
             filter_stitle(
@@ -184,7 +184,7 @@ mod tests {
 
         // Test 5 - removes "8-7" from input stitle "sp|Q6YZZ2|GL87_ORYSJ Germin-like protein 8-7 OS=Oryza sativa subsp. japonica OX=39947 GN=GER6 PE=2 SV=1":
         hit_words = "sp|Q6YZZ2|GL87_ORYSJ Germin-like protein 8-7 OS=Oryza sativa subsp. japonica OX=39947 GN=GER6 PE=2 SV=1".to_string();
-        expected = "germin";
+        expected = "germin protein";
         assert_eq!(
             expected,
             filter_stitle(

@@ -341,7 +341,6 @@ scriber/master/misc/filter_stitle_regexs_NCBI_NR.txt
 
 2.2.2 UniRef reference databases
 ------------------------------
-
 The UniRef databases (UniProt Reference Clusters) provide clustered sets of sequences from the
 UniProt Knowledgebase and selected UniParc records to obtain complete coverage of sequence space
 at several resolutions (100%, 90% and 50% identity) while hiding redundant sequences. 

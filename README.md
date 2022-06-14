@@ -126,7 +126,7 @@ conda activate prot-scriber
     <summary><b>Please read the manual of the latest stable version (<i>click to expand</i>).</b></summary>
 
 ```
-prot-scriber version 0.1.2
+prot-scriber version 0.1.3
 
 prot-scriber assigns human readable descriptions (HRD) to query biological sequences or sets of them
 (a.k.a gene-families).

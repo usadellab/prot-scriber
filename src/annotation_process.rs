@@ -327,7 +327,7 @@ impl AnnotationProcess {
         // panic! if query.id already in results, this means the input SSSR files were not sorted
         // by query identifiers (`qacc` in Blast terminology):
         if self.human_readable_descriptions.contains_key(&qacc) {
-            panic!( "Found an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.", &qacc);
+            panic!( "\n\nFound an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.\n\n", &qacc);
         }
         if !self.queries.contains_key(&qacc) {
             self.queries.insert(qacc.clone(), query);
@@ -361,7 +361,7 @@ impl AnnotationProcess {
             if self.query_id_to_seq_family_id_index.contains_key(query_id) {
                 let other_family_id = self.query_id_to_seq_family_id_index.get(query_id).unwrap();
                 if *other_family_id != seq_family_id {
-                    panic!("Biological sequence {:?} already set as member of family {:?}. But found {:?} again declared as member of another family {:?}.\nMake sure each biological sequence appears in one and only one family to avoid this problem.", query_id, other_family_id, query_id, seq_family_id);
+                    panic!("\n\nBiological sequence {:?} already set as member of family {:?}. But found {:?} again declared as member of another family {:?}.\nMake sure each biological sequence appears in one and only one family to avoid this problem.\n\n", query_id, other_family_id, query_id, seq_family_id);
                 }
             }
             self.query_id_to_seq_family_id_index
@@ -690,7 +690,7 @@ impl AnnotationProcess {
         // --header
         if !self.ssst_columns.is_empty() && self.ssst_columns.len() != n_ssst {
             let n_ssst_cols = self.ssst_columns.len();
-            panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but only {} column mappings. Please provide either no column mappings, causing the default to be used for all SSSTs, or provide one --field_separator (-e) argument for each of your input SSSTs. See --help for more details.", n_ssst_cols, n_ssst);
+            panic!("\n\nCannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but only {} column mappings. Please provide either no column mappings, causing the default to be used for all SSSTs, or provide one --field_separator (-e) argument for each of your input SSSTs. See --help or the following link for more details.\n\nhttps://github.com/usadellab/prot-scriber/blob/880d32bab31ab5d0b2a3708a9faec8f37b53be9b/README.md?plain=1#L172-L182\n\n", n_ssst_cols, n_ssst);
         }
         if !self.ssst_columns.is_empty() {
             let required_cols = vec!["qacc", "sacc", "stitle"];
@@ -698,7 +698,7 @@ impl AnnotationProcess {
                 for col_i in &required_cols {
                     if !ssst_cols_i.contains_key(&col_i.to_string()) {
                         panic!(
-                            "Cannot run Annotation-Process, because --header (-e) argument number {} does not contain required column {:?}!",
+                            "\n\nCannot run Annotation-Process, because --header (-e) argument number {} does not contain required column {:?}!\n\n",
                             i + 1, col_i
                         );
                     }
@@ -709,13 +709,13 @@ impl AnnotationProcess {
         // --blacklist-regexs
         if !self.ssst_blacklist_regexs.is_empty() && self.ssst_blacklist_regexs.len() != n_ssst {
             let n_blacklist_regexs = self.ssst_blacklist_regexs.len();
-            panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but {} --blacklist-regexs (-b). Please provide either no --blacklist-regexs, causing the default to be used for all SSSTs, or provide one --blacklist-regexs (-b) argument for each of your input SSSTs. See --help for more details.", n_ssst, n_blacklist_regexs);
+            panic!("\n\nCannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but {} --blacklist-regexs (-b). Please provide either no --blacklist-regexs, causing the default to be used for all SSSTs, or provide one --blacklist-regexs (-b) argument for each of your input SSSTs. See --help or the following link for more details.\n\nhttps://github.com/usadellab/prot-scriber/blob/880d32bab31ab5d0b2a3708a9faec8f37b53be9b/README.md?plain=1#L145-L154\n\n", n_ssst, n_blacklist_regexs);
         }
 
         // --filter-regexs
         if !self.ssst_filter_regexs.is_empty() && self.ssst_filter_regexs.len() != n_ssst {
             let n_ssst_filter_regexs = self.ssst_filter_regexs.len();
-            panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but {} --filter-regexs (-l). Please provide either no --filter-regexs, causing the default to be used for all SSSTs, or provide one --filter-regexs (-l) argument for each of your input SSSTs. See --help for more details.", n_ssst, n_ssst_filter_regexs);
+            panic!("\n\nCannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but {} --filter-regexs (-l). Please provide either no --filter-regexs, causing the default to be used for all SSSTs, or provide one --filter-regexs (-l) argument for each of your input SSSTs. See --help or the following link for more details.\n\nhttps://github.com/usadellab/prot-scriber/blob/880d32bab31ab5d0b2a3708a9faec8f37b53be9b/README.md?plain=1#L201-L213\n\n", n_ssst, n_ssst_filter_regexs);
         }
 
         // --capture-replace-pairs
@@ -723,25 +723,25 @@ impl AnnotationProcess {
             && self.ssst_capture_replace_pairs.len() != n_ssst
         {
             let n_ssst_capture_replace_pairs = self.ssst_capture_replace_pairs.len();
-            panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but {} --capture-replace-pairs (-c). Please provide either no --capture-replace-pairs, causing the default to be used for all SSSTs, or provide one --capture-replace-pairs (-c) argument for each of your input SSSTs. See --help for more details.", n_ssst, n_ssst_capture_replace_pairs);
+            panic!("\n\nCannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but {} --capture-replace-pairs (-c). Please provide either no --capture-replace-pairs, causing the default to be used for all SSSTs, or provide one --capture-replace-pairs (-c) argument for each of your input SSSTs. See --help or the following link for more details.\n\nhttps://github.com/usadellab/prot-scriber/blob/880d32bab31ab5d0b2a3708a9faec8f37b53be9b/README.md?plain=1#L156-L170\n\n", n_ssst, n_ssst_capture_replace_pairs);
         }
 
         // --field-separator
         if !self.ssst_field_separators.is_empty() && self.ssst_field_separators.len() != n_ssst {
             let n_ssst_field_seps = self.ssst_field_separators.len();
-            panic!("Cannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but {} field-separators. Please provide either no field-separators, causing the default to be used for all SSSTs, or provide one --field-separator (-p) argument for each of your input SSSTs. See --help for more details.", n_ssst, n_ssst_field_seps);
+            panic!("\n\nCannot run Annotation-Process, because got {} sequence similarity search result tables (SSSTs), but {} field-separators. Please provide either no field-separators, causing the default to be used for all SSSTs, or provide one --field-separator (-p) argument for each of your input SSSTs. See --help or the following link for more details.\n\nhttps://github.com/usadellab/prot-scriber/blob/880d32bab31ab5d0b2a3708a9faec8f37b53be9b/README.md?plain=1#L224-L229\n\n", n_ssst, n_ssst_field_seps);
         }
 
         // --n-threads
         if self.n_threads < 2 {
-            panic!("Cannot run Annotation-Process, because option '--n-threads' ('-n') must at least be minimum of two (2)!");
+            panic!("\n\nCannot run Annotation-Process, because option '--n-threads' ('-n') must at least be minimum of two (2)!\n\n");
         }
 
         // --center-inverse-word-information-content-at-quantile
         if self.center_iic_at_quantile != 50.0
             && (self.center_iic_at_quantile < 0.0 || self.center_iic_at_quantile > 1.0)
         {
-            panic!("Cannot run Annotation-Process, because option '--center-inverse-word-information-content-at-quantile' ('-q') is not a real value between zero and one (both inclusive) or literal 50 (indicating centering at the mean and not a quantile). Please provide a correct value. See --help for more details.");
+            panic!("\n\nCannot run Annotation-Process, because option '--center-inverse-word-information-content-at-quantile' ('-q') is not a real value between zero and one (both inclusive) or literal 50 (indicating centering at the mean and not a quantile). Please provide a correct value. See --help or the following link for more details.\n\nhttps://github.com/usadellab/prot-scriber/blob/880d32bab31ab5d0b2a3708a9faec8f37b53be9b/README.md?plain=1#L231-L235\n\n");
         }
     }
 }

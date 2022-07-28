@@ -3,7 +3,7 @@
 (?i)^H0.*protein
 (?i)contains.*
 IPR.*
-\w{2,}\d{1,2}[gGmMcC]\d+(\.\d+)*
+\w{2,}\d{1,2}[gGmMcC]\d+(\.\d+)*[a-zA-Z]?
 \b\[.*
 ^(\s|/|\(|\)|-|\+|\*|,|;|\.|:|\||\d)+$
 (?i)\bunknown\b
@@ -16,5 +16,4 @@ IPR.*
 (?i)\bcontig\b
 (?i)\brelated\b
 (?i)\bremark\b
-(?i)\bprotein\b
 (?i)\b\w?orf(\w?|\d+)\b

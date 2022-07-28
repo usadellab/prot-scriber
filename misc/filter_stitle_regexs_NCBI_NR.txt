@@ -16,5 +16,4 @@ IPR.*
 (?i)\bcontig\b
 (?i)\brelated\b
 (?i)\bremark\b
-(?i)\bprotein\b
 (?i)\b\w?orf(\w?|\d+)\b

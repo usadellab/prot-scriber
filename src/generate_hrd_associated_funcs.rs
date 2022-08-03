@@ -67,7 +67,9 @@ pub fn generate_human_readable_description(
             let hsp_option = highest_scoring_phrase(&desc, &ciic);
             match hsp_option {
                 Some(hsp) => {
-                    phrases.push(hsp);
+                    if !phrases.contains(&hsp) {
+                        phrases.push(hsp);
+                    }
                 }
                 None => {}
             }

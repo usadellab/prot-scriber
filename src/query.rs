@@ -1,4 +1,3 @@
-use super::default::UNKNOWN_PROTEIN_DESCRIPTION;
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
 use regex::Regex;
 use std::collections::HashMap;
@@ -39,27 +38,21 @@ impl Query {
         split_regex: &Regex,
         non_informative_words_regexs: &Vec<Regex>,
         center_at_quantile: &f64,
-    ) -> String {
-        let mut hrd: String = (*UNKNOWN_PROTEIN_DESCRIPTION).to_string();
+    ) -> Option<String> {
         if self.hits.len() > 0 {
             let hit_descriptions = self
                 .hits
                 .values()
                 .map(|hit_desc| (*hit_desc).clone())
                 .collect();
-            let hrd_option = generate_human_readable_description(
+            generate_human_readable_description(
                 &hit_descriptions,
                 split_regex,
                 non_informative_words_regexs,
                 center_at_quantile,
-            );
-            match hrd_option {
-                Some(hum_read_desc) => {
-                    hrd = hum_read_desc;
-                }
-                None => {}
-            }
+            )
+        } else {
+            None
         }
-        hrd
     }
 }

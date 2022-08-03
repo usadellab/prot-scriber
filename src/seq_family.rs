@@ -1,4 +1,3 @@
-use super::default::UNKNOWN_FAMILY_DESCRIPTION;
 use super::query::Query;
 use crate::generate_hrd_associated_funcs::generate_human_readable_description;
 use regex::Regex;
@@ -73,7 +72,7 @@ impl SeqFamily {
         split_regex: &Regex,
         non_informative_words_regexs: &Vec<Regex>,
         center_at_quantile: &f64,
-    ) -> String {
+    ) -> Option<String> {
         let mut hit_descriptions: Vec<String> = vec![];
         // Gather all Hit descriptions of all queries belonging to this sequence family. This
         // means collecting all queries' hit-descriptions:
@@ -85,24 +84,16 @@ impl SeqFamily {
                 }
             }
         }
-        // Generate a human readable description, if any source Hit descriptions are
-        // available, return the default "unkown family" otherwise:
-        let mut hrd: String = (*UNKNOWN_FAMILY_DESCRIPTION).to_string();
         if hit_descriptions.len() > 0 {
-            let hrd_option = generate_human_readable_description(
+            generate_human_readable_description(
                 &hit_descriptions,
                 split_regex,
                 non_informative_words_regexs,
                 center_at_quantile,
-            );
-            match hrd_option {
-                Some(hum_read_desc) => {
-                    hrd = hum_read_desc;
-                }
-                None => {}
-            }
+            )
+        } else {
+            None
         }
-        hrd
     }
 }
 

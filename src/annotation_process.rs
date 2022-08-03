@@ -2,7 +2,8 @@ use super::default::{
     BLACKLIST_STITLE_REGEXS, CAPTURE_REPLACE_DESCRIPTION_PAIRS,
     CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE, FILTER_REGEXS, NON_INFORMATIVE_WORDS_REGEXS,
     SEQ_SIM_TABLE_COLUMNS, SPLIT_DESCRIPTION_REGEX, SPLIT_GENE_FAMILY_GENES_REGEX,
-    SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR,
+    SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR, UNKNOWN_FAMILY_DESCRIPTION,
+    UNKNOWN_PROTEIN_DESCRIPTION,
 };
 use super::model_funcs::{parse_regex_file, parse_regex_replace_tuple_file};
 use super::query::Query;
@@ -73,6 +74,8 @@ pub struct AnnotationProcess {
     pub annotate_lonely_queries: bool,
     /// Does the user want informative messages about the annotation process printed out?
     pub verbose: bool,
+    /// Exclude results that could not be annotated from the output?
+    pub exclude_not_annotated_from_output: bool,
 }
 
 /// Representation of the mode an instance of AnnotationProcess runs in. Can be either (i)
@@ -306,6 +309,7 @@ impl AnnotationProcess {
             n_threads: nt,
             annotate_lonely_queries: false,
             verbose: false,
+            exclude_not_annotated_from_output: false,
         }
     }
 
@@ -405,8 +409,21 @@ impl AnnotationProcess {
         );
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
-        self.human_readable_descriptions
-            .insert(query_id.clone(), hrd);
+        match hrd {
+            Some(hrd_str) => {
+                self.human_readable_descriptions
+                    .insert(query_id.clone(), hrd_str);
+            }
+            None => {
+                // In case the user wants some default 'unknown protein' annotation for query
+                // proteins that could not successfully be annotated, add such a HRD. Otherwise the
+                // not annotable protein is simply not going to appear in the tabular output file.
+                if !self.exclude_not_annotated_from_output {
+                    self.human_readable_descriptions
+                        .insert(query_id.clone(), (*UNKNOWN_PROTEIN_DESCRIPTION).to_string());
+                }
+            }
+        }
         // Free memory by removing the parsed input data, no longer required:
         self.queries.remove(&query_id);
     }
@@ -433,8 +450,24 @@ impl AnnotationProcess {
         );
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
-        self.human_readable_descriptions
-            .insert((*seq_family_id).clone(), hrd);
+        match hrd {
+            Some(hrd_str) => {
+                self.human_readable_descriptions
+                    .insert((*seq_family_id).clone(), hrd_str);
+            }
+            None => {
+                // In case the user wants some default 'unknown sequence family' annotation for
+                // families that could not successfully be annotated, add such a HRD. Otherwise the
+                // not annotable sequence family is simply not going to appear in the tabular
+                // output file.
+                if !self.exclude_not_annotated_from_output {
+                    self.human_readable_descriptions.insert(
+                        (*seq_family_id).clone(),
+                        (*UNKNOWN_FAMILY_DESCRIPTION).to_string(),
+                    );
+                }
+            }
+        }
         // need to clone, otherwise had problems with the compiler (E0599):
         let query_ids = seq_family.query_ids.clone();
         // Free memory by removing the parsed input data, no longer required:
@@ -508,7 +541,7 @@ impl AnnotationProcess {
         // Mutex. Thus results are collected in terms of tuples containing the annotee identifier
         // and the generated human readable description.
         let mode = self.mode();
-        let hrd_tuples: Vec<(String, String)>;
+        let hrd_tuples: Vec<(String, Option<String>)>;
         match mode {
             // Handle annotation of single biological sequences:
             AnnotationProcessMode::SequenceAnnotation => {
@@ -562,7 +595,29 @@ impl AnnotationProcess {
 
         // Set the human readable descriptions generated in parallel:
         for i_tpl in hrd_tuples {
-            self.human_readable_descriptions.insert(i_tpl.0, i_tpl.1);
+            match i_tpl.1 {
+                Some(hrd_str) => {
+                    self.human_readable_descriptions.insert(i_tpl.0, hrd_str);
+                }
+                None => {
+                    // In case the user wants some default 'unknown protein' or 'unknown sequence
+                    // family' annotation for query proteins or families that could not
+                    // successfully be annotated, add such a HRD. Otherwise the not annotable
+                    // entity is simply not going to appear in the tabular output file.
+                    if !self.exclude_not_annotated_from_output {
+                        match mode {
+                            AnnotationProcessMode::SequenceAnnotation => {
+                                self.human_readable_descriptions
+                                    .insert(i_tpl.0, (*UNKNOWN_PROTEIN_DESCRIPTION).to_string());
+                            }
+                            AnnotationProcessMode::FamilyAnnotation => {
+                                self.human_readable_descriptions
+                                    .insert(i_tpl.0, (*UNKNOWN_FAMILY_DESCRIPTION).to_string());
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

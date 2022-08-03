@@ -158,6 +158,13 @@ fn main() {
             .long("n-threads")
             .help("The maximum number of parallel threads to use.")
             .long_help("The maximum number of parallel threads to use. Default is the number of logical cores. Required minimum is two (2). Note that at most one thread is used per input sequence similarity search result (Blast table) file. After parsing these annotation may use up to this number of threads to generate human readable descriptions."),
+        ).arg(
+            Arg::new("exclude-not-annotated-queries")
+            .short('x')
+            .takes_value(false)
+            .long("exclude-not-annotated-queries")
+            .help("Exclude results from the output table that could not be annotated.")
+            .long_help("Exclude results from the output table that could not be annotated, i.e. 'unknown protein' or 'unknown sequence family', respectively."),
         ).get_matches();
 
     // Create a new AnnotationProcess instance and provide it with the necessary input data:
@@ -297,6 +304,11 @@ fn main() {
     if matches.is_present("non-informative-words-regexs") {
         annotation_process.non_informative_words_regexs =
             parse_regex_file(matches.value_of("non-informative-words-regexs").unwrap());
+    }
+
+    // Shall non annotable queries or sequence families be excluded from the output table?
+    if matches.is_present("exclude-not-annotated-queries") {
+        annotation_process.exclude_not_annotated_from_output = true;
     }
 
     // Execute the Annotation-Process:

@@ -39,7 +39,7 @@ pub struct AnnotationProcess {
     /// "capture-replace-pairs", tuples of regular expressions and replace strings, is held here.
     /// These pairs are used to transform matching sub-strings from Blast Hit descriptions
     /// (`stitle`) - note that the vector-index is used to pair input ssst with its filter regexs.
-    pub ssst_capture_replace_pairs: Vec<Vec<(Regex, String)>>,
+    pub ssst_capture_replace_pairs: Vec<Vec<(fancy_regex::Regex, String)>>,
     /// The in memory database of parsed sequence similarity search results in terms of Queries
     /// with their respective Hits.
     pub queries: HashMap<String, Query>,
@@ -705,7 +705,7 @@ impl AnnotationProcess {
     /// * `&mut self` - A reference to a mutable instance of AnnotationProcess.
     /// * `capture_replace_pairs_arg: &str` - The passed command line argument
     pub fn add_ssst_capture_replace_pairs(&mut self, capture_replace_pairs_arg: &str) {
-        let capture_replace_pairs: Vec<(Regex, String)> =
+        let capture_replace_pairs: Vec<(fancy_regex::Regex, String)> =
             if capture_replace_pairs_arg.trim().to_lowercase() == "default" {
                 (*CAPTURE_REPLACE_DESCRIPTION_PAIRS).clone()
             } else {

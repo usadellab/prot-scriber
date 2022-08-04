@@ -26,14 +26,15 @@ pub fn matches_blacklist(testee: &str, regexs: &Vec<Regex>) -> bool {
 /// * stitle - The sequence title line as found in the original Fasta file.
 /// * regexs - A vector of regular expressions to be applied in series to the argument stitle to
 ///            extract the desired short description.
-/// * `capture_replace_pairs` - An `Option` of a vector of tuples, pairing a regular expression and
-///                             the capture-group replacement string. These are iteratively applied
-///                             and the argument descriptions to prepare it for final splitting
-///                             into words (see `split_descriptions` for details).
+/// * `capture_replace_pairs` - An `Option` of a vector of tuples, pairing a regular expression
+///                             (see crate fancy-regex for details on the syntax) and the
+///                             capture-group replacement string. These are iteratively applied and
+///                             the argument descriptions to prepare it for final splitting into
+///                             words (see `split_descriptions` for details).
 pub fn filter_stitle(
     stitle: &str,
     regexs: &Vec<Regex>,
-    capture_replace_pairs: Option<&Vec<(Regex, String)>>,
+    capture_replace_pairs: Option<&Vec<(fancy_regex::Regex, String)>>,
 ) -> String {
     let mut desc = regexs
         .iter()
@@ -45,7 +46,7 @@ pub fn filter_stitle(
     if let Some(rr_tuples) = capture_replace_pairs {
         for rr_tpl in rr_tuples {
             for _ in 0..(*MAX_MATCH_REPLACE_ITERATIONS) {
-                if rr_tpl.0.is_match(&desc) {
+                if rr_tpl.0.is_match(&desc).unwrap() {
                     desc = rr_tpl.0.replace(&desc, &rr_tpl.1).to_string();
                 } else {
                     break;
@@ -86,28 +87,28 @@ pub fn parse_regex_file(path: &str) -> Vec<Regex> {
 }
 
 /// Reads in and parses a file specified by argument `path` and converts each pair of lines into a
-/// tupel `(Regex, String)`. Returns a vector of the so instantiated tupels.
+/// tupel `(fancy_regex::Regex, String)`. Returns a vector of the so instantiated tupels.
 ///
 /// # Arguments
 ///
 /// * `path` - A `&str` representing the path to the file containing pairs of lines. The first
 /// always going to be parsed into a regular expression, the second returned as instance of
 /// `String`.
-pub fn parse_regex_replace_tuple_file(path: &str) -> Vec<(Regex, String)> {
+pub fn parse_regex_replace_tuple_file(path: &str) -> Vec<(fancy_regex::Regex, String)> {
     // Open stream to the file
     let file_path = path.to_string();
     let file = File::open(file_path).expect(format!("No such file {:?}", path).as_str());
     let reader = BufReader::new(file);
 
     // Parse tuples, i.e. pairs of lines:
-    let mut regex_replace_tuples: Vec<(Regex, String)> = vec![];
+    let mut regex_replace_tuples: Vec<(fancy_regex::Regex, String)> = vec![];
     let mut is_regex_line = true;
-    let mut regex_i: Regex = Regex::new("").unwrap();
+    let mut regex_i: fancy_regex::Regex = fancy_regex::Regex::new("").unwrap();
     let mut n_lines = 0;
     for line in reader.lines() {
         let line_str = line.unwrap();
         if is_regex_line {
-            regex_i = Regex::new(&line_str).expect(
+            regex_i = fancy_regex::Regex::new(&line_str).expect(
                 format!(
                     "Could not parse line {:?} as a regular expression (Rust syntax).",
                     line_str
@@ -185,6 +186,18 @@ mod tests {
         // Test 5 - removes "8-7" from input stitle "sp|Q6YZZ2|GL87_ORYSJ Germin-like protein 8-7 OS=Oryza sativa subsp. japonica OX=39947 GN=GER6 PE=2 SV=1":
         hit_words = "sp|Q6YZZ2|GL87_ORYSJ Germin-like protein 8-7 OS=Oryza sativa subsp. japonica OX=39947 GN=GER6 PE=2 SV=1".to_string();
         expected = "germin protein";
+        assert_eq!(
+            expected,
+            filter_stitle(
+                &hit_words,
+                &(*FILTER_REGEXS),
+                Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
+            )
+        );
+
+        // Test 6 remove duplicated words using default capture replace pairs:
+        hit_words = "sp|Q6YZZ2|GL87_ORYSJ WRKY-like wrky-domain protein OS=Oryza sativa subsp. japonica OX=39947 GN=GER6 PE=2 SV=1".to_string();
+        expected = "wrky domain protein";
         assert_eq!(
             expected,
             filter_stitle(

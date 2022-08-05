@@ -42,38 +42,38 @@ pub fn filter_stitle(
             current.replace_all(&accumulated, "").to_string()
         })
         .to_lowercase();
-    desc = apply_capture_replace_pairs(&desc, capture_replace_pairs);
+    apply_capture_replace_pairs(&mut desc, capture_replace_pairs);
     // Remove preceding and trailing whitespaces, and return:
     desc.trim().to_string()
 }
 
 /// Iteratively applies argument pairs of regular expressions (fancy-regex) and replace
-/// instructions (strings) to process the argument string `s`. The result will be returned as
-/// `String`.
+/// instructions (strings) to change the string referenced by argument `s`.
 ///
 /// # Arguments
 ///
-/// * s - A reference to a scalar `&str`
+/// * s - A reference to a String to be modified by iterative application of the argument
+/// capture-replace-pairs.
 /// * capture_replace_pairs - An `Option` containing a vector of tuples, within each the first
 /// entry is a regular expression (fancy-regex) and a replace instruction (string).
 pub fn apply_capture_replace_pairs(
-    s: &str,
+    s: &mut String,
     capture_replace_pairs: Option<&Vec<(fancy_regex::Regex, String)>>,
-) -> String {
-    let mut result = s.to_string();
+) {
     // Use regular expressions and replace with capture groups, if argument is given:
     if let Some(rr_tuples) = capture_replace_pairs {
         for rr_tpl in rr_tuples {
             for _ in 0..(*MAX_MATCH_REPLACE_ITERATIONS) {
-                if rr_tpl.0.is_match(&result).unwrap() {
-                    result = rr_tpl.0.replace(&result, &rr_tpl.1).to_string();
+                if rr_tpl.0.is_match(s).unwrap() {
+                    // `s` is a mutable reference. Set the value it points to to the string
+                    // produced by `replace`:
+                    *s = rr_tpl.0.replace(s, &rr_tpl.1).to_string();
                 } else {
                     break;
                 }
             }
         }
     }
-    result
 }
 
 /// Reads in and parses a file specified by argument `path` and converts each line into an instance

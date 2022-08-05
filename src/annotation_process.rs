@@ -641,16 +641,8 @@ impl AnnotationProcess {
     /// * self - A mutable reference to the respective instance of AnnotationProcess. This is a
     /// instance-method.
     pub fn polish_human_readable_descriptions(&mut self) {
-        // Update all human readable descriptions with their polished version, i.e. pass them
-        // through the respective `apply_capture_replace_pairs` function. Note that the HashMap
-        // human_readable_descriptions must be cloned otherwise multiple mutable borrow would be
-        // intended:
-        let hrds = self.human_readable_descriptions.clone();
-        for (query_id, hrd) in hrds.iter() {
-            let polished_hrd =
-                apply_capture_replace_pairs(&hrd, Some(&self.polish_capture_replace_pairs));
-            self.human_readable_descriptions
-                .insert(query_id.to_string(), polished_hrd);
+        for (_, hrd) in self.human_readable_descriptions.iter_mut() {
+            apply_capture_replace_pairs(hrd, Some(&self.polish_capture_replace_pairs));
         }
     }
 

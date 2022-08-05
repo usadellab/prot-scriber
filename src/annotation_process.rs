@@ -642,9 +642,15 @@ impl AnnotationProcess {
     /// instance-method.
     pub fn polish_human_readable_descriptions(&mut self) {
         // Update all human readable descriptions with their polished version, i.e. pass them
-        // through the respective `apply_capture_replace_pairs` function:
-        for (_, hrd) in self.human_readable_descriptions.iter_mut() {
-            apply_capture_replace_pairs(hrd, Some(&self.polish_capture_replace_pairs));
+        // through the respective `apply_capture_replace_pairs` function. Note that the HashMap
+        // human_readable_descriptions must be cloned otherwise multiple mutable borrow would be
+        // intended:
+        let hrds = self.human_readable_descriptions.clone();
+        for (query_id, hrd) in hrds.iter() {
+            let polished_hrd =
+                apply_capture_replace_pairs(&hrd, Some(&self.polish_capture_replace_pairs));
+            self.human_readable_descriptions
+                .insert(query_id.to_string(), polished_hrd);
         }
     }
 
@@ -1154,5 +1160,42 @@ mod tests {
         for (_, v) in hrds {
             assert!(!v.is_empty());
         }
+    }
+
+    #[test]
+    fn test_polish_human_readable_descriptions() {
+        let mut ap = AnnotationProcess::new();
+        ap.human_readable_descriptions.insert(
+            "Prot1".to_string(),
+            "polyadenylate binding protein and".to_string(),
+        );
+        ap.polish_human_readable_descriptions();
+
+        assert_eq!(
+            "polyadenylate binding protein",
+            ap.human_readable_descriptions.get("Prot1").unwrap()
+        );
+
+        ap.human_readable_descriptions.insert(
+            "Prot1".to_string(),
+            "polyadenylate binding protein".to_string(),
+        );
+        ap.polish_human_readable_descriptions();
+
+        assert_eq!(
+            "polyadenylate binding protein",
+            ap.human_readable_descriptions.get("Prot1").unwrap()
+        );
+
+        ap.human_readable_descriptions.insert(
+            "Prot1".to_string(),
+            "polyadenylate binding protein the".to_string(),
+        );
+        ap.polish_human_readable_descriptions();
+
+        assert_eq!(
+            "polyadenylate binding protein",
+            ap.human_readable_descriptions.get("Prot1").unwrap()
+        );
     }
 }

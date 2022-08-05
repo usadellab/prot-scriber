@@ -16,6 +16,7 @@ lazy_static! {
     /// in the description to be excluded from scoring. If ANY of these expression matches
     /// the word is considered as non-informative
     pub static ref NON_INFORMATIVE_WORDS_REGEXS: Vec<Regex> = vec![
+        Regex::new(r"(?i)\bthe\b").unwrap(),
         Regex::new(r"(?i)\band\b").unwrap(),
         Regex::new(r"(?i)\bor\b").unwrap(),
         Regex::new(r"(?i)\bfrom\b").unwrap(),
@@ -126,6 +127,20 @@ lazy_static! {
                 // Replace multiple adjacent whitespae characters with a single one:
                 fancy_regex::Regex::new(r"\s{2,}").unwrap(),
                 r" ".to_string()
+            )
+        );
+        rrd
+    };
+
+    /// The default vector of regular expressions _with_ match-groups to be used to post-process
+    /// ("polish") assigned human readable descriptions before using them as final output:
+    pub static ref POLISH_CAPTURE_REPLACE_PAIRS: Vec<(fancy_regex::Regex, String)> = {
+        let mut rrd : Vec<(fancy_regex::Regex, String)> = vec![];
+        rrd.push(
+            (
+                // Deletes trailing non-informative words like 'and', 'or', 'the' etc:
+                fancy_regex::Regex::new(r"(?i)\s*\b(and|or|the|from|to)\b\s*$").unwrap(),
+                r"".to_string()
             )
         );
         rrd

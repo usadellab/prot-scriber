@@ -152,6 +152,13 @@ fn main() {
             .long_help("The path to a file in which regular expressions (regexs) are stored, one per line. These regexs are used to recognize non-informative words, which will only receive a minimun score in the prot-scriber process that generates human readable description. There is a default list hard-coded into prot-scriber. An example file can be downloaded here: https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/non_informative_words_regexs.txt - Note that this is an expert option."),
         )
         .arg(
+            Arg::new("polish-capture-replace-pairs")
+            .short('d')
+            .long("polish-capture-replace-pairs")
+            .help("A file with line pairs of regex and capture group replacement; used in the last step ('polishing') when generating human readable description. Set to 'none' if you want to skip the polishing step.")
+            .long_help("The last step of the process generating human readable descriptions (HRDs) for the queries (proteins or sequence families) is to 'polish' the selected HRDs. Polishing is done by iterative application of regular expressions (fancy-regex) and replace instructions (capture-replace-pairs). If you do not want to use the default polishing capture replace pairs specify a file in which pairs of lines are given. Of each pair the first line hold a regular expression (fancy-regex syntax) and the second the replacement instructions providing access to capture groups. Set to 'none' or provide an empty file, if you want to suppress polishing. - Note that this an expert option."),
+        )
+        .arg(
             Arg::new("n-threads")
             .short('n')
             .takes_value(true)
@@ -212,6 +219,11 @@ fn main() {
                 .to_string();
         }
 
+        // Shall non family queries also be annotated?
+        if matches.is_present("annotate-non-family-queries") {
+            annotation_process.annotate_lonely_queries = true;
+        }
+
         parse_seq_families_file(seq_families, &mut annotation_process);
         if annotation_process.verbose {
             println!(
@@ -220,11 +232,6 @@ fn main() {
                 &seq_families
             );
         }
-    }
-
-    // Shall non family queries also be annotated?
-    if matches.is_present("annotate-non-family-queries") {
-        annotation_process.annotate_lonely_queries = true;
     }
 
     // Set the input sequence similarity search result (SSSR) tables (Blast or Diamond):
@@ -274,6 +281,14 @@ fn main() {
         for cr_pairs_arg in matches.values_of("capture-replace-pairs").unwrap() {
             annotation_process.add_ssst_capture_replace_pairs(cr_pairs_arg);
         }
+    }
+
+    // Set the capture replace pairs (fancy-regex) used in the last step of the generation of
+    // human readable descriptions. Note, that this can be "none" or "default".
+    if matches.is_present("polish-capture-replace-pairs") {
+        annotation_process.set_polish_capture_replace_pairs(
+            matches.value_of("polish-capture-replace-pairs").unwrap(),
+        );
     }
 
     // Did the user supply a custom regular expression to split descriptions (`stitle` in Blast

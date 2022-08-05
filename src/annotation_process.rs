@@ -1,11 +1,13 @@
 use super::default::{
     BLACKLIST_STITLE_REGEXS, CAPTURE_REPLACE_DESCRIPTION_PAIRS,
     CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE, FILTER_REGEXS, NON_INFORMATIVE_WORDS_REGEXS,
-    SEQ_SIM_TABLE_COLUMNS, SPLIT_DESCRIPTION_REGEX, SPLIT_GENE_FAMILY_GENES_REGEX,
-    SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR, UNKNOWN_FAMILY_DESCRIPTION,
-    UNKNOWN_PROTEIN_DESCRIPTION,
+    POLISH_CAPTURE_REPLACE_PAIRS, SEQ_SIM_TABLE_COLUMNS, SPLIT_DESCRIPTION_REGEX,
+    SPLIT_GENE_FAMILY_GENES_REGEX, SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR,
+    UNKNOWN_FAMILY_DESCRIPTION, UNKNOWN_PROTEIN_DESCRIPTION,
 };
-use super::model_funcs::{parse_regex_file, parse_regex_replace_tuple_file};
+use super::model_funcs::{
+    apply_capture_replace_pairs, parse_regex_file, parse_regex_replace_tuple_file,
+};
 use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
@@ -65,6 +67,9 @@ pub struct AnnotationProcess {
     /// sequences or families (sets of query sequences). Stored here using the query identifier as
     /// key and the generated HRD as values.
     pub human_readable_descriptions: HashMap<String, String>,
+    /// A list of "capture-replace-pairs", tuples of regular expressions and replace strings, is
+    /// held here. These pairs are used to polish assigned human readable descriptions.
+    pub polish_capture_replace_pairs: Vec<(fancy_regex::Regex, String)>,
     /// A real value between zero and one used to center the inverse information content scores.
     pub center_iic_at_quantile: f64,
     /// The number of parallel threads to use.
@@ -278,6 +283,11 @@ pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
     // Make sure all queries or sequence families are annotated:
     annotation_process.process_rest_data();
 
+    // Execute the final step of generating human readable descriptions. In this regular
+    // expressions (fancy-regex) and replace instructions, i.e. "capture-replace-pairs" are applied
+    // to the HRDs in annotation_process.human_readable_descriptions to polish them.
+    annotation_process.polish_human_readable_descriptions();
+
     // Return the modified `annotation_process`:
     annotation_process
 }
@@ -305,6 +315,7 @@ impl AnnotationProcess {
             non_informative_words_regexs: (*NON_INFORMATIVE_WORDS_REGEXS).clone(),
             query_id_to_seq_family_id_index: HashMap::new(),
             human_readable_descriptions: HashMap::new(),
+            polish_capture_replace_pairs: (*POLISH_CAPTURE_REPLACE_PAIRS).clone(),
             center_iic_at_quantile: *CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE,
             n_threads: nt,
             annotate_lonely_queries: false,
@@ -621,6 +632,22 @@ impl AnnotationProcess {
         }
     }
 
+    /// Iterates over all assigned human readable descriptions replacing them with their "polished"
+    /// version. Polishing is done by iteratively applying capture-replace pairs using the function
+    /// `apply_capture_replace_pairs`.
+    ///
+    /// # Arguments
+    ///
+    /// * self - A mutable reference to the respective instance of AnnotationProcess. This is a
+    /// instance-method.
+    pub fn polish_human_readable_descriptions(&mut self) {
+        // Update all human readable descriptions with their polished version, i.e. pass them
+        // through the respective `apply_capture_replace_pairs` function:
+        for (_, hrd) in self.human_readable_descriptions.iter_mut() {
+            apply_capture_replace_pairs(hrd, Some(&self.polish_capture_replace_pairs));
+        }
+    }
+
     /// Parses the command line argument `header` into a HashMap<String, usize> in which the
     /// sequence similarity search result (Blast) table (SSST) column names are mapped to their
     /// respective position in the to be parsed SSST. Inserts the parsed HashMap into
@@ -712,6 +739,24 @@ impl AnnotationProcess {
                 parse_regex_replace_tuple_file(capture_replace_pairs_arg)
             };
         self.ssst_capture_replace_pairs.push(capture_replace_pairs);
+    }
+
+    /// Parses the command line argument --polish-capture-replace-pairs
+    ///
+    /// # Arguments
+    ///
+    /// * self - A mutable reference to the instance of AnnotationProcess
+    /// * polish_capture_replace_pairs_arg - A scalar `&str` the provided command line argument
+    /// value
+    pub fn set_polish_capture_replace_pairs(&mut self, polish_capture_replace_pairs_arg: &str) {
+        self.polish_capture_replace_pairs =
+            if polish_capture_replace_pairs_arg.trim().to_lowercase() == "default" {
+                (*POLISH_CAPTURE_REPLACE_PAIRS).clone()
+            } else if polish_capture_replace_pairs_arg.trim().to_lowercase() == "none" {
+                vec![]
+            } else {
+                parse_regex_replace_tuple_file(polish_capture_replace_pairs_arg)
+            };
     }
 
     /// Parses the command line argument `field-separator` into a `char` used to split a line (row)

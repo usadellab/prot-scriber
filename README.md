@@ -157,19 +157,33 @@ OPTIONS:
 
     -c, --capture-replace-pairs <capture-replace-pairs>
             A file with pairs of lines. Within each pair the first line is a regular expressions
-            (Rust syntax) defining one or more capture groups. The second line of a pair is the
-            string used to replace the match in the regular expression with. This means the second
-            line contains the capture groups (Rust syntax). These pairs are used to further filter
-            the sequence similarity search result descriptions ('stitle' in Blast terminology). In
-            contrast to the --filter-regex (-l) matches are not deleted, but replaced with the
-            second line of the pair. Filtering is used to process descriptions ('stitle' in Blast
-            terminology) and prepare the descriptions for the prot-scriber annotation process. If
-            multiple --seq-sim-table (-s) args are provided make sure the --capture-replace-pairs
-            (-c) args appear in the correct order, e.g. the first -c arg will be used for the first
-            -s arg, the second -c will be used for the second -s and so on. Set to 'default' to use
-            the hard coded default. An example file can be downloaded here:
+            (fancy-regex syntax) defining one or more capture groups. The second line of a pair is
+            the string used to replace the match in the regular expression with. This means the
+            second line contains the capture groups (fancy-regex syntax). These pairs are used to
+            further filter the sequence similarity search result descriptions ('stitle' in Blast
+            terminology). In contrast to the --filter-regex (-l) matches are not deleted, but
+            replaced with the second line of the pair. Filtering is used to process descriptions
+            ('stitle' in Blast terminology) and prepare the descriptions for the prot-scriber
+            annotation process. If multiple --seq-sim-table (-s) args are provided make sure the
+            --capture-replace-pairs (-c) args appear in the correct order, e.g. the first -c arg
+            will be used for the first -s arg, the second -c will be used for the second -s and so
+            on. Set to 'default' to use the hard coded default. An example file can be downloaded
+            here:
             https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/capture_replace_pairs.txt
             - Note that this is an expert option.
+
+    -d, --polish-capture-replace-pairs
+            The last step of the process generating human readable descriptions (HRDs) for the
+            queries (proteins or sequence families) is to 'polish' the selected HRDs. Polishing is
+            done by iterative application of regular expressions (fancy-regex) and replace
+            instructions (capture-replace-pairs). If you do not want to use the default polishing
+            capture replace pairs specify a file in which pairs of lines are given. Of each pair the
+            first line hold a regular expression (fancy-regex syntax) and the second the replacement
+            instructions providing access to capture groups. Set to 'none' or provide an empty file,
+            if you want to suppress polishing. If you want to have a template file for your custom
+            polishing capture-replace-pairs please refer to
+            https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/polish_capture_replace_pairs.txt
+            - Note that this an expert option.
 
     -e, --header <header>
             Header of the --seq-sim-table (-s) arg. Separated by space (' ') the names of the

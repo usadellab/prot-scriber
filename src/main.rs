@@ -78,7 +78,7 @@ fn main() {
             .long("capture-replace-pairs")
             .multiple_occurrences(true)
             .help("A file with line pairs of regex and capture group replacement; used to transform matching parts of Blast Hit descriptions.")
-            .long_help("A file with pairs of lines. Within each pair the first line is a regular expressions (Rust syntax) defining one or more capture groups. The second line of a pair is the string used to replace the match in the regular expression with. This means the second line contains the capture groups (Rust syntax). These pairs are used to further filter the sequence similarity search result descriptions ('stitle' in Blast terminology). In contrast to the --filter-regex (-l) matches are not deleted, but replaced with the second line of the pair. Filtering is used to process descriptions ('stitle' in Blast terminology) and prepare the descriptions for the prot-scriber annotation process. If multiple --seq-sim-table (-s) args are provided make sure the --capture-replace-pairs (-c) args appear in the correct order, e.g. the first -c arg will be used for the first -s arg, the second -c will be used for the second -s and so on. Set to 'default' to use the hard coded default. An example file can be downloaded here: https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/capture_replace_pairs.txt - Note that this is an expert option."),
+            .long_help("A file with pairs of lines. Within each pair the first line is a regular expressions (fancy-regex syntax) defining one or more capture groups. The second line of a pair is the string used to replace the match in the regular expression with. This means the second line contains the capture groups (fancy-regex syntax). These pairs are used to further filter the sequence similarity search result descriptions ('stitle' in Blast terminology). In contrast to the --filter-regex (-l) matches are not deleted, but replaced with the second line of the pair. Filtering is used to process descriptions ('stitle' in Blast terminology) and prepare the descriptions for the prot-scriber annotation process. If multiple --seq-sim-table (-s) args are provided make sure the --capture-replace-pairs (-c) args appear in the correct order, e.g. the first -c arg will be used for the first -s arg, the second -c will be used for the second -s and so on. Set to 'default' to use the hard coded default. An example file can be downloaded here: https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/capture_replace_pairs.txt - Note that this is an expert option."),
         )
         .arg(
             Arg::new("field-separator")
@@ -148,8 +148,15 @@ fn main() {
             .short('w')
             .takes_value(true)
             .long("non-informative-words-regexs")
-            .help("File of regular expressions used to ifdentify non informative words.")
+            .help("File of regular expressions used to identify non informative words.")
             .long_help("The path to a file in which regular expressions (regexs) are stored, one per line. These regexs are used to recognize non-informative words, which will only receive a minimun score in the prot-scriber process that generates human readable description. There is a default list hard-coded into prot-scriber. An example file can be downloaded here: https://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/non_informative_words_regexs.txt - Note that this is an expert option."),
+        )
+        .arg(
+            Arg::new("polish-capture-replace-pairs")
+            .short('d')
+            .long("polish-capture-replace-pairs")
+            .help("A file with line pairs of regex and capture group replacement; used in the last step ('polishing') when generating human readable description. Set to 'none' if you want to skip the polishing step.")
+            .long_help("The last step of the process generating human readable descriptions (HRDs) for the queries (proteins or sequence families) is to 'polish' the selected HRDs. Polishing is done by iterative application of regular expressions (fancy-regex) and replace instructions (capture-replace-pairs). If you do not want to use the default polishing capture replace pairs specify a file in which pairs of lines are given. Of each pair the first line hold a regular expression (fancy-regex syntax) and the second the replacement instructions providing access to capture groups. Set to 'none' or provide an empty file, if you want to suppress polishing. If you want to have a template file for your custom polishing capture-replace-pairs please refer to\nhttps://raw.githubusercontent.com/usadellab/prot-scriber/master/misc/polish_capture_replace_pairs.txt\n- Note that this an expert option."),
         )
         .arg(
             Arg::new("n-threads")
@@ -158,6 +165,13 @@ fn main() {
             .long("n-threads")
             .help("The maximum number of parallel threads to use.")
             .long_help("The maximum number of parallel threads to use. Default is the number of logical cores. Required minimum is two (2). Note that at most one thread is used per input sequence similarity search result (Blast table) file. After parsing these annotation may use up to this number of threads to generate human readable descriptions."),
+        ).arg(
+            Arg::new("exclude-not-annotated-queries")
+            .short('x')
+            .takes_value(false)
+            .long("exclude-not-annotated-queries")
+            .help("Exclude results from the output table that could not be annotated.")
+            .long_help("Exclude results from the output table that could not be annotated, i.e. 'unknown protein' or 'unknown sequence family', respectively."),
         ).get_matches();
 
     // Create a new AnnotationProcess instance and provide it with the necessary input data:
@@ -205,6 +219,11 @@ fn main() {
                 .to_string();
         }
 
+        // Shall non family queries also be annotated?
+        if matches.is_present("annotate-non-family-queries") {
+            annotation_process.annotate_lonely_queries = true;
+        }
+
         parse_seq_families_file(seq_families, &mut annotation_process);
         if annotation_process.verbose {
             println!(
@@ -213,11 +232,6 @@ fn main() {
                 &seq_families
             );
         }
-    }
-
-    // Shall non family queries also be annotated?
-    if matches.is_present("annotate-non-family-queries") {
-        annotation_process.annotate_lonely_queries = true;
     }
 
     // Set the input sequence similarity search result (SSSR) tables (Blast or Diamond):
@@ -269,6 +283,14 @@ fn main() {
         }
     }
 
+    // Set the capture replace pairs (fancy-regex) used in the last step of the generation of
+    // human readable descriptions. Note, that this can be "none" or "default".
+    if matches.is_present("polish-capture-replace-pairs") {
+        annotation_process.set_polish_capture_replace_pairs(
+            matches.value_of("polish-capture-replace-pairs").unwrap(),
+        );
+    }
+
     // Did the user supply a custom regular expression to split descriptions (`stitle` in Blast
     // terminology) into words?
     if matches.is_present("description-split-regex") {
@@ -297,6 +319,11 @@ fn main() {
     if matches.is_present("non-informative-words-regexs") {
         annotation_process.non_informative_words_regexs =
             parse_regex_file(matches.value_of("non-informative-words-regexs").unwrap());
+    }
+
+    // Shall non annotable queries or sequence families be excluded from the output table?
+    if matches.is_present("exclude-not-annotated-queries") {
+        annotation_process.exclude_not_annotated_from_output = true;
     }
 
     // Execute the Annotation-Process:

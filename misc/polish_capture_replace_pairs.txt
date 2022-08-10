@@ -1,0 +1,2 @@
+(?i)\s*\b(and|or|the|from|to)\b\s*$
+

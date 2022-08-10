@@ -1,10 +1,13 @@
 use super::default::{
     BLACKLIST_STITLE_REGEXS, CAPTURE_REPLACE_DESCRIPTION_PAIRS,
     CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE, FILTER_REGEXS, NON_INFORMATIVE_WORDS_REGEXS,
-    SEQ_SIM_TABLE_COLUMNS, SPLIT_DESCRIPTION_REGEX, SPLIT_GENE_FAMILY_GENES_REGEX,
-    SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR,
+    POLISH_CAPTURE_REPLACE_PAIRS, SEQ_SIM_TABLE_COLUMNS, SPLIT_DESCRIPTION_REGEX,
+    SPLIT_GENE_FAMILY_GENES_REGEX, SPLIT_GENE_FAMILY_ID_FROM_GENE_SET, SSSR_TABLE_FIELD_SEPARATOR,
+    UNKNOWN_FAMILY_DESCRIPTION, UNKNOWN_PROTEIN_DESCRIPTION,
 };
-use super::model_funcs::{parse_regex_file, parse_regex_replace_tuple_file};
+use super::model_funcs::{
+    apply_capture_replace_pairs, parse_regex_file, parse_regex_replace_tuple_file,
+};
 use super::query::Query;
 use super::seq_family::SeqFamily;
 use super::seq_sim_table_reader::parse_table;
@@ -38,7 +41,7 @@ pub struct AnnotationProcess {
     /// "capture-replace-pairs", tuples of regular expressions and replace strings, is held here.
     /// These pairs are used to transform matching sub-strings from Blast Hit descriptions
     /// (`stitle`) - note that the vector-index is used to pair input ssst with its filter regexs.
-    pub ssst_capture_replace_pairs: Vec<Vec<(Regex, String)>>,
+    pub ssst_capture_replace_pairs: Vec<Vec<(fancy_regex::Regex, String)>>,
     /// The in memory database of parsed sequence similarity search results in terms of Queries
     /// with their respective Hits.
     pub queries: HashMap<String, Query>,
@@ -64,6 +67,9 @@ pub struct AnnotationProcess {
     /// sequences or families (sets of query sequences). Stored here using the query identifier as
     /// key and the generated HRD as values.
     pub human_readable_descriptions: HashMap<String, String>,
+    /// A list of "capture-replace-pairs", tuples of regular expressions and replace strings, is
+    /// held here. These pairs are used to polish assigned human readable descriptions.
+    pub polish_capture_replace_pairs: Vec<(fancy_regex::Regex, String)>,
     /// A real value between zero and one used to center the inverse information content scores.
     pub center_iic_at_quantile: f64,
     /// The number of parallel threads to use.
@@ -73,6 +79,8 @@ pub struct AnnotationProcess {
     pub annotate_lonely_queries: bool,
     /// Does the user want informative messages about the annotation process printed out?
     pub verbose: bool,
+    /// Exclude results that could not be annotated from the output?
+    pub exclude_not_annotated_from_output: bool,
 }
 
 /// Representation of the mode an instance of AnnotationProcess runs in. Can be either (i)
@@ -275,6 +283,11 @@ pub fn run(mut annotation_process: AnnotationProcess) -> AnnotationProcess {
     // Make sure all queries or sequence families are annotated:
     annotation_process.process_rest_data();
 
+    // Execute the final step of generating human readable descriptions. In this regular
+    // expressions (fancy-regex) and replace instructions, i.e. "capture-replace-pairs" are applied
+    // to the HRDs in annotation_process.human_readable_descriptions to polish them.
+    annotation_process.polish_human_readable_descriptions();
+
     // Return the modified `annotation_process`:
     annotation_process
 }
@@ -302,10 +315,12 @@ impl AnnotationProcess {
             non_informative_words_regexs: (*NON_INFORMATIVE_WORDS_REGEXS).clone(),
             query_id_to_seq_family_id_index: HashMap::new(),
             human_readable_descriptions: HashMap::new(),
+            polish_capture_replace_pairs: (*POLISH_CAPTURE_REPLACE_PAIRS).clone(),
             center_iic_at_quantile: *CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE,
             n_threads: nt,
             annotate_lonely_queries: false,
             verbose: false,
+            exclude_not_annotated_from_output: false,
         }
     }
 
@@ -405,8 +420,21 @@ impl AnnotationProcess {
         );
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
-        self.human_readable_descriptions
-            .insert(query_id.clone(), hrd);
+        match hrd {
+            Some(hrd_str) => {
+                self.human_readable_descriptions
+                    .insert(query_id.clone(), hrd_str);
+            }
+            None => {
+                // In case the user wants some default 'unknown protein' annotation for query
+                // proteins that could not successfully be annotated, add such a HRD. Otherwise the
+                // not annotable protein is simply not going to appear in the tabular output file.
+                if !self.exclude_not_annotated_from_output {
+                    self.human_readable_descriptions
+                        .insert(query_id.clone(), (*UNKNOWN_PROTEIN_DESCRIPTION).to_string());
+                }
+            }
+        }
         // Free memory by removing the parsed input data, no longer required:
         self.queries.remove(&query_id);
     }
@@ -433,8 +461,24 @@ impl AnnotationProcess {
         );
         // Add the new result to the in memory database, i.e.
         // `self.human_readable_descriptions`:
-        self.human_readable_descriptions
-            .insert((*seq_family_id).clone(), hrd);
+        match hrd {
+            Some(hrd_str) => {
+                self.human_readable_descriptions
+                    .insert((*seq_family_id).clone(), hrd_str);
+            }
+            None => {
+                // In case the user wants some default 'unknown sequence family' annotation for
+                // families that could not successfully be annotated, add such a HRD. Otherwise the
+                // not annotable sequence family is simply not going to appear in the tabular
+                // output file.
+                if !self.exclude_not_annotated_from_output {
+                    self.human_readable_descriptions.insert(
+                        (*seq_family_id).clone(),
+                        (*UNKNOWN_FAMILY_DESCRIPTION).to_string(),
+                    );
+                }
+            }
+        }
         // need to clone, otherwise had problems with the compiler (E0599):
         let query_ids = seq_family.query_ids.clone();
         // Free memory by removing the parsed input data, no longer required:
@@ -508,7 +552,7 @@ impl AnnotationProcess {
         // Mutex. Thus results are collected in terms of tuples containing the annotee identifier
         // and the generated human readable description.
         let mode = self.mode();
-        let hrd_tuples: Vec<(String, String)>;
+        let hrd_tuples: Vec<(String, Option<String>)>;
         match mode {
             // Handle annotation of single biological sequences:
             AnnotationProcessMode::SequenceAnnotation => {
@@ -562,7 +606,43 @@ impl AnnotationProcess {
 
         // Set the human readable descriptions generated in parallel:
         for i_tpl in hrd_tuples {
-            self.human_readable_descriptions.insert(i_tpl.0, i_tpl.1);
+            match i_tpl.1 {
+                Some(hrd_str) => {
+                    self.human_readable_descriptions.insert(i_tpl.0, hrd_str);
+                }
+                None => {
+                    // In case the user wants some default 'unknown protein' or 'unknown sequence
+                    // family' annotation for query proteins or families that could not
+                    // successfully be annotated, add such a HRD. Otherwise the not annotable
+                    // entity is simply not going to appear in the tabular output file.
+                    if !self.exclude_not_annotated_from_output {
+                        match mode {
+                            AnnotationProcessMode::SequenceAnnotation => {
+                                self.human_readable_descriptions
+                                    .insert(i_tpl.0, (*UNKNOWN_PROTEIN_DESCRIPTION).to_string());
+                            }
+                            AnnotationProcessMode::FamilyAnnotation => {
+                                self.human_readable_descriptions
+                                    .insert(i_tpl.0, (*UNKNOWN_FAMILY_DESCRIPTION).to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Iterates over all assigned human readable descriptions replacing them with their "polished"
+    /// version. Polishing is done by iteratively applying capture-replace pairs using the function
+    /// `apply_capture_replace_pairs`.
+    ///
+    /// # Arguments
+    ///
+    /// * self - A mutable reference to the respective instance of AnnotationProcess. This is a
+    /// instance-method.
+    pub fn polish_human_readable_descriptions(&mut self) {
+        for (_, hrd) in self.human_readable_descriptions.iter_mut() {
+            apply_capture_replace_pairs(hrd, Some(&self.polish_capture_replace_pairs));
         }
     }
 
@@ -650,13 +730,31 @@ impl AnnotationProcess {
     /// * `&mut self` - A reference to a mutable instance of AnnotationProcess.
     /// * `capture_replace_pairs_arg: &str` - The passed command line argument
     pub fn add_ssst_capture_replace_pairs(&mut self, capture_replace_pairs_arg: &str) {
-        let capture_replace_pairs: Vec<(Regex, String)> =
+        let capture_replace_pairs: Vec<(fancy_regex::Regex, String)> =
             if capture_replace_pairs_arg.trim().to_lowercase() == "default" {
                 (*CAPTURE_REPLACE_DESCRIPTION_PAIRS).clone()
             } else {
                 parse_regex_replace_tuple_file(capture_replace_pairs_arg)
             };
         self.ssst_capture_replace_pairs.push(capture_replace_pairs);
+    }
+
+    /// Parses the command line argument --polish-capture-replace-pairs
+    ///
+    /// # Arguments
+    ///
+    /// * self - A mutable reference to the instance of AnnotationProcess
+    /// * polish_capture_replace_pairs_arg - A scalar `&str` the provided command line argument
+    /// value
+    pub fn set_polish_capture_replace_pairs(&mut self, polish_capture_replace_pairs_arg: &str) {
+        self.polish_capture_replace_pairs =
+            if polish_capture_replace_pairs_arg.trim().to_lowercase() == "default" {
+                (*POLISH_CAPTURE_REPLACE_PAIRS).clone()
+            } else if polish_capture_replace_pairs_arg.trim().to_lowercase() == "none" {
+                vec![]
+            } else {
+                parse_regex_replace_tuple_file(polish_capture_replace_pairs_arg)
+            };
     }
 
     /// Parses the command line argument `field-separator` into a `char` used to split a line (row)
@@ -1054,5 +1152,42 @@ mod tests {
         for (_, v) in hrds {
             assert!(!v.is_empty());
         }
+    }
+
+    #[test]
+    fn test_polish_human_readable_descriptions() {
+        let mut ap = AnnotationProcess::new();
+        ap.human_readable_descriptions.insert(
+            "Prot1".to_string(),
+            "polyadenylate binding protein and".to_string(),
+        );
+        ap.polish_human_readable_descriptions();
+
+        assert_eq!(
+            "polyadenylate binding protein",
+            ap.human_readable_descriptions.get("Prot1").unwrap()
+        );
+
+        ap.human_readable_descriptions.insert(
+            "Prot1".to_string(),
+            "polyadenylate binding protein".to_string(),
+        );
+        ap.polish_human_readable_descriptions();
+
+        assert_eq!(
+            "polyadenylate binding protein",
+            ap.human_readable_descriptions.get("Prot1").unwrap()
+        );
+
+        ap.human_readable_descriptions.insert(
+            "Prot1".to_string(),
+            "polyadenylate binding protein the".to_string(),
+        );
+        ap.polish_human_readable_descriptions();
+
+        assert_eq!(
+            "polyadenylate binding protein",
+            ap.human_readable_descriptions.get("Prot1").unwrap()
+        );
     }
 }

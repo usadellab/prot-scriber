@@ -16,6 +16,7 @@ lazy_static! {
     /// in the description to be excluded from scoring. If ANY of these expression matches
     /// the word is considered as non-informative
     pub static ref NON_INFORMATIVE_WORDS_REGEXS: Vec<Regex> = vec![
+        Regex::new(r"(?i)\bthe\b").unwrap(),
         Regex::new(r"(?i)\band\b").unwrap(),
         Regex::new(r"(?i)\bor\b").unwrap(),
         Regex::new(r"(?i)\bfrom\b").unwrap(),
@@ -84,33 +85,62 @@ lazy_static! {
     };
 
     /// A Hit's description is split into words using this default regular expression.
-    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([~_\-/|\\;,':.\s]+)").unwrap();
+    pub static ref SPLIT_DESCRIPTION_REGEX: Regex = Regex::new(r"([()~_\-/|\\;,':.\s]+)").unwrap();
 
     /// The default vector of regular expressions _with_ match-groups to be used to split
     /// descriptions (parsed `stitle`) into separate words by replacing the matched region with
     /// the first and second captures:
-    pub static ref CAPTURE_REPLACE_DESCRIPTION_PAIRS: Vec<(Regex, String)> = {
-        let mut rrd : Vec<(Regex, String)> = vec![];
+    pub static ref CAPTURE_REPLACE_DESCRIPTION_PAIRS: Vec<(fancy_regex::Regex, String)> = {
+        let mut rrd : Vec<(fancy_regex::Regex, String)> = vec![];
         rrd.push(
             (
                 // Protects InterPro, PANTHER, Pfam annotations from being mangled by subsequent
                 // tuples:
-                Regex::new(r"(?i)\b(?P<first>duf|pf|ipr|pthr|go|kegg|ec)(?P<second>[0-9:]+)\b").unwrap(),
+                fancy_regex::Regex::new(r"(?i)\b(?P<first>duf|pf|ipr|pthr|go|kegg|ec)(?P<second>[0-9:]+)\b").unwrap(),
                 r"$first~$second".to_string()
             )
         );
         rrd.push(
             (
                 // Transforms e.g. "eix2" into "eix" or "SBT4.15" into "SBT" - case insensitive:
-                Regex::new(r"(?i)\b(?P<first>[a-z]{2,})[-.,\d]+\b").unwrap(),
+                fancy_regex::Regex::new(r"(?i)\b(?P<first>[a-z]{2,})[-.,\d]+\b").unwrap(),
                 "$first ".to_string()
             )
         );
         rrd.push(
             (
                 // Deletes numbers like "4", "4.12", or "12-4":
-                Regex::new(r"(^|\s+)[-.\d]+(\s+|$)").unwrap(),
+                fancy_regex::Regex::new(r"(^|\s+)[-.\d]+(\s+|$)").unwrap(),
                 " ".to_string()
+            )
+        );
+        rrd.push(
+            (
+                // Deletes multiple occurrences of words using the extended fancy-regex crate
+                // syntax. Only the first mention of a word occurring multiple times is retained:
+                fancy_regex::Regex::new(r"(?i)\b(?P<first>\b\w+\b)(?P<spacer>.*)\k<first>").unwrap(),
+                r"$first$spacer".to_string()
+            )
+        );
+        rrd.push(
+            (
+                // Replace multiple adjacent whitespae characters with a single one:
+                fancy_regex::Regex::new(r"\s{2,}").unwrap(),
+                r" ".to_string()
+            )
+        );
+        rrd
+    };
+
+    /// The default vector of regular expressions _with_ match-groups to be used to post-process
+    /// ("polish") assigned human readable descriptions before using them as final output:
+    pub static ref POLISH_CAPTURE_REPLACE_PAIRS: Vec<(fancy_regex::Regex, String)> = {
+        let mut rrd : Vec<(fancy_regex::Regex, String)> = vec![];
+        rrd.push(
+            (
+                // Deletes trailing non-informative words like 'and', 'or', 'the' etc:
+                fancy_regex::Regex::new(r"(?i)\s*\b(and|or|the|from|to)\b\s*$").unwrap(),
+                r"".to_string()
             )
         );
         rrd

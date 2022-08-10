@@ -37,7 +37,7 @@ pub fn parse_table(
     stitle_col: &usize,
     blacklist_regexs: &Vec<Regex>,
     filter_regexs: &Vec<Regex>,
-    capture_replace_pairs: Option<&Vec<(Regex, String)>>,
+    capture_replace_pairs: Option<&Vec<(fancy_regex::Regex, String)>>,
     transmitter: Sender<(String, Query)>,
 ) {
     let lines =

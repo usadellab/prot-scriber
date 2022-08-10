@@ -39,7 +39,7 @@ pub fn generate_human_readable_description(
             .map(|dsc| split_descriptions(dsc, split_regex))
             .collect();
 
-        // The universe if informative words, maintaining the word-frequencies:
+        // The universe of informative words, maintaining the word-frequencies:
         let mut informative_words_universe: Vec<String> = vec![];
         for desc_words in &description_words {
             for word in desc_words {
@@ -55,44 +55,50 @@ pub fn generate_human_readable_description(
             }
         }
 
-        // Calculate the frequency of the informative universe words:
-        let word_frequencies = frequencies(&informative_words_universe);
-        let ciic: HashMap<String, f64> =
-            centered_inverse_information_content(&word_frequencies, center_at_quantile);
+        // Only continue with the process of generating a human readable description if at least a
+        // single informative word has been found:
+        if informative_words_universe.len() > 0 {
+            // Calculate the frequency of the informative universe words:
+            let word_frequencies = frequencies(&informative_words_universe);
+            let ciic: HashMap<String, f64> =
+                centered_inverse_information_content(&word_frequencies, center_at_quantile);
 
-        // Find highest scoring phrase
-        let mut phrases: Vec<(Vec<String>, f64)> = vec![];
+            // Find highest scoring phrase
+            let mut phrases: Vec<(Vec<String>, f64)> = vec![];
 
-        for desc in &description_words {
-            let hsp_option = highest_scoring_phrase(&desc, &ciic);
-            match hsp_option {
-                Some(hsp) => {
-                    phrases.push(hsp);
-                }
-                None => {}
-            }
-        }
-        if phrases.len() > 0 {
-            let mut high_score_ind: usize = 0;
-            for i in 0..phrases.len() {
-                if phrases[i].1 > phrases[high_score_ind].1 {
-                    high_score_ind = i;
-                // In case the two phrases receive an equal score, use the
-                // phrase that alphabetically comes before the other to ensure a
-                // reproducible behavior of prot-scriber
-                } else if phrases[i].1 == phrases[high_score_ind].1
-                    && phrases[i]
-                        .0
-                        .join(" ")
-                        .cmp(&phrases[high_score_ind].0.join(" "))
-                        == Less
-                {
-                    high_score_ind = i;
+            for desc in &description_words {
+                let hsp_option = highest_scoring_phrase(&desc, &ciic);
+                match hsp_option {
+                    Some(hsp) => {
+                        if !phrases.contains(&hsp) {
+                            phrases.push(hsp);
+                        }
+                    }
+                    None => {}
                 }
             }
+            if phrases.len() > 0 {
+                let mut high_score_ind: usize = 0;
+                for i in 0..phrases.len() {
+                    if phrases[i].1 > phrases[high_score_ind].1 {
+                        high_score_ind = i;
+                    // In case the two phrases receive an equal score, use the
+                    // phrase that alphabetically comes before the other to ensure a
+                    // reproducible behavior of prot-scriber
+                    } else if phrases[i].1 == phrases[high_score_ind].1
+                        && phrases[i]
+                            .0
+                            .join(" ")
+                            .cmp(&phrases[high_score_ind].0.join(" "))
+                            == Less
+                    {
+                        high_score_ind = i;
+                    }
+                }
 
-            let human_readable_description: String = phrases[high_score_ind].0.join(" ");
-            human_readable_rescription_result = Some(human_readable_description);
+                let human_readable_description: String = phrases[high_score_ind].0.join(" ");
+                human_readable_rescription_result = Some(human_readable_description);
+            }
         }
     }
     human_readable_rescription_result
@@ -666,5 +672,19 @@ mod tests {
         )
         .unwrap();
         assert_eq!(expected, result);
+
+        // Test 4:
+        hit_hrds = vec![
+            "member and protein or gene".to_string(),
+            "gene and member or protein".to_string(),
+            "member or protein".to_string(),
+        ];
+        let result_option = generate_human_readable_description(
+            &hit_hrds,
+            &(*SPLIT_DESCRIPTION_REGEX),
+            &(*NON_INFORMATIVE_WORDS_REGEXS),
+            &(*CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE),
+        );
+        assert_eq!(None, result_option);
     }
 }

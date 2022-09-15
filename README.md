@@ -126,7 +126,7 @@ conda activate prot-scriber
     <summary><b>Please read the manual of the latest stable version (<i>click to expand</i>).</b></summary>
 
 ```
-prot-scriber version 0.1.3
+prot-scriber version 0.1.4
 
 PLEASE USE '--help' FOR MORE DETAILS!
 

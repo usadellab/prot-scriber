@@ -347,7 +347,7 @@ dependencies = [
 
 [[package]]
 name = "prot-scriber"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "assert_approx_eq",
  "clap",

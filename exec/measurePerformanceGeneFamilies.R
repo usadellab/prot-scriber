@@ -214,7 +214,7 @@ mccDf<-mclapply(wordSetHRD_rowList, function(row) {
                 })
 mccTable<-do.call(rbind, mccDf)
 
-write.table(mccTable,"mcctable.txt",
+write.table(mccTable,"preliminary_results.txt",
             sep = "\t", row.names = FALSE, quote = TRUE)
 
 

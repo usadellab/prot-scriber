@@ -118,14 +118,15 @@ queries.ahrd <- if (!is.null(script.args$ahrd)) {
 } else NULL
 
 
-#########################
+#########################################################
+#' New code for gene families:
+
 #' Load prot-scriber results for queries:
 queries.prot.scriber <- read.table(script.args$`prot-scriber`, 
                                    header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 #' Speed up lockup times:
 rownames(queries.prot.scriber) <- queries.prot.scriber$Annotee.Identifier
 
-####################
 #' Load gene families results for queries:
 queries.gene.families <- read.table(script.args$`gene-families`, 
                                     header = TRUE, sep = "\t", stringsAsFactors = FALSE)
@@ -142,7 +143,7 @@ gene.families.expanded<-merge(x=queries.gene.families, y=queries.prot.scriber, b
 gene.families.expanded <- gene.families.expanded[which(gene.families.expanded$Human.Readable.Description != 
                                                      "unknown sequence family"), ]
 
-#'-a flag: -annotate-non-family-queries. Copy them to $Proteins column
+#'prot-scriber -a flag: -annotate-non-family-queries. Copy query ids to $Proteins column (2)
 substrFamily<-"Seq-Fam_"
 for(row in 1:nrow(gene.families.expanded)){
 	substrID<-substr(gene.families.expanded[row, 1], 0, 8)
@@ -150,13 +151,15 @@ for(row in 1:nrow(gene.families.expanded)){
 		gene.families.expanded[row, 2] <- paste(gene.families.expanded[row, 1])
 	}
 }
+
 #'lowercase query.id and Annotee.Identifier
 gene.families.expanded$Proteins <- tolower(gene.families.expanded$Proteins)
 gene.families.expanded$Annotee.Identifier <- tolower(gene.families.expanded$Annotee.Identifier)
 
-#' add some columns for intermediate results
+#' add some columns to check intermediate results. 
 gene.families.expanded <- cbind(gene.families.expanded,wordSet_hrd=NA, Merged.Ref.Family.Description=NA, blastWordUniverse=NA,univ.words=NA, mcc.simple=NA)
-##############
+
+#########################################################
 
 #' All query identifier that have data for performance evaluation:
 queries.sssr <- list(swissprot = blast.sprot, trembl = blast.trembl)
@@ -172,9 +175,13 @@ queries.ref.mercator <- referenceWordListFromMercator4Annos(queries.mercator)
 queries.ref <- mergeMercatorAndPfamAReferences(queries.ref.mercator, 
                                                queries.ref.pfamA)
 
+#########################################################
+#' New code for gene families:
 
 #'apply filter wordSet prot-scriber HRD gene family results
 #'find reference words set for each gene family
+#'find blast word universe set for each gene family
+#'find univ.words set for each gene family
 
 rowList<-split(gene.families.expanded, 1:nrow(gene.families.expanded))
 wordSetHRD<-mclapply(rowList,
@@ -186,29 +193,47 @@ wordSetHRD<-mclapply(rowList,
                                   all.ref.words<-union(all.ref.words, queries.ref[protein])
 				  blast.word.universe<-union(blast.word.universe, wordUniverse(protein, queries.sssr))
                                 }
-                                
-				ps.words <- wordSet(row[,3], blacklist.regexs = NULL) #wordSet prot-scriber HRD
+                                #wordSet prot-scriber for univ.words parameter
+				ps.words <- wordSet(row[,3], blacklist.regexs = NULL)
                                 univ.words<-unlist(strsplit(union(ps.words, blast.word.universe), split=' '))
 
+				#Merged reference words for each family
 				row[,5]=paste(unique(unlist(all.ref.words)), collapse = ' ')
+				#wordSet prot-scriber HRD with blacklist filter
                                 row[,4]=paste(wordSet(row[,3]), collapse = ' ')
+				#Blast word universe
 				row[,6]=paste(unique(unlist(blast.word.universe)), collapse = ' ')
+				#univ.words 
 				row[,7]=paste(unique(unlist(univ.words)), collapse = ' ')
 
+				#intermediate results: 
+				#seq-fam id
+				#HRD prot-scriber
+				#wordSet filtered HRD prot-scriber
+				#reference words
+				#blast word universe
+				#univ.words
+				#mcc.simple(empty)
                                 columns<-row[,c(1,3,4,5,6,7,8)]
                               })
 
 wordSetTable<-do.call(rbind, wordSetHRD)
 
+
 #'calculate Matthews Correlation Coefficient
+
 wordSetHRD_rowList<-split(wordSetTable, 1:nrow(wordSetTable))
 mccDf<-mclapply(wordSetHRD_rowList, function(row) {
 
-		pred<-unlist(strsplit(row[,3], split=" ")) #prot-scriber HRD
-                ref<-unlist(strsplit(row[,4], split=" ")) #merged reference vector
+		#wordSet prot-scriber HRD
+		pred<-unlist(strsplit(row[,3], split=" "))
+		#merged reference words
+                ref<-unlist(strsplit(row[,4], split=" "))
+	
          	univ.words<-unlist(strsplit(row[,6], split=" "))
 
                 mcc.simple <- mcc(pred, ref, univ.words)
+		#fill in mcc.simple column
                 row[,7]=paste(mcc.simple, collapse = ' ')
                 columns<-row[,c(1,2,3,4,5,6,7)]
                 })
@@ -218,18 +243,18 @@ write.table(mccTable,"preliminary_results.txt",
             sep = "\t", row.names = FALSE, quote = TRUE)
 
 
-
+#currently inactive due to error length(ref)==0
 #'calculate FScore
 
 #mccTable_rowList<-split(mccTable, 1:nrow(mccTable))
 
 #fscoreDf<-mclapply(mccTable_rowList,
 #                    function(row) {
-#		      pred<-unlist(strsplit(row[,3], split=" "))
+#		       pred<-unlist(strsplit(row[,3], split=" "))
 #                      ref<-unlist(strsplit(row[,4], split=" "))
 #  
 #                      fscore<-fScoreCalculator(pred, ref)
-#                      #columns<-fscore[,1:4]
+#                      columns<-fscore[,1:4]
 #                 }, mc.preschedule = FALSE)
 #fscoreTable<-do.call(rbind, fscoreDf)
 #fscoreTable<-cbind(mccTable, fscoreTable[,1:4]) #c(1,2,3,4)])

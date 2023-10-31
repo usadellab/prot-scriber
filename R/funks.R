@@ -291,8 +291,8 @@ referenceWordListFromMercator4Annos <- function(mm4.anno.tbl,
         c("35")), curate.annos.funk = getOption("referenceWordListFromMercator4Annos.curate.annos.funk",
         curateMercator4Annos)) {
     mm4.curated.tbl <- curate.annos.funk(mm4.anno.tbl)
-    filter.i <- mm4.curated.tbl$TYPE & !grepl(paste0("^",
-        paste(exclude.mm4.root.bins, collapse = "|")),
+    filter.i <- mm4.curated.tbl$TYPE & !grepl(paste0("^", "(",
+        paste(exclude.mm4.root.bins, collapse = "|"), ")"),
         mm4.anno.tbl$BINCODE)
     mm4.fltrd.tbl <- mm4.curated.tbl[filter.i,
         ]

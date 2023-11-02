@@ -93,8 +93,7 @@ parseSeqSimSearchTable <- function(path.to.table,
 #' tabular output.
 #' @export
 parseMercator4Tblout <- function(path.to.table,
-    col.names = c("BINCODE", "NAME", "IDENTIFIER",
-        "DESCRIPTION", "TYPE")) {
+    col.names = c("BINCODE", "NAME", "IDENTIFIER", "TYPE")) {
     m.dt <- fread(path.to.table, sep = "\t", header = TRUE,
         stringsAsFactors = FALSE, na.strings = "",
         quote = "")
@@ -104,8 +103,7 @@ parseMercator4Tblout <- function(path.to.table,
     #' will actually not solve this issue, because some of the Map Man Bin
     #' DESCRIPTIONS actually _conatain_ a single quote. Hence, the manual
     #' removal of leading and trailing single quotes.
-    for (col.i in c("BINCODE", "NAME", "IDENTIFIER",
-        "DESCRIPTION")) {
+    for (col.i in c("BINCODE", "NAME", "IDENTIFIER")) {
         m.dt[[col.i]] <- sub("^'", "", sub("'$",
             "", m.dt[[col.i]]))
     }
@@ -131,8 +129,8 @@ parseMercator4Tblout <- function(path.to.table,
 #' @return A filtered copy of the input argument mm4.tbl, excluding those rows
 #' where the regular expression filtering matched.
 #' @export
-filterMercator4Table <- function(mm4.tbl, exclude.bin.regexs = c("^35",
-    "^50"), bincode.col = "BINCODE") {
+filterMercator4Table <- function(mm4.tbl, exclude.bin.regexs = c("'35.",
+    "'50."), bincode.col = "BINCODE") {
     i <- do.call(`&`, lapply(exclude.bin.regexs,
         function(bin.rgx) {
             !grepl(bin.rgx, mm4.tbl[[bincode.col]],
@@ -288,20 +286,18 @@ curateMercator4Annos <- function(mm4.anno.tbl) {
 #' @export
 referenceWordListFromMercator4Annos <- function(mm4.anno.tbl,
     exclude.mm4.root.bins = getOption("referenceWordListFromMercator4Annos.exclude.mm4.root.bins",
-        c("35")), curate.annos.funk = getOption("referenceWordListFromMercator4Annos.curate.annos.funk",
-        curateMercator4Annos)) {
-    mm4.curated.tbl <- curate.annos.funk(mm4.anno.tbl)
-    filter.i <- mm4.curated.tbl$TYPE & !grepl(paste0("^", "(",
+        c("35"))) {
+    mm4.copy.tbl <- filterMercator4Table(mm4.anno.tbl)
+    filter.i <- mm4.copy.tbl$TYPE & !grepl(paste0("^", "(",
         paste(exclude.mm4.root.bins, collapse = "|"), ")"),
         mm4.anno.tbl$BINCODE)
-    mm4.fltrd.tbl <- mm4.curated.tbl[filter.i,
+    mm4.fltrd.tbl <- mm4.copy.tbl[filter.i,
         ]
     uniq.prot.ids <- unique(mm4.fltrd.tbl$IDENTIFIER)
     setNames(mclapply(uniq.prot.ids, function(prot.id) {
         i <- which(mm4.fltrd.tbl$IDENTIFIER ==
             prot.id)
-        mm4.descs <- unlist(mm4.fltrd.tbl[i, c("NAME",
-            "DESCRIPTION")])
+        mm4.descs <- unlist(mm4.fltrd.tbl[i, c("NAME")])
         unique(unlist(lapply(mm4.descs, wordSet)))
     }), uniq.prot.ids)
 }

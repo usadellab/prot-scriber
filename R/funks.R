@@ -94,7 +94,7 @@ parseSeqSimSearchTable <- function(path.to.table,
 #' @export
 parseMercator4Tblout <- function(path.to.table,
     col.names = c("BINCODE", "NAME", "IDENTIFIER", "TYPE")) {
-    m.dt <- fread(path.to.table, sep = "\t", header = TRUE,
+    m.dt <- fread(path.to.table,drop="DESCRIPTION", sep = "\t", header = TRUE,
         stringsAsFactors = FALSE, na.strings = "",
         quote = "")
     m.dt$TYPE <- !is.na(m.dt$TYPE)

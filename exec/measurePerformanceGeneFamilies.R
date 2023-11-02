@@ -238,7 +238,7 @@ mccDf<-mclapply(wordSetHRD_rowList, function(row) {
                 columns<-row[,c(1,2,3,4,5,6,7)]
                 })
 mccTable<-do.call(rbind, mccDf)
-
+mccTable<-subset(mccTable[mccTable$Merged.Ref.Family.Description!="" & mccTable$wordSet_hrd!="", ])
 write.table(mccTable,"preliminary_results.txt",
             sep = "\t", row.names = FALSE, quote = TRUE)
 
@@ -246,22 +246,22 @@ write.table(mccTable,"preliminary_results.txt",
 #currently inactive due to error length(ref)==0
 #'calculate FScore
 
-#mccTable_rowList<-split(mccTable, 1:nrow(mccTable))
-
-#fscoreDf<-mclapply(mccTable_rowList,
-#                    function(row) {
-#		       pred<-unlist(strsplit(row[,3], split=" "))
-#                      ref<-unlist(strsplit(row[,4], split=" "))
-#  
-#                      fscore<-fScoreCalculator(pred, ref)
-#                      columns<-fscore[,1:4]
-#                 }, mc.preschedule = FALSE)
-#fscoreTable<-do.call(rbind, fscoreDf)
-#fscoreTable<-cbind(mccTable, fscoreTable[,1:4]) #c(1,2,3,4)])
+mccTable_rowList<-split(mccTable, 1:nrow(mccTable))
+print("testing")
+fscoreDf<-mclapply(mccTable_rowList,
+                    function(row) {
+		      pred<-unlist(strsplit(row[,3], split=" "))
+                      ref<-unlist(strsplit(row[,4], split=" "))
+  
+                      fscore<-fScoreCalculator(pred, ref)
+                      columns<-fscore[,1:4]
+                 })
+fscoreTable<-do.call(rbind, fscoreDf)
+fscoreTable<-cbind(mccTable, fscoreTable[,1:4]) #c(1,2,3,4)])
 
 #' Save result table:
-#write.table(fscoreTable, "fscoretable.txt", 
-#            sep = "\t", row.names = FALSE, quote = TRUE)
+write.table(fscoreTable, "fscoretable.txt", 
+            sep = "\t", row.names = FALSE, quote = TRUE)
 
 ################################################################                            
 

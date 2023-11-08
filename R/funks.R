@@ -129,8 +129,8 @@ parseMercator4Tblout <- function(path.to.table,
 #' @return A filtered copy of the input argument mm4.tbl, excluding those rows
 #' where the regular expression filtering matched.
 #' @export
-filterMercator4Table <- function(mm4.tbl, exclude.bin.regexs = c("'35.",
-    "'50."), bincode.col = "BINCODE") {
+filterMercator4Table <- function(mm4.tbl, exclude.bin.regexs = c("35.",
+    "50."), bincode.col = "BINCODE") {
     i <- do.call(`&`, lapply(exclude.bin.regexs,
         function(bin.rgx) {
             !grepl(bin.rgx, mm4.tbl[[bincode.col]],

@@ -78,11 +78,11 @@ options(mc.cores = script.args$`n-cores`)
 
 #' Non default column names?
 if (!is.null(script.args$`seq-sim-tbl-column-names`)) {
-    seq.sim.tbl.col.names <- strsplit(script.args$`seq-sim-tbl-column-names`, 
-        " ")[[1]]
-    message("ALL input sequence similarity search result table are expected to have the following columns - but no actual header:\n", 
-        paste(seq.sim.tbl.col.names, collapse = ", "))
-    options(parseSeqSimSearchTable.col.names = seq.sim.tbl.col.names)
+  seq.sim.tbl.col.names <- strsplit(script.args$`seq-sim-tbl-column-names`, 
+                                    " ")[[1]]
+  message("ALL input sequence similarity search result table are expected to have the following columns - but no actual header:\n", 
+          paste(seq.sim.tbl.col.names, collapse = ", "))
+  options(parseSeqSimSearchTable.col.names = seq.sim.tbl.col.names)
 }
 
 #' Load Blast Search results of queries vs Swissprot:
@@ -141,15 +141,15 @@ gene.families.expanded<-merge(x=queries.gene.families, y=queries.prot.scriber, b
 
 #' Only process true prediction:
 gene.families.expanded <- gene.families.expanded[which(gene.families.expanded$Human.Readable.Description != 
-                                                     "unknown sequence family"), ]
+                                                         "unknown sequence family"), ]
 
 #'prot-scriber -a flag: -annotate-non-family-queries. Copy query ids to $Proteins column (2)
 substrFamily<-"Seq-Fam_"
 for(row in 1:nrow(gene.families.expanded)){
-	substrID<-substr(gene.families.expanded[row, 1], 0, 8)
-	if(substrFamily!=substrID){
-		gene.families.expanded[row, 2] <- paste(gene.families.expanded[row, 1])
-	}
+  substrID<-substr(gene.families.expanded[row, 1], 0, 8)
+  if(substrFamily!=substrID){
+    gene.families.expanded[row, 2] <- paste(gene.families.expanded[row, 1])
+  }
 }
 
 #'lowercase query.id and Annotee.Identifier
@@ -167,9 +167,47 @@ queries.sssr <- list(swissprot = blast.sprot, trembl = blast.trembl)
 #' Get the gold standard (reference) prepared:
 #' - from PfamA annotations:
 queries.ref.pfamA <- referenceWordListFromPfamAAnnos(queries.pfamA)
+#########################################################
+#new code for mercator4 references:
+
+#' remove "DESCRIPTION" column from mercator4 result table
+q.m <-subset(queries.mercator, select = -4)
+
+#' test function from funks.R
+#' filter 35 and 50 BINs
+filterMercator4Table <- function(mm4.tbl, exclude.bin.regexs = c("35.", "50."), bincode.col = "BINCODE") {
+  i <- do.call(`&`, lapply(exclude.bin.regexs,
+                           function(bin.rgx) {
+                             !grepl(bin.rgx, mm4.tbl[[bincode.col]],
+                                    perl = TRUE)
+                           }))
+  mm4.tbl[i, ]
+}
+#' apply robust 35&50 filter
+q.m<-filterMercator4Table(q.m)
+
+#' overwritten function from funks.R without "DESCRIPTION" and 35 & 50 Bins
+#' removed curateMercatorAnnos 
+referenceWordListFromMercator4Annos_geneFamilies <- function(mm4.anno.tbl,
+                                                       exclude.mm4.root.bins = getOption("referenceWordListFromMercator4Annos.exclude.mm4.root.bins",
+                                                                                         c("35"))) {
+  mm4.copy.tbl <- mm4.anno.tbl
+  filter.i <- mm4.copy.tbl$TYPE & !grepl(paste0("^", "(",
+                                                paste(exclude.mm4.root.bins, collapse = "|"), ")"),
+                                         mm4.anno.tbl$BINCODE)
+  mm4.fltrd.tbl <- mm4.copy.tbl[filter.i,
+  ]
+  uniq.prot.ids <- unique(mm4.fltrd.tbl$IDENTIFIER)
+  setNames(mclapply(uniq.prot.ids, function(prot.id) {
+    i <- which(mm4.fltrd.tbl$IDENTIFIER ==
+                 prot.id)
+    mm4.descs <- unlist(mm4.fltrd.tbl[i, c("NAME")])
+    unique(unlist(lapply(mm4.descs, wordSet)))
+  }), uniq.prot.ids)
+}
 
 #' - from Mercator (MapMan Bin) annotations:
-queries.ref.mercator <- referenceWordListFromMercator4Annos(queries.mercator)
+queries.ref.mercator <- referenceWordListFromMercator4Annos_geneFamilies(q.m)
 
 #' - join both references:
 queries.ref <- mergeMercatorAndPfamAReferences(queries.ref.mercator, 
@@ -185,37 +223,37 @@ queries.ref <- mergeMercatorAndPfamAReferences(queries.ref.mercator,
 
 rowList<-split(gene.families.expanded, 1:nrow(gene.families.expanded))
 wordSetHRD<-mclapply(rowList,
-                              function(row) {   
-                                split.prot <-unlist(strsplit(row[,2], split=","))
-                                all.ref.words<-character()
-				blast.word.universe<-character()
-                                for (protein in (split.prot)){
-                                  all.ref.words<-union(all.ref.words, queries.ref[protein])
-				  blast.word.universe<-union(blast.word.universe, wordUniverse(protein, queries.sssr))
-                                }
-                                #wordSet prot-scriber for univ.words parameter
-				ps.words <- wordSet(row[,3], blacklist.regexs = NULL)
-                                univ.words<-unlist(strsplit(union(ps.words, blast.word.universe), split=' '))
-
-				#Merged reference words for each family
-				row[,5]=paste(unique(unlist(all.ref.words)), collapse = ' ')
-				#wordSet prot-scriber HRD with blacklist filter
-                                row[,4]=paste(wordSet(row[,3]), collapse = ' ')
-				#Blast word universe
-				row[,6]=paste(unique(unlist(blast.word.universe)), collapse = ' ')
-				#univ.words 
-				row[,7]=paste(unique(unlist(univ.words)), collapse = ' ')
-
-				#intermediate results: 
-				#seq-fam id
-				#HRD prot-scriber
-				#wordSet filtered HRD prot-scriber
-				#reference words
-				#blast word universe
-				#univ.words
-				#mcc.simple(empty)
-                                columns<-row[,c(1,3,4,5,6,7,8)]
-                              })
+                     function(row) {   
+                       split.prot <-unlist(strsplit(row[,2], split=","))
+                       all.ref.words<-character()
+                       blast.word.universe<-character()
+                       for (protein in (split.prot)){
+                         all.ref.words<-union(all.ref.words, queries.ref[protein])
+                         blast.word.universe<-union(blast.word.universe, wordUniverse(protein, queries.sssr))
+                       }
+                       #wordSet prot-scriber for univ.words parameter
+                       ps.words <- wordSet(row[,3], blacklist.regexs = NULL)
+                       univ.words<-unlist(strsplit(union(ps.words, blast.word.universe), split=' '))
+                       
+                       #Merged reference words for each family
+                       row[,5]=paste(unique(unlist(all.ref.words)), collapse = ' ')
+                       #wordSet prot-scriber HRD with blacklist filter
+                       row[,4]=paste(wordSet(row[,3]), collapse = ' ')
+                       #Blast word universe
+                       row[,6]=paste(unique(unlist(blast.word.universe)), collapse = ' ')
+                       #univ.words 
+                       row[,7]=paste(unique(unlist(univ.words)), collapse = ' ')
+                       
+                       #intermediate results: 
+                       #seq-fam id
+                       #HRD prot-scriber
+                       #wordSet filtered HRD prot-scriber
+                       #reference words
+                       #blast word universe
+                       #univ.words
+                       #mcc.simple(empty)
+                       columns<-row[,c(1,3,4,5,6,7,8)]
+                     })
 
 wordSetTable<-do.call(rbind, wordSetHRD)
 
@@ -224,43 +262,43 @@ wordSetTable<-do.call(rbind, wordSetHRD)
 
 wordSetHRD_rowList<-split(wordSetTable, 1:nrow(wordSetTable))
 mccDf<-mclapply(wordSetHRD_rowList, function(row) {
-
-		#wordSet prot-scriber HRD
-		pred<-unlist(strsplit(row[,3], split=" "))
-		#merged reference words
-                ref<-unlist(strsplit(row[,4], split=" "))
-	
-         	univ.words<-unlist(strsplit(row[,6], split=" "))
-
-                mcc.simple <- mcc(pred, ref, univ.words)
-		#fill in mcc.simple column
-                row[,7]=paste(mcc.simple, collapse = ' ')
-                columns<-row[,c(1,2,3,4,5,6,7)]
-                })
+  
+  #wordSet prot-scriber HRD
+  pred<-unlist(strsplit(row[,3], split=" "))
+  #merged reference words
+  ref<-unlist(strsplit(row[,4], split=" "))
+  
+  univ.words<-unlist(strsplit(row[,6], split=" "))
+  
+  mcc.simple <- mcc(pred, ref, univ.words)
+  #fill in mcc.simple column
+  row[,7]=paste(mcc.simple, collapse = ' ')
+  columns<-row[,c(1,2,3,4,5,6,7)]
+})
 mccTable<-do.call(rbind, mccDf)
 mccTable<-subset(mccTable[mccTable$Merged.Ref.Family.Description!="" & mccTable$wordSet_hrd!="", ])
-write.table(mccTable,"preliminary_results.txt",
-            sep = "\t", row.names = FALSE, quote = TRUE)
+#write.table(mccTable,"preliminary_results.txt",
+#            sep = "\t", row.names = FALSE, quote = TRUE)
 
 
-#currently inactive due to error length(ref)==0
+
 #'calculate FScore
 
 mccTable_rowList<-split(mccTable, 1:nrow(mccTable))
 print("testing")
 fscoreDf<-mclapply(mccTable_rowList,
-                    function(row) {
-		      pred<-unlist(strsplit(row[,3], split=" "))
-                      ref<-unlist(strsplit(row[,4], split=" "))
-  
-                      fscore<-fScoreCalculator(pred, ref)
-                      columns<-fscore[,1:4]
-                 })
+                   function(row) {
+                     pred<-unlist(strsplit(row[,3], split=" "))
+                     ref<-unlist(strsplit(row[,4], split=" "))
+                     
+                     fscore<-fScoreCalculator(pred, ref)
+                     columns<-fscore[,1:4]
+                   })
 fscoreTable<-do.call(rbind, fscoreDf)
 fscoreTable<-cbind(mccTable, fscoreTable[,1:4]) #c(1,2,3,4)])
 
 #' Save result table:
-write.table(fscoreTable, "fscoretable.txt", 
+write.table(fscoreTable, "EndResults", 
             sep = "\t", row.names = FALSE, quote = TRUE)
 
 ################################################################                            

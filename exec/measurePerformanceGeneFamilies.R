@@ -298,7 +298,7 @@ fscoreTable<-do.call(rbind, fscoreDf)
 fscoreTable<-cbind(mccTable, fscoreTable[,1:4]) #c(1,2,3,4)])
 
 #' Save result table:
-write.table(fscoreTable, "EndResults", 
+write.table(fscoreTable, "EndResults.txt", 
             sep = "\t", row.names = FALSE, quote = TRUE)
 
 ################################################################                            

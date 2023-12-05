@@ -52,9 +52,9 @@ lazy_static! {
         Regex::new(r"(?i)^H0.*protein").unwrap(),
         Regex::new(r"(?i)contains.*").unwrap(),
         Regex::new(r"IPR.*").unwrap(),
+        Regex::new(r"\b\S+\|\S+\|\S+").unwrap(),
         Regex::new(r"\w{2,}\d{1,2}[gGmMcC]\d+(\.\d+)*").unwrap(),
         Regex::new(r"\b\[.*").unwrap(),
-        Regex::new(r"\b\S+\|\S+\|\S+").unwrap(),
         Regex::new(r"^(\s|/|\(|\)|-|\+|\*|,|;|\.|:|\||\d)+$").unwrap(),
         Regex::new(r"(?i)\bunknown\b").unwrap(),
         Regex::new(r"(?i)-?\blike\b").unwrap(),
@@ -118,7 +118,7 @@ lazy_static! {
             (
                 // Deletes multiple occurrences of words using the extended fancy-regex crate
                 // syntax. Only the first mention of a word occurring multiple times is retained:
-                fancy_regex::Regex::new(r"(?i)\b(?P<first>\b\w+\b)(?P<spacer>.*)\k<first>").unwrap(),
+                fancy_regex::Regex::new(r"(?i)\b(?P<first>\b\w+\b)(?P<spacer>.*)\b\k<first>").unwrap(),
                 r"$first$spacer".to_string()
             )
         );

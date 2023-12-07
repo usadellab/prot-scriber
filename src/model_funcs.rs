@@ -224,6 +224,32 @@ mod tests {
                 Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
             )
         );
+
+        // Test 7 checks that the identifier is filtered out 
+        hit_words = "sp|Q9C8M9|SRF6_ARATH Protein STRUBBELIG-RECEPTOR FAMILY 6 OS=Arabidopsis thaliana OX=3702 GN=SRF6 PE=1 SV=1".to_string();
+        expected = "protein strubbelig receptor family";
+        assert_eq!(
+            expected, 
+            filter_stitle(
+                &hit_words,
+                &(*FILTER_REGEXS),
+                Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
+            )
+        );
+
+        // Test 8 also checks that no additional letters are deleted
+        hit_words = "sp|Q6R2K2|SRF4_ARATH n Transferase Domain Containing Protein OS=Arabidopsis thaliana OX=3702 GN=SRF4 PE=2 SV=1".to_string();
+        expected = "n transferase domain containing protein";
+        assert_eq!(
+            expected, 
+            filter_stitle(
+                &hit_words,
+                &(*FILTER_REGEXS),
+                Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
+            )
+        );
+        
+
     }
 
     #[test]

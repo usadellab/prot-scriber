@@ -248,6 +248,18 @@ mod tests {
                 Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
             )
         );
+
+        // Test 8 also checks that no additional letters are deleted
+        hit_words = "sp|Q6R2K2|SRF4_ARATH P Transferase Domain Containing Protein OS=Arabidopsis thaliana OX=3702 GN=SRF4 PE=2 SV=1".to_string();
+        expected = "p transferase domain containing protein";
+        assert_eq!(
+            expected, 
+            filter_stitle(
+                &hit_words,
+                &(*FILTER_REGEXS),
+                Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
+            )
+        );
         
 
     }

@@ -118,7 +118,7 @@ lazy_static! {
             (
                 // Deletes multiple occurrences of words using the extended fancy-regex crate
                 // syntax. Only the first mention of a word occurring multiple times is retained:
-                fancy_regex::Regex::new(r"(?i)\b(?P<first>\b\w+\b)(?P<spacer>.*)\b\k<first>").unwrap(),
+                fancy_regex::Regex::new(r"(?i)\b(?P<first>\b\w+\b)(?P<spacer>.*)\b\k<first>\b").unwrap(),
                 r"$first$spacer".to_string()
             )
         );

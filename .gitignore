@@ -2,3 +2,4 @@
 man/
 data/
 tmp.*
+.Rhistory

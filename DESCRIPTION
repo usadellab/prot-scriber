@@ -17,4 +17,4 @@ Depends:
     seqinr (>= 3.6.1),
     ggplot2 (>= 3.3.0),
     RColorBrewer (>= 1.1.2)
-RoxygenNote: 7.1.0
+RoxygenNote: 7.3.1

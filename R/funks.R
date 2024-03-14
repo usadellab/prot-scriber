@@ -110,35 +110,6 @@ parseMercator4Tblout <- function(path.to.table,
     m.dt
 }
 
-#' Filter a parsed Mercator4 output table to discard Mapman-Bin annotations
-#' that come from Best Blast approaches or similar. These are Mapman-Bin
-#' Annotations that are actually not derived from Hidden Markov Model sequence
-#' similarity search resuls, meaning that these annotations are not based on
-#' curated protein families sharing similar function.
-#'
-#' @param mm4.tbl - An instance of data.table holding the parsed content of a
-#' Mercator4 output table. See function parseMercator4Tblout for details.
-#' @param exclude.bin.regexs - A character vector of Perl syntax regular
-#' expression to be matched with the bincode.col of the input mm4.tbl. All
-#' matching rows will be excluded by this filtering function. Default is
-#' c('^35', '^50')
-#' @param bincode.col - The name (string) of the column upon which to apply the
-#' regular expression based identification of to be excluded columns. Default
-#' is 'BINCODE'.
-#'
-#' @return A filtered copy of the input argument mm4.tbl, excluding those rows
-#' where the regular expression filtering matched.
-#' @export
-filterMercator4Table <- function(mm4.tbl, exclude.bin.regexs = c("35.",
-    "50."), bincode.col = "BINCODE") {
-    i <- do.call(`&`, lapply(exclude.bin.regexs,
-        function(bin.rgx) {
-            !grepl(bin.rgx, mm4.tbl[[bincode.col]],
-                perl = TRUE)
-        }))
-    mm4.tbl[i, ]
-}
-
 #' Parse HMMER3 `--tblout` tabular output. Because this is a fixed width table
 #' and no quoting is done, parsing it is quite a challange. This function uses
 #' `data.table::fread` with a sophisticated combination of `sed` and `awk` to
@@ -206,7 +177,7 @@ wordSet <- function(in.desc, split.regex = getOption("splitDescriptionIntoWordSe
         desc.words <- strsplit(in.desc, split = split.regex,
             perl = TRUE)[[1]]
         dw.retain.bool <- if (length(blacklist.regexs) >
-            0 && !is.na(blacklist.regexs)) {
+            0) {
             "" != lapply(desc.words, applyRegexList,
                 regexs = blacklist.regexs)
         } else {
@@ -272,7 +243,7 @@ curateMercator4Annos <- function(mm4.anno.tbl) {
 #' @param exclude.mm4.root.bins - A character vector of Map-Man 4 root Bins to
 #' be excluded as reference annotations. Default is
 #' getOption('referenceWordListFromMercator4Annos.exclude.mm4.root.bins',
-#' c('35'))
+#' c('35', '50'))
 #' @param curate.annos.funk - A function receiving the single argument
 #' `mm4.anno.tbl` and returning a subset of it. Can be used to preprocess e.g.
 #' annotation of BIN 50 to filter out best Blast Hit descriptions. Default does
@@ -286,12 +257,12 @@ curateMercator4Annos <- function(mm4.anno.tbl) {
 #' @export
 referenceWordListFromMercator4Annos <- function(mm4.anno.tbl,
     exclude.mm4.root.bins = getOption("referenceWordListFromMercator4Annos.exclude.mm4.root.bins",
-        c("35"))) {
-    mm4.copy.tbl <- filterMercator4Table(mm4.anno.tbl)
-    filter.i <- mm4.copy.tbl$TYPE & !grepl(paste0("^", "(",
+        c("35", "50"))) {
+    #' mm4.filtered.tbl <- filterMercator4Table(mm4.anno.tbl)
+    filter.i <- mm4.anno.tbl$TYPE & !grepl(paste0("^", "(",
         paste(exclude.mm4.root.bins, collapse = "|"), ")"),
         mm4.anno.tbl$BINCODE)
-    mm4.fltrd.tbl <- mm4.copy.tbl[filter.i,
+    mm4.fltrd.tbl <- mm4.anno.tbl[filter.i,
         ]
     uniq.prot.ids <- unique(mm4.fltrd.tbl$IDENTIFIER)
     setNames(mclapply(uniq.prot.ids, function(prot.id) {

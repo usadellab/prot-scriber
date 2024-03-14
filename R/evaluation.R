@@ -72,7 +72,7 @@ matthewsCorrelationCoefficient <- function(pred, ref,
     } else {
         NA
     }
-    if (length(ref) == 0 || is.na(ref)) {
+    if (length(ref) == 0 || all(is.na(ref))) {
         #' No references means we cannot compute a MCC:
         data.frame(Protein.ID = prot.id, HRD = hrd, 
             n.words = length(pred), univ.words = length(univ.words), 
@@ -203,7 +203,7 @@ fScore <- function(pred, ref, univ.words, prot.id,
     } else {
         as.character(NA)
     }
-    if (length(ref) == 0 || is.na(ref)) {
+    if (length(ref) == 0 || all(is.na(ref))) {
         #' No references means we cannot compute a F-Score:
         data.frame(Protein.ID = prot.id, HRD = hrd, 
             n.words = length(pred), precision = NA, 

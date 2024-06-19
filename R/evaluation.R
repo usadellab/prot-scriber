@@ -838,24 +838,13 @@ measurePredictionsPerformance <- function(
       query.id,
       sssr
     ))
-    #' TODO:
-    #' intersect references and blat hit description word-sets to be fair.
-    #'
-    #' If requested reduce reference words to the "fair" list of references, i.e.
-    #' only those words that the predictors "Best Blast" and "prot-scriber" can
-    #' choose from which is the intersection of our "gold standard" (Pfam-A and
-    #' Mercator/Mapman Bin descriptions; queries.ref) and the words appearing in
-    #' Blast Hit descriptions (queries.sssr):
     if (use.fair.references) {
-      #' For each query identifier in 'query.ids' intersect reference (the query's
-      #' "ref"; see queries.ref) and prediction (the query's "sssr"; see
-      #' queries.sssr) word-sets:
-      #' To Do: Faensern please write a function (or two) that does the above.
-      #' intersectPredictionsAndReferences(query.ids, queries.sssr, queries.ref)
-      #' gene-id is key in queries.ref, and in the table queries.sssr[["swissprot"]]
-      #' sp.tbl <- queries.sssr[["swissprot"]]
-      #'
-      query.ref <- intersect(refs, univ.words)
+      #' If requested reduce reference words to the "fair" list of references,
+      #' i.e. only those words that the predictors "Best Blast" and
+      #' "prot-scriber" can choose from which is the intersection of our "gold
+      #' standard" (Pfam-A and Mercator/Mapman Bin descriptions; queries.ref)
+      #' and the words appearing in Blast Hit descriptions (queries.sssr):
+      query.ref <- intersect(refs[[query.id]], univ.words)
     }
     best.blast.performance <- bestBlastHrds(
       query.id,

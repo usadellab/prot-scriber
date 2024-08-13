@@ -473,27 +473,29 @@ bestProtScriberPhrases <- function(
 #' @return A character vector of unique words found in the HRDs of the argument
 #' query sequence's ('prot.id') sequence similarity search Hits.
 #' @export
-wordUniverse <- function(prot.id, sssr, to.lower = getOption(
-                           "wordUniverse.to.lower",
-                           TRUE
-                         )) {
-  univ.words <- unique(unlist(lapply(sssr, function(seq.sim.tbl) {
-    hits.ind <- which(seq.sim.tbl$qseqid == prot.id)
-    if (length(hits.ind) > 0) {
-      unlist(lapply(
-        seq.sim.tbl[hits.ind, ]$HRD,
-        wordSet
-      ))
+wordUniverse <-
+  function(prot.id, sssr,
+           to.lower = getOption(
+             "wordUniverse.to.lower",
+             TRUE
+           )) {
+    univ.words <- unique(unlist(lapply(sssr, function(seq.sim.tbl) {
+      hits.ind <- which(seq.sim.tbl$qseqid == prot.id)
+      if (length(hits.ind) > 0) {
+        unlist(lapply(
+          seq.sim.tbl[hits.ind, ]$HRD,
+          wordSet
+        ))
+      } else {
+        character(0)
+      }
+    })))
+    if (to.lower) {
+      tolower(univ.words)
     } else {
-      character(0)
+      univ.words
     }
-  })))
-  if (to.lower) {
-    tolower(univ.words)
-  } else {
-    univ.words
   }
-}
 
 #' Generate short human readable descriptions (HRD) for all query proteins in
 #' the argument sequence similarity search results 'sssr' using the Best Blast
@@ -802,7 +804,8 @@ annotateProteinsAndEvaluatePerformance.MultiRegion <- function(
 #' calculation fair, because the competitors "Best Blast" and "prot-scriber"
 #' can only use words that appear in Blast Hit Descriptions, they cannot
 #' annotate words that appear in Pfam or Mercator but not in the Blast Hit
-#' Descriptions. Hence those words should not result in worse scores.
+#' Descriptions. Hence those words should not result in worse scores. Default
+#' is "TRUE".
 #'
 #' @return An instance of base::data.frame with the following columns:
 #' 'Protein.ID', 'F.Score', 'precision' 'recall', 'fScore.beta', 'HRD'
@@ -832,8 +835,8 @@ measurePredictionsPerformance <- function(
     } else {
       c()
     }
-    #' To Do: Word universe should be the union of references and all words
-    #' that appear in Blast Hit Descriptions (all lowercase)
+    #' Word universe should be the union of references and all words that
+    #' appear in Blast Hit Descriptions (all lowercase)
     univ.words <- union(ps.words, wordUniverse(
       query.id,
       sssr
@@ -933,6 +936,179 @@ measurePredictionsPerformance <- function(
     } else {
       rslt
     }
+  } else {
+    message(
+      "WARNING: Could not find query.id '",
+      query.id, "' in references."
+    )
+    NULL
+  }
+}
+
+#' For each gene family in the argument 'gene.fam.tbl' the sequence similarity
+#' search result tables in argument 'prot.sssr' is searched. All Human Readable
+#' Descriptions (HRDs) found in Blast Hits for a gene family's proteins are
+#' processed, split into words, these are lowercased and joined in a character
+#' vector of "universe words" representing all words that were available to
+#' prot-scriber to generate a HRD for this family from. These universe words
+#' can e.g. be used to calculate the TRUE NEGATIVE RATE.
+#'
+#' @param gene.fam.tbl - An instance of data.table with two character columns:
+#' "Annotee.Identifier", "Proteins". The former holds the gene family
+#' identifiers and the latter character vectors of proteins that belong to the
+#' respective gene families.
+#' @param sssr - A named list, in which names represent searched reference
+#' sequence databases and values the read in tabular output (see function
+#' parseSeqSimSearchTable).
+#' @param gene.family.prot.id.split.regex - A regular expression used to split
+#' a string holding a list of protein identiers into a character vector of
+#' those identifiers using base::strsplit. Default is "\\s*,\\s*|\\s+".
+#'
+#' @return A named list, in which names represent the gene family identifiers
+#' and values are character vectors of unique (mathematical set) universe words
+#' in lowercase. The words are extracted by splitting the human readable
+#' descriptions of Blast HIts found for each gene family's proteins into words.
+#' @export
+geneFamilyWordUniverses <-
+  function(gene.fam.tbl, prot.sssr, gene.family.prot.id.split.regex = "[\\s,|]") {
+    Reduce(append, mclapply(1:nrow(gene.fam.tbl), function(row.i) {
+      fam.id <- gene.fam.tbl$Annotee.Identifier[[row.i]]
+      fam.prot.ids <- strsplit(
+        gene.fam.tbl$Proteins[[row.i]],
+        gene.family.prot.id.split.regex,
+        perl = TRUE
+      )[[1]]
+      if (length(fam.prot.ids) > 0) {
+        fam.univ.words <- unique(unlist(lapply(
+          fam.prot.ids, function(prot.id) {
+            wordUniverse(
+              prot.id,
+              prot.sssr
+            )
+          }
+        )))
+        if (length(fam.univ.words) > 0) {
+          #' return
+          setNames(list(fam.univ.words), fam.id)
+        } #' else return NULL
+      }
+    }))
+  }
+
+#' Measures performance of query gene family function prediction generated by
+#' prot-scriber using the provided argument "gold standard", references
+#' obtained from trustworthy annotators like Pfam-A and Mercator 4.
+#'
+#' @param query.id - A string representing the gene family identifier for which
+#' prot-scriber generated an output, i.e. a Human Readable Description (HRDs).
+#' @param ps.res - An instance of base::data.frame with two columns
+#' 'Annotee.Identifier' and 'Human.Readable.Description'. The table holds the
+#' results of prot-scriber for the respective queries. Note that this table is
+#' expected to have been produced by the Rust implementation of prot-scriber.
+#' @param refs - A named list in which for the argument query.id a vector of
+#' strings is expected to hold the 'truth', i.e. the words expected to be
+#' reproduced by the competing annotators. Currently generated by Mercator and
+#' HMMER3 on Pfam.
+#' @param word.univs - A named list, in which the names refer to the gene
+#' family identifiers, including the argument 'query.id', and values are
+#' character vectors of words extracted from the Blast Hit Descriptions found
+#' for any protein that belongs to the respective gene family. These word
+#' universes are used to calculate true negatives. Also see argument
+#' 'use.fair.references' below.
+#' @param ps.na.hrd - A string representing the default HRD prot-scriber
+#' annotates if none of the input Blast Hits (of the respective query) survive
+#' blacklisting. This default HRD must be interpreted as NA and not literally
+#' in order to avoid scoring this default HRD more negatively than necessary.
+#' Default is 'ps.na.hrd = getOption('ps.na.hrd.gene.fam', 'unknown sequence
+#' family')'
+#' @param use.fair.references - A logical (boolean) switch indicating whether
+#' the word set of the references should be reduced to the intersection of gold
+#' standard (Pfam-A and Mercator/Mapman Bin descriptions) and the words
+#' appearing in ALL Blast Hit Descriptions. This makes the performance
+#' calculation fair, because "prot-scriber" can only use words that appear in
+#' Blast Hit Descriptions, it cannot annotate words that appear in Pfam or
+#' Mercator but not in the Blast Hit Descriptions. Hence those words should not
+#' result in worse scores. Default is "TRUE".
+#'
+#' @return An instance of base::data.frame with the following columns:
+#' 'Family.ID', 'F.Score', 'precision' 'recall', 'fScore.beta', 'HRD'
+#' 'n.words', 'F.Score.relative', 'F.Score.best.possible' 'MCC',
+#' 'MCC.relative', 'MCC.best.possible' 'univ.words', 'ref.words',
+#' 'univ.ref.words'
+#' @export
+measurePredictionPerformanceForGeneFamily <- function(
+    query.id,
+    ps.res, refs, word.univs, ps.na.hrd = getOption(
+      "ps.na.hrd.gene.fam",
+      "unknown sequence family"
+    ), use.fair.references = TRUE) {
+  if (query.id %in% names(refs)) {
+    #' Best Blast Hits' performance:
+    query.ref <- refs[[query.id]]
+    #' The Rust implementation of prot-scriber actually adds words to the
+    #' universe, because it used regular expressions and capture-groups to
+    #' split stitle (Blast Hit descriptions) into words. See Rust module
+    #' 'generate_hrd_associated_funcs.rs' function 'split_descriptions' for
+    #' details. Thus, we need to add words from the prot-scriber annotation to
+    #' the word universe:
+    ps.words <- if (query.id %in% ps.res$Annotee.Identifier) {
+      wordSet(ps.res[[query.id, "Human.Readable.Description"]],
+        blacklist.regexs = NULL
+      )
+    } else {
+      c()
+    }
+    #' A mathematical set of words generated from all Human Readable
+    #' Descriptions (HRDs) found for proteins that belong to this gene family
+    #' (query.id):
+    univ.words <- word.univs[[query.id]]
+    if (use.fair.references) {
+      #' If requested reduce reference words to the "fair" list of references,
+      #' i.e. only those words that the predictors "Best Blast" and
+      #' "prot-scriber" can choose from which is the intersection of our "gold
+      #' standard" (Pfam-A and Mercator/Mapman Bin descriptions; queries.ref)
+      #' and the words appearing in Blast Hit descriptions (queries.sssr):
+      query.ref <- intersect(refs[[query.id]], univ.words)
+    }
+
+    #' prot-scriber performance:
+    query.ps.hrd <- if (query.id %in% ps.res$Annotee.Identifier) {
+      ps.hrd <- ps.res[[query.id, "Human.Readable.Description"]]
+      if (ps.hrd == ps.na.hrd) {
+        #' prot-scriber annotates queries with a default HRD if none of
+        #' the Blast Hits survived black-listing. This default HRD must
+        #' be interpreted as NA, not literally:
+        NA
+      } else {
+        ps.hrd
+      }
+    } else {
+      NA
+    }
+    ps.n.words <- if (is.na(query.ps.hrd)) {
+      0
+    } else {
+      length(strsplit(query.ps.hrd, " ")[[1]])
+    }
+    #' "Fake" the original experiment that compared several prot-scriber
+    #' algorithms. We are now in a version that already has a stable
+    #' implementation in Rust, i.e. we know what the best solution for
+    #' prot-scriber is:
+    query.ps.tbl <- data.frame(
+      HRD = query.ps.hrd,
+      n.words = ps.n.words, stringsAsFactors = FALSE
+    )
+    prot.scriber.performance <- bestProtScriberPhrases(
+      query.id,
+      query.ps.tbl, 2, query.ref, univ.words
+    )
+    #' Correct problem arising from legacy code which causes prot-scriber
+    #' to appear as '2' in column 'Method' of data.frame
+    #' 'prot.scriber.performance':
+    prot.scriber.performance$Method <- "prot-scriber"
+
+    #' Result:
+    prot.scriber.performance
   } else {
     message(
       "WARNING: Could not find query.id '",

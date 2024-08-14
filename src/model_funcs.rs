@@ -225,11 +225,11 @@ mod tests {
             )
         );
 
-        // Test 7 checks that the identifier is filtered out 
+        // Test 7 checks that the identifier is filtered out
         hit_words = "sp|Q9C8M9|SRF6_ARATH Protein STRUBBELIG-RECEPTOR FAMILY 6 OS=Arabidopsis thaliana OX=3702 GN=SRF6 PE=1 SV=1".to_string();
         expected = "protein strubbelig receptor family";
         assert_eq!(
-            expected, 
+            expected,
             filter_stitle(
                 &hit_words,
                 &(*FILTER_REGEXS),
@@ -241,7 +241,7 @@ mod tests {
         hit_words = "sp|Q6R2K2|SRF4_ARATH n Transferase Domain Containing Protein OS=Arabidopsis thaliana OX=3702 GN=SRF4 PE=2 SV=1".to_string();
         expected = "n transferase domain containing protein";
         assert_eq!(
-            expected, 
+            expected,
             filter_stitle(
                 &hit_words,
                 &(*FILTER_REGEXS),
@@ -249,19 +249,42 @@ mod tests {
             )
         );
 
-        // Test 8 also checks that no additional letters are deleted
+        // Test 9 also checks that no additional letters are deleted
         hit_words = "sp|Q6R2K2|SRF4_ARATH P Transferase Domain Containing Protein OS=Arabidopsis thaliana OX=3702 GN=SRF4 PE=2 SV=1".to_string();
         expected = "p transferase domain containing protein";
         assert_eq!(
-            expected, 
+            expected,
             filter_stitle(
                 &hit_words,
                 &(*FILTER_REGEXS),
                 Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
             )
         );
-        
 
+        // Test 10 checks that the Drosophila specific HRD description prefix 'LOW QUALITY
+        // PROTEIN:' is removed:
+        hit_words = "tr|A0A6P4E2J9|A0A6P4E2J9_DRORH LOW QUALITY PROTEIN: muscarinic acetylcholine receptor DM1 OS=Drosophila rhopaloa OX=1041015 GN=LOC108039593 PE=3 SV=1".to_string();
+        expected = "muscarinic acetylcholine receptor dm";
+        assert_eq!(
+            expected,
+            filter_stitle(
+                &hit_words,
+                &(*FILTER_REGEXS),
+                Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
+            )
+        );
+
+        // Test 11 checks that the Drosophila specific HRD description prefix 'Blast:' is removed:
+        hit_words = "tr|A0A3B0K592|A0A3B0K592_DROGU Blast:Homeobox protein abdominal-A OS=Drosophila guanche OX=7266 GN=DGUA_6G017991 PE=3 SV=1".to_string();
+        expected = "homeobox protein abdominal a";
+        assert_eq!(
+            expected,
+            filter_stitle(
+                &hit_words,
+                &(*FILTER_REGEXS),
+                Some(&(*CAPTURE_REPLACE_DESCRIPTION_PAIRS))
+            )
+        );
     }
 
     #[test]

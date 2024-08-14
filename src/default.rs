@@ -47,6 +47,7 @@ lazy_static! {
     /// The default regular expressions used to filter a Hit title (`stitle`) and retain the short
     /// human readable description.
     pub static ref FILTER_REGEXS: Vec<Regex> = vec![
+        Regex::new(r"(?i)low\s+quality\s+protein:").unwrap(),
         Regex::new(r"\sOS=.*$").unwrap(),
         Regex::new(r"(?i)OS.*[.].*protein").unwrap(),
         Regex::new(r"(?i)^H0.*protein").unwrap(),
@@ -72,7 +73,6 @@ lazy_static! {
         Regex::new(r"(?i)\bfragment\b").unwrap(),
         Regex::new(r"(?i)\bcontig\b").unwrap(),
         Regex::new(r"(?i)\bblast:\b").unwrap(),
-        Regex::new(r"(?i)\blow quality protein:\b").unwrap(),
         ];
 
     /// The default header definition of sequence similarity search result tables, i.e. mapping

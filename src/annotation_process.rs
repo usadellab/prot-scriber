@@ -355,7 +355,7 @@ impl AnnotationProcess {
         stored_query.n_parsed_from_sssr_tables += 1;
         // Have all input SSSR files provided data for the argument `query`?
         if stored_query.n_parsed_from_sssr_tables == self.seq_sim_search_tables.len() as u16 {
-            drop(stored_query);
+            let _ = stored_query;
             // If yes, then process the parsed data:
             self.process_query_data_complete(qacc);
         }

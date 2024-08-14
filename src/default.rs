@@ -72,6 +72,7 @@ lazy_static! {
         Regex::new(r"(?i)\bfragment\b").unwrap(),
         Regex::new(r"(?i)\bcontig\b").unwrap(),
         Regex::new(r"(?i)\bblast:\b").unwrap(),
+        Regex::new(r"(?i)\blow quality protein:\b").unwrap(),
         ];
 
     /// The default header definition of sequence similarity search result tables, i.e. mapping

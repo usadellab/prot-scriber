@@ -79,9 +79,71 @@ pub fn parse_table(
         }
     }
 
-    // Send last parsed query:
-    if curr_query.hits.len() > 0 && !last_qacc.is_empty() {
+    // Send last parsed query. Note this must NOT require `curr_query.hits` to be non-empty: the
+    // qacc-change branch above always sends `curr_query` regardless of whether any hits survived
+    // blacklist/filtering, so a query whose hits are all blacklisted (e.g. every Hit is
+    // "hypothetical protein") must be sent here too, or it is silently dropped from the
+    // annotation process entirely whenever it happens to be the last query in the file -- instead
+    // of being registered with zero hits and annotated as "unknown protein", like an otherwise
+    // identical query positioned anywhere else in the (sorted) input file:
+    if !last_qacc.is_empty() {
         transmitter.send((last_qacc, curr_query)).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::default::{BLACKLIST_STITLE_REGEXS, FILTER_REGEXS};
+    use std::collections::HashMap;
+    use std::sync::mpsc;
+
+    // Regression test for a bug where a query is silently dropped -- never sent to the receiver
+    // at all -- if (a) every one of its Hit descriptions matches a blacklist regex (e.g.
+    // "hypothetical protein") AND (b) it happens to be the last `qacc` block in the input file.
+    // Every other position in the file is unaffected by (a) alone, because the qacc-change branch
+    // inside the parsing loop always sends the accumulated `curr_query` regardless of whether any
+    // of its hits survived blacklist/filtering; only the trailing send after the loop, for the
+    // very last query block, additionally requires `curr_query.hits` to be non-empty -- which an
+    // all-blacklisted last query never is. The practical impact: such a query does not even show
+    // up as "unknown protein" in the output. It just vanishes, and whether it does so depends
+    // purely on its position in the (correctly sorted) input file, not on its data.
+    #[test]
+    fn parse_table_sends_last_query_even_if_all_its_hits_are_blacklisted() {
+        let path = Path::new("misc")
+            .join("tmp_test_parse_table_last_query_all_blacklisted.txt")
+            .to_str()
+            .unwrap()
+            .to_string();
+        std::fs::write(
+            &path,
+            concat!(
+                "Query1\tHit1\tsome informative kinase domain\n",
+                "Query2\tHit2\thypothetical protein\n"
+            ),
+        )
+        .unwrap();
+
+        let (tx, rx) = mpsc::channel();
+        parse_table(
+            &path,
+            &'\t',
+            &0,
+            &1,
+            &2,
+            &BLACKLIST_STITLE_REGEXS,
+            &FILTER_REGEXS,
+            None,
+            tx,
+        );
+        std::fs::remove_file(&path).unwrap();
+
+        let received: HashMap<String, Query> = rx.into_iter().collect();
+        assert!(received.contains_key("Query1"));
+        // Query2 is the last block in the file and all its hits are blacklisted ("hypothetical
+        // protein"); it must still be reported, with zero surviving hits, not silently dropped:
+        assert!(received.contains_key("Query2"));
+        assert!(received.get("Query2").unwrap().hits.is_empty());
     }
 }
 

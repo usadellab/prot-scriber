@@ -14,7 +14,7 @@ use super::seq_sim_table_reader::parse_table;
 use num_cpus;
 use rayon::prelude::*;
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
@@ -45,6 +45,12 @@ pub struct AnnotationProcess {
     /// The in memory database of parsed sequence similarity search results in terms of Queries
     /// with their respective Hits.
     pub queries: HashMap<String, Query>,
+    /// The set of query identifiers for which all input SSST files have already contributed their
+    /// data, i.e. for which `process_query_data_complete` has already run. Tracked independently
+    /// of `human_readable_descriptions` to detect unsorted input (see `insert_query`): in
+    /// `AnnotationProcessMode::FamilyAnnotation` `human_readable_descriptions` is keyed by
+    /// seq-family-id, not query-id, so it cannot serve that purpose in that mode.
+    pub completed_query_ids: HashSet<String>,
     /// The in memory database of biological sequence families, i.e. sets of query identifiers, to
     /// be annotated with human readable descriptions. Keys are the families identifier and values
     /// are the SeqFamily instances.
@@ -308,6 +314,7 @@ impl AnnotationProcess {
             ssst_capture_replace_pairs: vec![],
             ssst_field_separators: vec![],
             queries: HashMap::new(),
+            completed_query_ids: HashSet::new(),
             seq_families: HashMap::new(),
             seq_family_id_genes_separator: (*SPLIT_GENE_FAMILY_ID_FROM_GENE_SET).to_string(),
             seq_family_gene_ids_separator: (*SPLIT_GENE_FAMILY_GENES_REGEX).to_string(),
@@ -339,9 +346,12 @@ impl AnnotationProcess {
     ///                    self.queries.
     /// * `query: Query` - A reference to the query to be inserted into the in memory database.
     pub fn insert_query(&mut self, qacc: String, query: Query) {
-        // panic! if query.id already in results, this means the input SSSR files were not sorted
-        // by query identifiers (`qacc` in Blast terminology):
-        if self.human_readable_descriptions.contains_key(&qacc) {
+        // panic! if query.id was already completed, this means the input SSSR files were not
+        // sorted by query identifiers (`qacc` in Blast terminology). Note this must check
+        // `completed_query_ids`, and not e.g. `human_readable_descriptions`: in
+        // `AnnotationProcessMode::FamilyAnnotation` the latter is keyed by seq-family-id, not
+        // query-id, so relying on it silently misses this exact problem in family mode.
+        if self.completed_query_ids.contains(&qacc) {
             panic!( "\n\nFound an unexpected occurrence of query {:?} while parsing input files. Make sure your sequence similarity search result tables are sorted by query identifiers, i.e. `qacc` in Blast terminology. Use GNU sort, e.g. `sort -k <qacc-col-no> <your-blast-out-table>`.\n\n", &qacc);
         }
         if !self.queries.contains_key(&qacc) {
@@ -356,6 +366,7 @@ impl AnnotationProcess {
         // Have all input SSSR files provided data for the argument `query`?
         if stored_query.n_parsed_from_sssr_tables == self.seq_sim_search_tables.len() as u16 {
             let _ = stored_query;
+            self.completed_query_ids.insert(qacc.clone());
             // If yes, then process the parsed data:
             self.process_query_data_complete(qacc);
         }
@@ -918,11 +929,40 @@ mod tests {
         let nq1 = Query::new();
         let qacc = "Soltu.DM.02G015700.1".to_string();
 
-        // Mark nq1 as already processed:
-        ap.human_readable_descriptions
-            .insert(qacc.clone(), "Unknown protein".to_string());
+        // Mark qacc as already completed, simulating that all input SSST files already fully
+        // reported this query once before, as happens after a legitimate first completion:
+        ap.completed_query_ids.insert(qacc.clone());
         // Should panic:
         ap.insert_query(qacc, nq1);
+    }
+
+    // Regression test: the "unsorted input" duplicate-detection only works in
+    // `AnnotationProcessMode::SequenceAnnotation`, because it checks
+    // `human_readable_descriptions.contains_key(&qacc)`. In
+    // `AnnotationProcessMode::FamilyAnnotation`, however, `human_readable_descriptions` is keyed
+    // by seq-family-id, not query-id (see `annotate_seq_family`), so the very same qacc
+    // reappearing non-contiguously -- i.e. the input table was not sorted by qacc -- goes
+    // completely undetected: the second, spurious `Query` is silently inserted as an orphan
+    // (since `annotate_seq_family` has already removed the query from `self.queries` and
+    // `query_id_to_seq_family_id_index` once its family got annotated) and its data is lost
+    // without a warning, instead of causing the same loud panic as in sequence-annotation mode.
+    #[test]
+    #[should_panic]
+    fn insert_query_panics_in_case_of_unsorted_blast_table_in_family_mode() {
+        let mut ap = AnnotationProcess::new();
+        ap.seq_sim_search_tables = vec!["blast_out_table.txt".to_string()];
+        let qacc = "Soltu.DM.02G015700.1".to_string();
+        let mut sf1 = SeqFamily::new();
+        sf1.query_ids = vec![qacc.clone()];
+        ap.insert_seq_family("SeqFamily1".to_string(), sf1);
+
+        // First (legitimate) arrival of the query's data completes and annotates the family:
+        ap.insert_query(qacc.clone(), Query::new());
+        assert!(ap.human_readable_descriptions.contains_key("SeqFamily1"));
+
+        // A second, non-contiguous arrival of the very same qacc (as would happen with an
+        // unsorted input file) must panic instead of being silently dropped as an orphan:
+        ap.insert_query(qacc, Query::new());
     }
 
     #[test]

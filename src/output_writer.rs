@@ -13,9 +13,15 @@ pub fn write_output_table(
 ) -> std::io::Result<()> {
     if human_readable_descriptions.keys().len() > 0 {
         let mut output = String::from("Annotee-Identifier\tHuman-Readable-Description");
+        // Sorted by annotee, not in HashMap order. RandomState seeds every map afresh, so
+        // iterating the map directly emitted the same annotations in a different line order on
+        // every run: two output files with identical content had different checksums, and diffing
+        // one run against another showed the whole table as changed.
+        let mut annotees: Vec<&String> = human_readable_descriptions.keys().collect();
+        annotees.sort();
         // stream write line after line
-        // iterate over entries in argument human_readable_descriptions
-        for (annotee_name, annotation) in human_readable_descriptions {
+        for annotee_name in annotees {
+            let annotation = &human_readable_descriptions[annotee_name];
             output.push_str(&(format!("\n{}\t{}", annotee_name, annotation)));
         }
         // add trailing newline for the last annotation

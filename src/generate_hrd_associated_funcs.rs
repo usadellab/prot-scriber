@@ -310,7 +310,30 @@ pub fn word_scores_quantile(values: &Vec<(String, f64)>, tau: f64) -> f64 {
             &tau
         );
     }
-    let scores: Vec<f64> = values.iter().map(|(_, s)| (*s)).collect();
+    let mut scores: Vec<f64> = values.iter().map(|(_, s)| (*s)).collect();
+    // Sorted so that this function depends only on the SET of scores it is handed, never on the
+    // order they arrive in -- and they arrive in the order of a HashMap, whose iteration Rust's
+    // RandomState seeds afresh for every map.
+    //
+    // It matters because of the `tau == 50.0` branch below, the one the default
+    // CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE takes: floating point addition is not
+    // associative, so the same scores summed in two orders give a mean differing in its last bits.
+    // Those last bits are not harmless. Every word score is centred by subtracting this value, and
+    // generate_human_readable_description picks between equally scoring phrases with a tie-break
+    // that fires only on EXACT f64 equality, so a one-ULP shift silently handed a query a
+    // different description.
+    //
+    // This one sort is enough for the whole path. Everything upstream is already
+    // order-independent: each word's inverse information content is computed on its own, and the
+    // frequency total it divides by is a sum of integer counts, which is exact in f64 in any
+    // order. Everything downstream is too: the centred scores go into a HashMap by key.
+    //
+    // The `else` branch needs no sorting of its own -- Data::quantile sorts internally -- but
+    // sorting here first costs it nothing and keeps the guarantee in one place.
+    scores.sort_by(|a, b| {
+        a.partial_cmp(b)
+            .expect("word scores must be comparable; NaN cannot be ordered")
+    });
     let mut scores_data = Data::new(scores);
     if tau == 50.0 {
         scores_data.mean().unwrap()
@@ -322,6 +345,70 @@ pub fn word_scores_quantile(values: &Vec<(String, f64)>, tau: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Two orderings of the SAME ten word scores, found by summing a realistic score vector in
+    /// many random orders and keeping the two extremes. Added naively they give means one ULP
+    /// apart, and that difference is the whole bug: it reaches every centred word score and flips
+    /// the exact-equality tie-break in `generate_human_readable_description`.
+    #[test]
+    fn test_word_scores_quantile_ignores_the_order_of_its_input() {
+        let one_order: Vec<(String, f64)> = [
+            0.04652001563489282_f64,
+            0.1466034741918754,
+            0.02298951822469872,
+            0.22884157242884753,
+            0.02298951822469872,
+            0.17327172127403667,
+            0.22884157242884753,
+            0.0953101798043249,
+            0.04652001563489282,
+            0.07061756721395329,
+        ]
+        .iter()
+        .map(|v| (String::new(), *v))
+        .collect();
+        let another_order: Vec<(String, f64)> = [
+            0.02298951822469872_f64,
+            0.22884157242884753,
+            0.02298951822469872,
+            0.04652001563489282,
+            0.22884157242884753,
+            0.0953101798043249,
+            0.04652001563489282,
+            0.1466034741918754,
+            0.17327172127403667,
+            0.07061756721395329,
+        ]
+        .iter()
+        .map(|v| (String::new(), *v))
+        .collect();
+
+        let mut left: Vec<f64> = one_order.iter().map(|(_, v)| *v).collect();
+        let mut right: Vec<f64> = another_order.iter().map(|(_, v)| *v).collect();
+        left.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        right.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(left, right, "the two orderings must hold the same multiset");
+
+        // ... and the fixture has to be genuinely order-sensitive, or this proves nothing.
+        let naive = |v: &Vec<(String, f64)>| {
+            let mut sum = 0.0_f64;
+            for (_, s) in v {
+                sum += *s;
+            }
+            sum / v.len() as f64
+        };
+        assert_ne!(
+            naive(&one_order),
+            naive(&another_order),
+            "these two orderings must sum to different f64, or the test is vacuous"
+        );
+
+        assert_eq!(
+            word_scores_quantile(&one_order, 50.0),
+            word_scores_quantile(&another_order, 50.0),
+            "the centring mean must not depend on the order the scores arrive in"
+        );
+    }
     use crate::default::{
         CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE, NON_INFORMATIVE_WORDS_REGEXS,
         SPLIT_DESCRIPTION_REGEX,

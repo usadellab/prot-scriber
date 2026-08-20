@@ -849,6 +849,145 @@ mod tests {
     use super::*;
     use std::path::Path;
 
+    /// prot-scriber must return the same annotations for the same input.
+    ///
+    /// It did not. Running the binary repeatedly over one unchanged Blast table yielded a
+    /// different output file almost every time -- measured on a 10,000-query search against NCBI
+    /// nr, 0.35% of queries received a different Human Readable Description from one run to the
+    /// next, and most of those differences were not cosmetic: a word appeared or disappeared,
+    /// e.g. `b subunit glutamyl trna amidotransferase` against
+    /// `aspartyl glutamyl trna amidotransferase subunit b`.
+    ///
+    /// `misc/five_proteins_vs_nr_blastp.txt` is a 245-row extract of that search holding five of
+    /// the affected queries, enough to reproduce the effect in-process in about a second.
+    ///
+    /// The cause is not thread scheduling -- pinning `--n-threads 2` does not help. The only
+    /// randomness in the process is Rust `HashMap` iteration order, which `RandomState` seeds
+    /// afresh for every map. Hit descriptions live in `Query::hits` and reach
+    /// `generate_human_readable_description` in that map's iteration order; word frequencies live
+    /// in another `HashMap`, and `centered_inverse_information_content` builds its score vector by
+    /// iterating that map's keys. With the default
+    /// `CENTER_INVERSE_INFORMATION_CONTENT_AT_QUANTILE` of 50.0, `word_scores_quantile` then takes
+    /// its `mean()` branch and sums those scores in that order -- and floating point addition is
+    /// not associative, so the centring value differs in its last bits between runs, and every
+    /// centred word score with it. The lexicographic tie-break added to
+    /// `generate_human_readable_description` "to ensure a reproducible behavior of prot-scriber"
+    /// cannot absorb that: it fires only on exact `f64` equality.
+    #[test]
+    fn test_human_readable_descriptions_are_reproducible() {
+        const RUNS: usize = 12;
+        const HITS: &str = "misc/five_proteins_vs_nr_blastp.txt";
+        const HEADER: &str = "qacc sacc pident length qstart qend qlen sstart send slen evalue bitscore stitle overlap gop";
+        const FILTERS: &str = "misc/filter_stitle_regexs_NCBI_NR.txt";
+
+        fn annotate() -> std::collections::BTreeMap<String, String> {
+            let mut ap = AnnotationProcess::new();
+            ap.seq_sim_search_tables = vec![HITS.to_string()];
+            ap.add_ssst_columns(HEADER);
+            ap.add_ssst_field_separator("\t");
+            // The per-database filter list matters: without it the descriptions keep their
+            // accessions and species brackets, which changes the word universe enough that this
+            // fixture no longer reaches the near-tie the bug needs.
+            ap.add_ssst_filter_regexs(FILTERS);
+            ap = run(ap);
+            ap.human_readable_descriptions.into_iter().collect()
+        }
+
+        let runs: Vec<_> = (0..RUNS).map(|_| annotate()).collect();
+        assert!(
+            !runs[0].is_empty(),
+            "the fixture produced no annotations; the test would pass vacuously"
+        );
+
+        // Compare every run against the first and classify each disagreement, because the two
+        // kinds mean different things to a user: a reordering is cosmetic, a different word set is
+        // a different annotation of the same protein.
+        let first = &runs[0];
+        let mut differing_runs = 0;
+        let mut reorderings = 0;
+        let mut different_word_sets = 0;
+        let mut unstable: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        let mut example: Option<(String, String, String)> = None;
+
+        for other in runs.iter().skip(1) {
+            let mut differs = false;
+            for (annotee, hrd) in first {
+                if let Some(other_hrd) = other.get(annotee) {
+                    if other_hrd != hrd {
+                        differs = true;
+                        unstable.insert(annotee.clone());
+                        let mut a: Vec<&str> = hrd.split_whitespace().collect();
+                        let mut b: Vec<&str> = other_hrd.split_whitespace().collect();
+                        a.sort_unstable();
+                        b.sort_unstable();
+                        if a == b {
+                            reorderings += 1;
+                        } else {
+                            different_word_sets += 1;
+                        }
+                        if example.is_none() {
+                            example =
+                                Some((annotee.clone(), hrd.clone(), other_hrd.clone()));
+                        }
+                    }
+                }
+            }
+            if differs {
+                differing_runs += 1;
+            }
+        }
+
+        let mut summary = format!(
+            "prot-scriber is not reproducible: {} of {} runs on the SAME input disagreed with the first.\n\
+             \x20 annotees affected      : {} of {}\n\
+             \x20 disagreements total    : {}\n\
+             \x20   different word sets  : {}  (a word appeared or disappeared)\n\
+             \x20   reorderings only     : {}  (same words, different order)",
+            differing_runs,
+            RUNS - 1,
+            unstable.len(),
+            first.len(),
+            reorderings + different_word_sets,
+            different_word_sets,
+            reorderings,
+        );
+        if let Some((annotee, a, b)) = example {
+            summary.push_str(&format!(
+                "\n\x20 example                : {}\n\x20   run 1: {:?}\n\x20   run n: {:?}",
+                annotee, a, b
+            ));
+        }
+        assert_eq!(0, differing_runs, "{}", summary);
+    }
+
+    /// The output table must also be written in a deterministic line order. It used to be emitted
+    /// in `HashMap` order, so two runs that agreed on every annotation still produced files with
+    /// different checksums, and a diff of one against the other reported every line as changed.
+    #[test]
+    fn test_output_table_line_order_is_deterministic() {
+        use crate::output_writer::write_output_table;
+        // A FRESH map per write. `HashMap::clone` copies the `RandomState` as well, so cloning
+        // one map would give every write the same iteration order and the test would pass even
+        // with the output left unsorted.
+        let mut written: Vec<String> = vec![];
+        for i in 0..8 {
+            let mut hrds: HashMap<String, String> = HashMap::new();
+            for j in 0..64 {
+                hrds.insert(format!("Query-{:03}", j), format!("description {}", j));
+            }
+            let path = format!("./target/tmp_line_order_{}.test", i);
+            write_output_table(path.clone(), hrds).unwrap();
+            written.push(std::fs::read_to_string(&path).unwrap());
+            let _ = std::fs::remove_file(&path);
+        }
+        let differing = written.iter().filter(|f| **f != written[0]).count();
+        assert_eq!(
+            0, differing,
+            "{} of 7 writes of the same annotations produced a different file",
+            differing
+        );
+    }
+
     #[test]
     fn new_annotation_process_initializes_fields() {
         let ap = AnnotationProcess::new();
